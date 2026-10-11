@@ -36,7 +36,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </a>
       </div>
       <div className="mt-auto px-2 pt-6 text-[12px] text-[#A9C6B8]">
-        <div className="truncate">{name}</div>
+        {name && <div className="truncate">{name}</div>}
         <div>{repo?.mode === 'cloud' ? '클라우드 저장 (Firebase)' : '미리보기 · 이 브라우저에만 저장'}</div>
         {repo?.mode === 'cloud' && (
           <button onClick={signOut} className="mt-2 inline-flex min-h-[36px] items-center gap-1 text-[#DCE9E2] hover:underline"><LogOut size={14} aria-hidden="true" />로그아웃</button>

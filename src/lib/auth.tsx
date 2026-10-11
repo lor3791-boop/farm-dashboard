@@ -21,7 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!firebaseConfig) {
-      set({ status: 'ready', email: 'preview', name: '미리보기', repo: localRepo(), error: '' });
+      set({ status: 'ready', email: 'preview', name: '', repo: localRepo(), error: '' });
       return;
     }
     let unsub = () => {};
