@@ -19,7 +19,7 @@ export interface UiState {
 }
 const init: UiState = {
   fSel: null, fOpen: false, fQ: '', fStatus: 'all', det: null, exp: {},
-  hView: 'table', hMode: 'entry', stage: 'all', warnOnly: false, hidden: { claim: true, avgw: true, end: true, next: true },
+  hView: 'table', hMode: 'entry', stage: 'all', warnOnly: false, hidden: { claim: true, end: true, next: true },
   anTab: 'settle', heat: false, rpTab: 'report', sGroup: '민서 26-3', inTab: 'death', dFarm: '산성농원', dDong: '4', dGroup: null
 };
 
@@ -38,7 +38,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
   const nav = useNavigate();
   // 저장 대기 중 화면이 바로 바뀌도록 낙관적 값
   const [opt, setOpt] = useState<Partial<UiSaved>>({});
-  const saved: UiSaved = useMemo(() => ({ planned: {}, done: {}, heatVals: {}, firstShipByFarm: {}, ...(data?.ui ?? {}), ...opt }), [data, opt]);
+  const saved: UiSaved = useMemo(() => ({ planned: {}, done: {}, heatVals: {}, firstShipByFarm: {}, shareLinks: {}, ...(data?.ui ?? {}), ...opt }), [data, opt]);
   const set = useCallback((p: Partial<UiState>) => setS((o) => ({ ...o, ...p })), []);
   const save = useCallback((p: Partial<UiSaved>) => {
     setOpt((o) => ({ ...o, ...p }));

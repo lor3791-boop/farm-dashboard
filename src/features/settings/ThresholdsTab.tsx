@@ -33,7 +33,6 @@ export function ThresholdsTab() {
         {THRESHOLD_GROUPS.map((g) => (
           <Card key={g.title}>
             <CardTitle>{g.title}</CardTitle>
-            {g.note && <p className="-mt-1 mb-3 text-[12px] text-muted">{g.note}</p>}
             <div className="divide-y divide-line2">
               {g.items.map((it) => {
                 const changed = t[it.k] !== SEED_THRESHOLDS[it.k];
@@ -48,16 +47,6 @@ export function ThresholdsTab() {
             </div>
           </Card>
         ))}
-        <Card>
-          <CardTitle>고정 계산 규칙</CardTitle>
-          <ul className="list-disc space-y-1.5 pl-5 text-[14px] leading-relaxed">
-            <li>전입 = 실두수 − 클레임 (정산·육성률). 재고 맞추기는 실두수</li>
-            <li>육성률 = (전입 − 폐사) ÷ 전입, 소수 첫째 자리 반올림 후 판정</li>
-            <li>예상육성률 = (출하 + 재고 − 클레임) ÷ 전입, 폭염 인정두수는 괄호 병기</li>
-            <li>일령 = 차수 두수 가중 평균</li>
-            <li>출하성적은 출하실적종합 값을 그대로 표시 (재계산·재배분 안 함)</li>
-          </ul>
-        </Card>
       </div>
     </div>
   );

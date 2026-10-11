@@ -13,6 +13,22 @@ service cloud.firestore {
     match /config/{id} { allow read, write: if isAdmin(); }
     match /logs/{id}   { allow read, create: if isAdmin(); }
     match /deaths/{id} { allow read, write: if isAdmin(); }
-    // 묶음 6 농장 공유 화면 규칙은 그때 추가한다. 그 외 경로는 모두 거부.
+    match /shipments/{id} { allow read, write: if isAdmin(); }
+    // 농장 공유 화면: 열쇠(문서 이름)를 아는 사람만 그 농장 문서 1개를 읽는다. 목록 조회는 불가.
+    match /share/{key} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow write: if isAdmin();
+    }
+    // 공유 화면 폐사 등록: 올바른 열쇠 + 그 농장 이름 + 정해진 칸만 + 두수 1~300
+    match /shareDeaths/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['token', 'farm', 'date', 'dong', 'group', 'count', 'at'])
+        && request.resource.data.count is int && request.resource.data.count >= 1 && request.resource.data.count <= 300
+        && request.resource.data.token is string
+        && exists(/databases/$(database)/documents/share/$(request.resource.data.token))
+        && get(/databases/$(database)/documents/share/$(request.resource.data.token)).data.farm == request.resource.data.farm;
+      allow read, delete: if isAdmin();
+    }
+    // 그 외 경로는 모두 거부.
   }
 }

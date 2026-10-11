@@ -59,9 +59,8 @@ export function HomePage() {
       <div className="card" style={{ marginTop: 16 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
           <h2 className="h2">이번 달 정산예정 · {planList.length}개 그룹 <span className="muted small" style={{ fontWeight: 400 }}>재고 {fmt(planList.reduce((a, r) => a + r.stock, 0))}두</span></h2>
-          <span className="muted small">돈군 표의 '정산' 체크 또는 그룹 상세에서 추가 · 줄을 누르면 상세</span>
         </div>
-        {planList.length === 0 ? <div className="muted small" style={{ padding: '10px 0' }}>정산예정 그룹이 없습니다. 돈군 표에서 '정산'을 체크하면 여기에 나옵니다.</div> : (
+        {planList.length === 0 ? <div className="muted small" style={{ padding: '10px 0' }}>정산예정 그룹이 없습니다.</div> : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(320px, 100%), 1fr))', gap: 10 }}>
             {planList.map((p) => (
               <div key={p.who} className="rowx" style={{ border: '1px solid #E2DDD2', borderRadius: 10, padding: '12px 14px', background: '#FBFAF7' }}>
@@ -93,10 +92,9 @@ export function HomePage() {
               {past.map((t) => <TaskRow key={t.key} t={t} small />)}
             </>
           )}
-          <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>완료를 누르면 초록색, 다시 누르면 미완료로 돌아갑니다. 완료 표시는 저장됩니다.</div>
         </div>
         <div className="card">
-          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}><h2 className="h2">농장별 현황</h2><span className="muted small">제목을 누르면 정렬 · 농장 이름을 누르면 돈군으로</span></div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}><h2 className="h2">농장별 현황</h2></div>
           <Grid cols={fCols} sort={sorts.of('farms')} onSort={(k) => sorts.cycle('farms', k)} minW="560px" rows={sortRows(sorts.of('farms'), fCols, farmAgg).map((f) => ({
             key: f.name, aria: f.name + ' 돈군 보기', onClick: () => go('/herd', { fSel: [f.name], exp: { ...s.exp, [f.name]: true } }),
             cells: [<Lnk v={f.name} />, <Num v={fmt(f.stock)} />, <Num v={f.groups} />, <Num v={f.mort + '%'} />, <Num v={f.surv + '%'} />, <span className={f.bad ? 'chip bad' : 'chip ok'}>{f.bad ? '문제' : '정상'}</span>, <span className="small">{f.low.length ? f.low.map((r) => r.group + ' ' + r.surv + '%').join(', ') : '—'}</span>]

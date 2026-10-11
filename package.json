@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:share": "vite build --config vite.share.config.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.2.0",

@@ -35,7 +35,6 @@ export function NameMapTab() {
           <Button size="sm" variant="primary" disabled={!dirty || dup.size > 0} onClick={async () => { await repo!.saveNameMap(rows.filter((r) => r.source.trim()), email); await repo!.log('이름 맞춤표 수정', `${rows.length}건`, email); }}>저장</Button>
         </div>
       }>이름 맞춤표</CardTitle>
-      <p className="mb-3 text-[13px] text-muted">파일마다 다르게 적힌 이름을 대시보드 농장 이름에 한 번 연결해 두면 업로드 때 자동으로 알아봅니다. '담당 아님'은 업로드 때 건너뜁니다.</p>
       <div className="mb-3 flex flex-wrap gap-2">
         <Input className="max-w-[260px]" placeholder="이름 검색" value={q} onChange={(e) => setQ(e.target.value)} />
         <Button size="md" onClick={() => setRows([...rows, { id: uid(), kind: '농가', source: '', sourceFile: '피그온', target: '', excluded: false, memo: '' }])}><Plus size={15} aria-hidden="true" />줄 추가</Button>

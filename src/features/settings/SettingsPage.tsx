@@ -3,6 +3,9 @@ import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useData } from '@/lib/data';
 import { useHerd } from '@/lib/ui';
+import { useAuth } from '@/lib/auth';
+import { newShareKey } from '@/share/payload';
+import { shareUrl } from '@/share/shareConfig';
 import { LOTS } from '@/data/snapshot';
 import { FarmsTab } from './FarmsTab';
 import { ThresholdsTab } from './ThresholdsTab';
@@ -11,8 +14,15 @@ import { BackupTab } from './BackupTab';
 
 export function SettingsPage() {
   const { data } = useData();
-  const { farms } = useHerd();
+  const { farms, saved, save } = useHerd();
+  const { repo } = useAuth();
   const [tab, setTab] = useState('farms');
+  const [copied, setCopied] = useState('');
+  const [renew, setRenew] = useState('');
+  const links = saved.shareLinks;
+  const issue = (f: string) => save({ shareLinks: { ...links, [f]: newShareKey() } });
+  const reissue = async (f: string) => { const old = links[f]; save({ shareLinks: { ...links, [f]: newShareKey() } }); if (old) await repo?.remove('share', old).catch(() => {}); setRenew(''); };
+  const copy = (f: string) => { navigator.clipboard?.writeText(shareUrl(links[f])); setCopied(f); setTimeout(() => setCopied(''), 1500); };
   if (!data) return null;
   const T = data.thresholds;
   const edit = (t: string) => { setTab(t); setTimeout(() => document.getElementById('manage')?.scrollIntoView({ behavior: 'smooth' }), 0); };
@@ -47,13 +57,16 @@ export function SettingsPage() {
         </div>
         <div className="card">
           <h2 className="h2" style={{ marginBottom: 10 }}>농장 공유 링크</h2>
-          <div className="tblbox"><table className="wrapcells">
-            <thead><tr><th>농장</th><th>공유 링크 (조회 + 폐사 등록)</th><th>언어</th></tr></thead>
+          <div className="tblbox"><table>
+            <thead><tr><th>농장</th><th>공유 링크 (조회 + 폐사 등록)</th><th /></tr></thead>
             <tbody>{farms.map((f) => (
-              <tr key={f}><td>{f}</td><td><a href={'#/share?farm=' + encodeURIComponent(f)}>링크 보기</a> · <button className="lnk" style={{ fontWeight: 400 }} onClick={() => navigator.clipboard?.writeText(base + '#/share?farm=' + encodeURIComponent(f))}>복사</button></td><td>한국어 · 네팔어 (화면에서 전환)</td></tr>
+              <tr key={f}>
+                <td>{f}</td>
+                <td>{links[f] ? <><button className="lnk" style={{ fontWeight: 400 }} onClick={() => copy(f)}>{copied === f ? '복사됨 ✓' : '링크 복사'}</button> · <a href={shareUrl(links[f])} target="_blank" rel="noreferrer">열기</a> · <a href={'#/share?farm=' + encodeURIComponent(f)}>미리보기</a></> : <button className="btn sm" onClick={() => issue(f)}>링크 만들기</button>}</td>
+                <td className="r">{links[f] && (renew === f ? <button className="btn sm" style={{ borderColor: '#9A3216', color: '#9A3216' }} onClick={() => reissue(f)}>예전 링크 끊기</button> : <button className="btn sm ghost" onClick={() => setRenew(f)}>새 링크로</button>)}</td>
+              </tr>
             ))}</tbody>
           </table></div>
-          <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>주소는 드라이브 '농장_좌표표' 연결 · 지금은 부장님 로그인으로만 열립니다. 사장님·직원용 공개 링크는 묶음 6에서 발급</div>
         </div>
         <div>
           <div className="card">
@@ -73,7 +86,6 @@ export function SettingsPage() {
 
       <div id="manage" className="card" style={{ marginTop: 24 }}>
         <h2 className="h2" style={{ marginBottom: 6 }}>관리</h2>
-        <p className="muted small" style={{ margin: '0 0 10px' }}>바뀌는 값은 모두 여기서 고칩니다 — 코드 수정 없이 농장·동·기준값·이름 맞춤 관리. 고친 값은 위 카드와 모든 화면에 바로 반영됩니다.</p>
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
             <TabsTrigger value="farms">농장·동</TabsTrigger>

@@ -15,10 +15,15 @@ export interface Repo {
   replaceAll(d: AppData, by: string): Promise<void>;
   log(action: string, detail: string, by: string): Promise<void>;
   addDeath(d: DeathRec, by: string): Promise<void>;
+  // 기록 묶음(컬렉션) — shipments(출하 직접 입력), shareDeaths(공유 화면 폐사), share(공유 화면 자료)
+  watch<T>(col: string, cb: (rows: (T & { id: string })[]) => void, onError?: (e: Error) => void): () => void;
+  add(col: string, data: Record<string, unknown>, by: string): Promise<void>;
+  put(col: string, id: string, data: Record<string, unknown>): Promise<void>;
+  remove(col: string, id: string): Promise<void>;
 }
 
 export interface DeathRec { date: string; farm: string; dong: string; group: string; count: number }
-export const emptyUi = (): UiSaved => ({ planned: {}, done: {}, heatVals: {}, firstShipByFarm: {} });
+export const emptyUi = (): UiSaved => ({ planned: {}, done: {}, heatVals: {}, firstShipByFarm: {}, shareLinks: {} });
 export const withUi = (u: Partial<UiSaved> | undefined): UiSaved => ({ ...emptyUi(), ...(u ?? {}) });
 export const seedData = (): AppData => ({
   farms: structuredClone(SEED_FARMS),
@@ -56,7 +61,22 @@ export function localRepo(): Repo {
     saveUi: (p) => mut((d) => { d.ui = { ...d.ui, ...p }; }),
     replaceAll: (n) => mut((d) => { d.farms = n.farms; d.thresholds = withDefaults(n.thresholds); d.nameMap = n.nameMap; if (n.ui) d.ui = withUi(n.ui); }),
     log: async () => {},
+    ...localCols(),
     addDeath: async (r, by) => { try { const k = 'farm-dashboard:deaths'; const L = JSON.parse(localStorage.getItem(k) || '[]'); L.push({ ...r, by, at: nowIso() }); localStorage.setItem(k, JSON.stringify(L)); } catch { /* 저장 불가 */ } }
+  };
+}
+
+// 미리보기 모드의 컬렉션: localStorage 'farm-dashboard:col:<이름>'
+function localCols() {
+  const subs: Record<string, ((r: any[]) => void)[]> = {};
+  const key = (c: string) => 'farm-dashboard:col:' + c;
+  const read = (c: string): any[] => { try { return JSON.parse(localStorage.getItem(key(c)) || '[]'); } catch { return []; } };
+  const write = (c: string, rows: any[]) => { try { localStorage.setItem(key(c), JSON.stringify(rows)); } catch { /* 저장 불가 */ } (subs[c] || []).forEach((f) => f(rows)); };
+  return {
+    watch: (c: string, cb: (r: any[]) => void) => { (subs[c] ||= []).push(cb); setTimeout(() => cb(read(c)), 0); return () => { subs[c] = subs[c].filter((f) => f !== cb); }; },
+    add: async (c: string, d: Record<string, unknown>, by: string) => { write(c, [...read(c), { ...d, id: Math.random().toString(36).slice(2, 12), by, at: nowIso() }]); },
+    put: async (c: string, id: string, d: Record<string, unknown>) => { write(c, [...read(c).filter((x) => x.id !== id), { ...d, id }]); },
+    remove: async (c: string, id: string) => { write(c, read(c).filter((x) => x.id !== id)); }
   };
 }
 
@@ -112,6 +132,10 @@ export async function cloudRepo(config: Record<string, string>): Promise<Repo> {
       await b.commit();
     },
     log: async (action, detail, by) => { await addDoc(collection(db, 'logs'), { action, detail, by, at: nowIso() }); },
-    addDeath: async (r, by) => { await addDoc(collection(db, 'deaths'), { ...r, by, at: nowIso(), checked: false }); }
+    addDeath: async (r, by) => { await addDoc(collection(db, 'deaths'), { ...r, by, at: nowIso(), checked: false }); },
+    watch: (c, cb, onError) => onSnapshot(collection(db, c), (s) => cb(s.docs.map((d) => ({ ...(d.data() as any), id: d.id }))), (e) => onError?.(e)),
+    add: async (c, d, by) => { await addDoc(collection(db, c), { ...d, by, at: nowIso() }); },
+    put: async (c, id, d) => { await setDoc(doc(db, c, id), d); },
+    remove: async (c, id) => { await deleteDoc(doc(db, c, id)); }
   };
 }

@@ -132,7 +132,6 @@ export function HerdPage() {
         {hRows0.length === 0 && (
           <div className="card" style={{ textAlign: 'center', padding: 28 }}>
             <div className="b">조건에 맞는 그룹이 없습니다</div>
-            <div className="muted small" style={{ margin: '6px 0 12px' }}>농장 선택, 상태, 출하 단계, '문제·경고 그룹만' 조건을 확인하세요.</div>
             <button className="btn" onClick={reset}>필터 초기화</button>
           </div>
         )}
@@ -141,7 +140,6 @@ export function HerdPage() {
             <div className="card" style={{ padding: '8px 10px' }}>
               <Grid cols={vis} sort={hs} onSort={(k) => sorts.cycle('herd', k)} rows={herdRows} scroll />
             </div>
-            <div className="muted" style={{ fontSize: 12, marginTop: 8, lineHeight: 1.7 }}>전입 = 실두수 − 클레임 (정산 기준). 육성률 = (전입 − 폐사) ÷ 전입, 소수 첫째 자리로 {T.problemSurvivalPct}% 판정. 일령 = 차수별 두수 가중 평균. 회색 줄 = 농장 소계(누르면 펼치기/접기). 줄 아무 곳이나 누르면 오른쪽에 상세(농장 소계 줄은 펼치기/접기). '정산' 체크 = 이번 달 정산예정. 머리줄과 첫 열은 스크롤해도 고정.</div>
           </>
         )}
         {s.hView === 'heat' && hRows0.length > 0 && <Heatmap farms={hFarmSorted} rows={hRows0} mode={s.hMode} setMode={(m) => set({ hMode: m })} det={s.det} onOpen={goDet} />}
@@ -185,7 +183,6 @@ function Heatmap({ farms, rows, mode, setMode, det, onOpen }: { farms: string[];
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginBottom: 10 }}>
         <span className="small muted">기준</span>
         <Segs label="주차 기준" opts={[['entry', '전입 후 주차'], ['cal', '달력 주 (최근 12주)']]} value={mode} onPick={setMode} />
-        <span className="small muted">전입 후 주차 = 그룹 나이 비교 · 달력 주 = 같은 주에 어느 농장에서 폐사가 났는지 비교</span>
       </div>
       <div className="card" style={{ padding: 12 }}>
         <div className="gt"><div style={{ minWidth: minW }}>
@@ -224,8 +221,7 @@ function Heatmap({ farms, rows, mode, setMode, det, onOpen }: { farms: string[];
         <span className="hc" style={{ width: 30, height: 22, background: '#F2B27E', color: '#3D1F00' }}>3–5</span>
         <span className="hc" style={{ width: 30, height: 22, background: '#D9773F', color: '#fff' }}>6–9</span>
         <span className="hc" style={{ width: 30, height: 22, background: '#9A3216', color: '#fff' }}>10+</span>
-        <span className="hc" style={{ width: 30, height: 22, border: '1px dashed #D9D3C6' }} /><span>아직 안 온 주 / 전입 전</span>
-        <span>· 진한 테두리 = 이번 주 · 4주(1개월)마다 색 띠와 간격으로 구분 · 칸 아래 글자 = 구충/FMD 작업</span>
+        <span className="hc" style={{ width: 30, height: 22, border: '1px dashed #D9D3C6' }} />
       </div>
     </>
   );
@@ -263,7 +259,7 @@ function Detail({ who, order, onDeath }: { who: string; order: string[]; onDeath
         {kpis.map(([l, v, x]) => <div key={l} style={{ background: '#F7F5F0', borderRadius: 8, padding: '10px 12px' }}><div className="muted" style={{ fontSize: 12 }}>{l}</div><div style={{ fontSize: 18, fontWeight: 700 }}>{v}</div><div className="sub">{x}</div></div>)}
       </div>
       {d.warn.length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>{d.warn.map((w) => <span key={w} className="chip warn">{w}</span>)}</div>}
-      <div className="b" style={{ margin: '16px 0 6px' }}>주차별 폐사 <span className="muted small" style={{ fontWeight: 400 }}>· 한 줄 = 1개월(4주)</span></div>
+      <div className="b" style={{ margin: '16px 0 6px' }}>주차별 폐사</div>
       {months.map((m) => (
         <div key={m.label} style={{ display: 'grid', gridTemplateColumns: '58px repeat(4, minmax(0, 1fr))', gap: 5, alignItems: 'stretch', marginBottom: 5 }}>
           <div className="small b" style={{ alignSelf: 'center' }}>{m.label}</div>

@@ -3,10 +3,12 @@ import { useState } from 'react';
 import { useHerd } from '@/lib/ui';
 import { agg, type Group } from '@/lib/calc/herd';
 import { fmt, r1 } from '@/lib/calc/dates';
-import { shipAgg } from '@/lib/calc/ship';
-import { MONTHS, SHIP, WEEKLY } from '@/data/snapshot';
+import { allShips, shipAgg } from '@/lib/calc/ship';
+import { MONTHS, WEEKLY } from '@/data/snapshot';
 import { FarmPicker, Segs, Tabs } from '@/components/v5';
 import { downloadXlsx } from '@/lib/xlsx';
+import { useCol } from '@/lib/useCol';
+import type { ManualShip } from '@/data/types';
 
 const monthOpts = MONTHS.map((m) => ({ v: m, l: m.slice(0, 4) + '년 ' + Number(m.slice(5)) + '월' }));
 
@@ -14,6 +16,7 @@ export function ReportPage() {
   const { all, farms, isPlanned, s, set, T } = useHerd();
   const [r, setR] = useState({ mode: 'compare' as 'single' | 'compare', sel: ['재성', '산성농원', '민서'], open: false, q: '', from: '2026-07', to: '2026-10', msg: '', money: false });
   const [xMsg, setXMsg] = useState('');
+  const SHIP = allShips(useCol<ManualShip>('shipments'));
   if (!T) return null;
   const rMax = r.mode === 'single' ? 1 : 3;
   const rSel = r.sel.slice(0, rMax);
@@ -95,7 +98,6 @@ export function ReportPage() {
                     <div key={l} className="gr" style={{ gridTemplateColumns: grid }}><div className="muted">{l}</div>{rCols.map((c) => <div key={c.f} className={l === '육성률' && c.g.length && agg(c.g).surv < T.problemSurvivalPct ? 'r b neg' : 'r'}>{fn(c.g)}</div>)}</div>
                   ))}
                 </div></div>
-                <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>기간 = 선택한 기간에 전입한 그룹 기준 · 엑셀 시트: 요약 · 그룹별 상세 · 주차별 폐사 · 출하성적</div>
               </>
             )}
           </div>
@@ -120,7 +122,6 @@ export function ReportPage() {
               </div>
             ))}
           </div>
-          <div className="muted" style={{ fontSize: 12, marginTop: 10 }}>정산서 엑셀의 해당 칸에 시트별로 그대로 붙여 넣을 수 있게 열 순서를 맞춤. 2단계에서 정산서 자동 작성으로 확장.</div>
         </>
       )}
     </>

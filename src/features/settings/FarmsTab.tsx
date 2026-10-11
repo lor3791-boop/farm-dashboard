@@ -46,7 +46,6 @@ export function FarmsTab() {
           <Button variant="primary" size="sm" onClick={() => setEdit(blank((data?.farms.length ?? 0) + 1))}><Plus size={15} aria-hidden="true" />농장 추가</Button>
         </div>
       }>농장·동 목록</CardTitle>
-      <p className="mb-3 text-[13px] text-muted">줄을 누르면 수정합니다. 동은 폐사 입력과 동 배치표에서 쓰입니다. 농장을 지우지 않고 '담당 해제'로 숨기므로 과거 자료는 남습니다.</p>
       <DataTable data={farms} columns={cols} onRowClick={(f) => setEdit(structuredClone(f))} />
       {edit && <FarmDialog farm={edit} onClose={() => setEdit(null)} onSave={async (f) => {
         const isNew = !f.id;

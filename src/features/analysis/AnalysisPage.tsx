@@ -3,10 +3,12 @@ import { useState } from 'react';
 import { useHerd, useUi } from '@/lib/ui';
 import { agg, type Group } from '@/lib/calc/herd';
 import { fmt, md, r1 } from '@/lib/calc/dates';
-import { shipAgg, shortDest, type ShipAgg } from '@/lib/calc/ship';
-import { SHIP, MONTHS } from '@/data/snapshot';
+import { allShips, shipAgg, shortDest, type ShipAgg } from '@/lib/calc/ship';
+import { MONTHS } from '@/data/snapshot';
 import { Grid, Lnk, Num, Segs, Tabs, Txt, sortRows, useSorts, type Col } from '@/components/v5';
 import { downloadXlsx } from '@/lib/xlsx';
+import { useCol } from '@/lib/useCol';
+import type { ManualShip } from '@/data/types';
 import { useAuth } from '@/lib/auth';
 
 const monthOpts = MONTHS.map((m) => ({ v: m, l: m.slice(0, 4) + '년 ' + Number(m.slice(5)) + '월' }));
@@ -16,6 +18,7 @@ export function AnalysisPage() {
   const { all, farms, rows, passFarm, isPlanned, setPlanned, s, set, saved, save, T } = H;
   const { go } = useUi();
   const sorts = useSorts();
+  const SHIP = allShips(useCol<ManualShip>('shipments'));
   const [g, setG] = useState({ from: '2026-08', to: '2026-10', view: 'farm' as 'farm' | 'all', farm: '민서', setOpen: false });
   if (!T) return null;
   const goDet = (who: string) => go('/herd', { det: who });
@@ -63,7 +66,6 @@ export function AnalysisPage() {
       {s.anTab === 'settle' && (
         <div className="card">
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}><h2 className="h2">10월 정산예정 · 추천 {recCount}건</h2><button className="btn sm" onClick={() => xl('정산예정', ['농장', '그룹', '전입', '폐사', '출하', '재고', '진행률(%)', '마지막 출하', '추천', '정산예정'], cand.map((r) => [r.farm, r.group, r.net, r.death, r.sold, r.stock, r.prog, r.last ?? '', r.rec ? r.recWhy : '', isPlanned(r) ? 'Y' : '']))}>엑셀</button></div>
-          <div className="muted small" style={{ margin: '6px 0 10px', lineHeight: 1.7 }}>추천: 진행률 {T.settleProgressPct}% 이상 · 재고가 전입의 {T.settleStockPct}% 이하 · 마지막 출하 후 {T.settleLastShipDays}일 경과(진행률 {T.settleLastShipMinProgress}% 이상). 추천 그룹은 자동으로 정산예정, 버튼으로 빼거나 추가.</div>
           <Grid cols={SC} sort={sorts.of('settle')} onSort={(k) => sorts.cycle('settle', k)} rows={sortRows(sorts.of('settle'), SC, [...cand].sort((a, b) => Number(b.rec) - Number(a.rec) || b.prog - a.prog)).map((r) => { const on = isPlanned(r); return {
             key: r.who, bg: on ? '#F3F8F4' : '#FFFFFF', aria: r.farm + ' ' + r.group + ' 열기', onClick: () => goDet(r.who),
             cells: [<Lnk v={r.group} sub={r.farm} />, <Num v={fmt(r.net)} />, <Num v={r.death} />, <Num v={fmt(r.sold)} />, <Num v={fmt(r.stock)} />, <Num v={r.prog + '%'} />, <Txt v={r.last ? md(r.last) : '—'} sub={r.last ? r.since + '일 전' : ''} />, r.rec ? <span className="chip ok">{r.recWhy}</span> : null,
@@ -84,7 +86,6 @@ export function AnalysisPage() {
               </div>
             ); })}
           </div>
-          <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>예상육성률 = (출하 + 재고 − 클레임) ÷ (실두수 − 클레임). 폭염 인정두수를 넣으면 괄호에 '폭염 포함' 값.</div>
         </div>
       )}
       {s.anTab === 'rank' && (
@@ -104,7 +105,6 @@ export function AnalysisPage() {
             cells: [<Lnk v={r.group} sub={r.farm} />, <Num v={r.age} />, <Num v={fmt(r.sold)} />, <Num v={fmt(r.stock)} />, <Num v={r.prog + '%'} />, <span className={r.warnBad ? 'small neg' : 'small warnT'}>{r.warn.join(' · ')}</span>]
           }))} />
           {warnRows.length === 0 && <div className="muted small" style={{ padding: 12 }}>경고 그룹이 없습니다.</div>}
-          <div className="muted" style={{ fontSize: 12, marginTop: 8, lineHeight: 1.7 }}>{T.delayNoShipAge}일령 초과 + 출하 0두 · {T.delayRemainAge}일령 초과 + 재고 남음(빨강) · 출하 멈춤(마지막 출하 {T.settleLastShipDays}일, 진행 {T.stallProgressPct}% 미만) · 첫출하예정 {T.firstShipOverdueDays}일 이상 경과 + 출하 0두.</div>
         </div>
       )}
       {s.anTab === 'grade' && (
@@ -129,11 +129,11 @@ export function AnalysisPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px, 100%), 1fr))', gap: 10, marginTop: 14 }}>
             {gCards.map(([l, v, x]) => <div key={l} className="card" style={{ padding: '14px 16px' }}><div className="muted small">{l}</div><div style={{ fontSize: 24, fontWeight: 700 }}>{v}</div><div className="sub">{x}</div></div>)}
           </div>
-          <div className="muted" style={{ fontSize: 12, margin: '8px 0 14px' }}>위 카드 = 상단 필터의 농장 전체 가중평균 · {noShip.length ? '기간 내 출하 없음: ' + noShip.map((f) => (f === '골드피그' ? '골드피그(신규 · 출하 전)' : f)).join(', ') : ''}</div>
+          <div className="muted" style={{ fontSize: 12, margin: '8px 0 14px' }}>{noShip.length ? '기간 내 출하 없음: ' + noShip.map((f) => (f === '골드피그' ? '골드피그(신규 · 출하 전)' : f)).join(', ') : ''}</div>
           {g.view === 'farm' && (
             <>
               <div className="card">
-                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}><h2 className="h2">농장별 가중평균</h2><span className="muted small">줄을 누르면 아래에 그 농장 출하 내역</span></div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}><h2 className="h2">농장별 가중평균</h2></div>
                 <Grid cols={GC} sort={sorts.of('gfarm')} onSort={(k) => sorts.cycle('gfarm', k)} rows={sortRows(sorts.of('gfarm'), GC, gFarmAgg).map((a) => ({ key: a.name, bg: a.name === g.farm ? '#E4ECF3' : '#FFFFFF', aria: a.name + ' 열기', onClick: () => setG({ ...g, farm: a.name }), cells: gCells(a) }))} />
               </div>
               {gList.length > 0 && (
@@ -156,7 +156,6 @@ export function AnalysisPage() {
               <Grid cols={GC.map((c, i) => (i === 0 ? { ...c, l: '월' } : c))} sort={sorts.of('gmonth')} onSort={(k) => sorts.cycle('gmonth', k)} rows={sortRows(sorts.of('gmonth'), GC, gMonths).map((a) => ({ key: a.name, cells: gCells(a) }))} />
             </div>
           )}
-          <div className="muted" style={{ fontSize: 12, marginTop: 8, lineHeight: 1.7 }}>자료: 출하실적종합 (5~10/9) · 평균체중 = 생체 합 ÷ 두수 · 지육율 = 지육 합 ÷ 생체 합 · 지급율 = 지육중량으로 가중한 평균 · 등급율 = (1+ + 1) ÷ 두수</div>
         </>
       )}
     </>
@@ -192,7 +191,6 @@ function FirstShipSetting() {
       </div>
       {msg && <div style={{ marginTop: 8 }}><span className={msg.startsWith('적용') ? 'chip ok' : 'chip warn'}>{msg}</span></div>}
       {byFarm.length > 0 && <div className="small" style={{ marginTop: 8 }}>농장별 기준: {byFarm.map(([f, k]) => f + ' ' + k + 'kg').join(' · ')}</div>}
-      <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>적용하면 돈군·분석의 첫출하예정, 출하종료(+42일), 다음 전입(+7일)이 다시 계산됩니다.</div>
     </div>
   );
 }

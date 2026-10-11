@@ -44,13 +44,10 @@ export function BackupTab() {
     <div className="grid gap-4 md:grid-cols-2">
       <Card>
         <CardTitle>백업 받기</CardTitle>
-        <p className="mb-3 text-[14px] text-muted">설정 자료(농장·동, 기준값, 이름 맞춤표)를 파일로 받습니다. 엑셀은 확인용, JSON은 복원용입니다.</p>
         <div className="flex flex-wrap gap-2"><Button variant="primary" onClick={excel}>엑셀로 받기</Button><Button onClick={json}>복원용 파일(JSON) 받기</Button></div>
-        <p className="mt-3 text-[12px] text-muted">매일 밤 구글 시트 자동 백업은 Firebase 연결 후 켭니다.</p>
       </Card>
       <Card>
         <CardTitle>복원</CardTitle>
-        <p className="mb-3 text-[14px] text-muted">복원용 파일을 고르면 내용을 보여드리고, 확인을 눌러야 바뀝니다. 지금 설정은 모두 파일 내용으로 바뀝니다.</p>
         <input ref={file} type="file" accept=".json,application/json" className="hidden" onChange={(e) => e.target.files?.[0] && pick(e.target.files[0])} />
         <Button onClick={() => file.current?.click()}>파일 고르기</Button>
         {msg && <div className="mt-3"><Badge t={msg.includes('형식') ? 'bad' : 'ok'}>{msg}</Badge></div>}

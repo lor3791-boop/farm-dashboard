@@ -67,6 +67,7 @@ export interface UiSaved {
   done: Record<string, boolean>;     // '민서 26-8|구제역 백신|11-10' → 완료
   heatVals: Record<string, string>;  // 그룹 → 폭염 인정두수
   firstShipByFarm: Record<string, number>; // 농장별 첫출하 체중 (없으면 기준값)
+  shareLinks: Record<string, string>;      // 농장 → 공유 화면 열쇠(무작위 16자). 주소에 농장 이름·대시보드 주소가 드러나지 않음
 }
 
 export interface AppData {
@@ -74,4 +75,11 @@ export interface AppData {
   thresholds: Thresholds;
   nameMap: NameMapRow[];
   ui: UiSaved;
+}
+
+// 출하 직접 입력 (등급판정서 없이) — 출하성적 분석에 출하실적종합과 함께 들어간다
+export interface ManualShip {
+  id: string; farm: string; group: string; date: string; dest: string;
+  n: number; live: number; yld: number; pay: number | null; price: number | null;
+  g1p: number; g1: number; g2: number; out: number; lowReason: string; writer: string; by?: string; at?: string;
 }

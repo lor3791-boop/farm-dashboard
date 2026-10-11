@@ -5,12 +5,14 @@ import { MENU } from './menu';
 import { FilterBar } from './FilterBar';
 import { useAuth } from '@/lib/auth';
 import { useData } from '@/lib/data';
+import { useSharePublisher } from '@/share/usePublish';
 
 export function Layout({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const { name, repo, signOut } = useAuth();
   const { error } = useData();
   const loc = useLocation();
+  useSharePublisher();
   const cur = MENU.find((m) => (m.path === '/' ? loc.pathname === '/' : loc.pathname.startsWith(m.path))) ?? MENU[0];
 
   const nav = (
@@ -49,7 +51,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <button className="flex items-center justify-center lg:hidden" aria-label="메뉴 열기" onClick={() => setOpen(true)} style={{ width: 44, height: 44, borderRadius: 8, fontSize: 22 }}>☰</button>
             <h1 style={{ margin: 0, fontSize: 24 }}>{cur.label}</h1>
           </div>
-          <span className="chip warn">재고·전입·폐사·주차 기록은 10/9 실제값 · 피그온 업로드 연결 전</span>
+          <span className="chip warn">10/9 기준</span>
         </div>
         {repo?.mode === 'local' && <div className="chip info" style={{ display: 'block', whiteSpace: 'normal', marginBottom: 12 }}>미리보기 모드 — 체크·입력은 이 브라우저에만 저장됩니다. Firebase 연결 후 구글 로그인하면 모든 기기에서 같은 자료를 봅니다.</div>}
         {error && <div className="chip bad" style={{ display: 'block', whiteSpace: 'normal', marginBottom: 12 }}>서버 연결 오류: {error} — Firestore 규칙 게시 여부를 확인하세요</div>}

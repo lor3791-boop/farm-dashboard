@@ -6,6 +6,8 @@ import { dongsOf, REF } from '@/lib/calc/herd';
 import { fmt, md } from '@/lib/calc/dates';
 import { Tabs } from '@/components/v5';
 import { todayKST } from '@/lib/util';
+import { ShipManualButton, ShipManualList } from './ShipManual';
+import { ShareDeaths } from './ShareDeaths';
 
 // 파일 고르기 — 고른 파일 이름을 보여주고, 자동 인식은 해당 묶음에서 연결
 function FilePick({ label, cls = 'btn', style, accept = '.xls,.xlsx' }: { label: string; cls?: string; style?: React.CSSProperties; accept?: string }) {
@@ -15,7 +17,7 @@ function FilePick({ label, cls = 'btn', style, accept = '.xls,.xlsx' }: { label:
     <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start', ...style }}>
       <input ref={ref} type="file" accept={accept} hidden onChange={(e) => setName(e.target.files?.[0]?.name ?? '')} />
       <button className={cls} onClick={() => ref.current?.click()}>{label}</button>
-      {name && <span className="chip info" style={{ whiteSpace: 'normal' }}>{name} · 받음 — 자동 인식은 업로드 연결 단계에서 켜집니다</span>}
+      {name && <span className="chip info" style={{ whiteSpace: 'normal' }}>{name}</span>}
     </span>
   );
 }
@@ -38,7 +40,7 @@ export function InputPage() {
   const save = async () => {
     if (!chosen) { setSavedOk(false); setSaved('그룹을 먼저 골라야 저장됩니다'); return; }
     await repo!.addDeath({ date, farm: s.dFarm, dong: s.dDong ?? '', group: chosen, count: cnt }, email);
-    setSavedOk(true); setSaved(`저장됨: ${s.dFarm} ${chosen} 폐사 ${cnt}두 · ${md(date)} — 재고 차감·사진 드라이브 저장은 폐사입력 통합 때 연결`);
+    setSavedOk(true); setSaved(`저장됨: ${s.dFarm} ${chosen} 폐사 ${cnt}두 · ${md(date)}`);
     setCnt(1);
   };
   const entryRows = all.filter((r) => passFarm(r.farm)).map((r) => {
@@ -56,7 +58,6 @@ export function InputPage() {
       {s.inTab === 'death' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(360px, 100%), 1fr))', gap: 16 }}>
           <div className="card" style={{ maxWidth: 460 }}>
-            <div className="muted" style={{ fontSize: 13 }}>카톡에서 사진 3장 공유 → '폐사입력' 선택 시 열리는 화면</div>
             <div style={{ display: 'flex', gap: 8, margin: '12px 0' }}>
               {[1, 2, 3].map((n) => <div key={n} style={{ width: 90, height: 90, borderRadius: 8, background: '#DCD6C9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#56645E' }}>사진 {n}</div>)}
             </div>
@@ -90,25 +91,15 @@ export function InputPage() {
             </div>
             {saved && <div style={{ marginTop: 12 }}><span className={savedOk ? 'chip ok' : 'chip bad'} style={{ whiteSpace: 'normal' }}>{saved}</span></div>}
           </div>
-          <div className="card">
-            <h2 className="h2" style={{ marginBottom: 10 }}>입력 규칙</h2>
-            <ul style={{ margin: 0, paddingLeft: 20, fontSize: 14, lineHeight: 1.9, listStyle: 'disc' }}>
-              <li>동을 고르면 그 동의 재고 그룹이 1개일 때 자동 연결</li>
-              <li>같은 동에 재고 그룹이 2개 이상이면 그룹 버튼을 띄움 (산성 4동, 욥 2·3동, 용암 1·2·3동, 원가림 1·2동, 재성 3동, 정축산 1·2동)</li>
-              <li>명임은 동 없이 그룹만 선택</li>
-              <li>사진은 드라이브 <code>폐사사진/농장/연월</code>에 저장, 신호 없으면 폰에 보관 후 자동 전송</li>
-              <li>직원 입력은 바로 반영되고 홈에 '직원 입력'으로 표시</li>
-            </ul>
-            <div className="muted" style={{ fontSize: 13, marginTop: 12 }}>해볼 것: 산성농원 → 4동 (그룹 선택), 산성농원 → 1동 (자동), 명임 (그룹만)</div>
-          </div>
+          <ShareDeaths />
         </div>
       )}
       {s.inTab === 'ship' && (
         <>
           <div className="card">
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
-              <div><div style={{ fontWeight: 700 }}>등급판정서 올리기</div><div className="muted" style={{ fontSize: 13 }}>도축장 양식 · 축평원 양식 자동 구분 · 카톡에서 공유도 가능</div></div>
-              <FilePick label="파일 선택" />
+              <div><div style={{ fontWeight: 700 }}>등급판정서 올리기</div></div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}><FilePick label="파일 선택" /><ShipManualButton /></div>
             </div>
             <div style={{ marginTop: 14, padding: '12px 14px', background: '#F4F2EC', borderRadius: 8, fontSize: 14, lineHeight: 1.8 }}>
               <b>10.06(화) 최진수(68두)등판자료.xls</b> · 도축장 양식 인식<br />
@@ -131,7 +122,6 @@ export function InputPage() {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
               <button className="btn">+ 구간 추가</button><button className="btn">이력번호별로 나누기</button><button className="btn pri">저장 (재고 차감)</button>
             </div>
-            <div className="muted" style={{ fontSize: 13, marginTop: 10 }}>도체번호 구간은 화면 예시. 등급 두수는 실제 파일을 13·17·38두로 나눈 결과이며 출하실적종합 10/6 3행과 같음.</div>
           </div>
           <div className="card" style={{ marginTop: 16 }}>
             <h2 className="h2">출하실적종합 대조</h2>
@@ -140,14 +130,15 @@ export function InputPage() {
               <tbody><tr><td>10/06</td><td>민서</td><td className="r">68</td><td className="r">7,715</td><td className="r">7,715 (1,475+1,929+4,311)</td><td><span className="chip ok">일치</span></td></tr></tbody>
             </table></div>
           </div>
+          <ShipManualList />
         </>
       )}
       {s.inTab === 'entry' && (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(300px, 100%), 1fr))', gap: 14 }}>
-            <div className="card"><div style={{ fontWeight: 700 }}>피그온 전입현황</div><div className="muted" style={{ fontSize: 13, marginTop: 4 }}>로트별 전입일·체중·일령·클레임</div><div style={{ marginTop: 10 }}><span className="chip ok">10/8 업로드 · 로트 반영 완료</span></div><FilePick label="새 파일 올리기" style={{ marginTop: 12 }} /></div>
-            <div className="card"><div style={{ fontWeight: 700 }}>피그온 돈수불</div><div className="muted" style={{ fontSize: 13, marginTop: 4 }}>이동·판매·현재고</div><div style={{ marginTop: 10 }}><span className="chip ok">재고 그룹 {all.length}개 · {fmt(totStock)}두</span></div><FilePick label="새 파일 올리기" style={{ marginTop: 12 }} /></div>
-            <div className="card"><div style={{ fontWeight: 700 }}>직접 입력</div><div className="muted" style={{ fontSize: 13, marginTop: 4 }}>피그온 등록 전 급한 전입</div><button className="btn pri" style={{ marginTop: 22 }}>+ 그룹 직접 등록</button></div>
+            <div className="card"><div style={{ fontWeight: 700 }}>피그온 전입현황</div><div style={{ marginTop: 10 }}><span className="chip ok">10/8 업로드 · 로트 반영 완료</span></div><FilePick label="새 파일 올리기" style={{ marginTop: 12 }} /></div>
+            <div className="card"><div style={{ fontWeight: 700 }}>피그온 돈수불</div><div style={{ marginTop: 10 }}><span className="chip ok">재고 그룹 {all.length}개 · {fmt(totStock)}두</span></div><FilePick label="새 파일 올리기" style={{ marginTop: 12 }} /></div>
+            <div className="card"><div style={{ fontWeight: 700 }}>직접 입력</div><button className="btn pri" style={{ marginTop: 22 }}>+ 그룹 직접 등록</button></div>
           </div>
           <div className="card" style={{ marginTop: 16 }}>
             <h2 className="h2" style={{ marginBottom: 10 }}>동 배치표</h2>
@@ -163,7 +154,7 @@ export function InputPage() {
           <div className="card">
             <h2 className="h2" style={{ marginBottom: 8 }}>피그온 그룹 사료 사용</h2>
             <div><span className="chip ok">2026-01 ~ 2026-09 반영 · 1,784행</span></div>
-            <div className="muted" style={{ fontSize: 13, margin: '10px 0' }}>예: 민서 26-3 (정산서 사료 행과 동일)</div>
+            <div className="muted" style={{ fontSize: 13, margin: '10px 0' }}>민서 26-3</div>
             <div className="tblbox"><table>
               <thead><tr><th>월</th><th>단계</th><th className="r">kg</th></tr></thead>
               <tbody>
@@ -179,7 +170,7 @@ export function InputPage() {
               <label style={{ fontSize: 14 }}>접종일<br /><input type="date" defaultValue={todayKST()} /></label>
               <label style={{ fontSize: 14 }}>금액(원)<br /><input type="number" placeholder="[금액]" style={{ width: 140 }} /></label>
             </div>
-            <div style={{ fontSize: 14, marginTop: 12 }}>대상 그룹: <label><input type="checkbox" defaultChecked /> 26-8</label> <label><input type="checkbox" /> 26-6</label> <span className="muted">(여럿이면 재고 비례 배분)</span></div>
+            <div style={{ fontSize: 14, marginTop: 12 }}>대상 그룹: <label><input type="checkbox" defaultChecked /> 26-8</label> <label><input type="checkbox" /> 26-6</label></div>
             <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}><button className="btn pri">저장</button><a href="https://drive.google.com" target="_blank" rel="noreferrer" style={{ alignSelf: 'center', fontSize: 14 }}>드라이브 정산증빙 폴더 열기</a></div>
           </div>
         </div>

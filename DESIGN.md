@@ -37,7 +37,7 @@
 - 검산 샘플은 `*.test.ts`. 배포 전에 자동 실행된다.
 
 ## Firestore 경로
-`farms/{farmId}`, `config/thresholds`, `config/nameMap`, `config/ui`, `deaths/{auto}`, `logs/{auto}` — 모든 기록에 `updatedAt`, `updatedBy`.
+`farms/{farmId}`, `config/thresholds`, `config/nameMap`, `config/ui`(정산예정·작업완료·폭염·첫출하·공유 열쇠), `deaths`, `shipments`(출하 직접 입력), `share/{열쇠}`(공개 읽기), `shareDeaths`, `logs` — 모든 기록에 `updatedAt`, `updatedBy`.
 묶음 2부터: `groups`, `lots`, `placements`(동 배치), `deaths`, `shipments`, `shipSummary`, `heat`, `feed`, `tasks`, `vaccineCost`, `uploads`.
 
 ## 데이터 원천 (계산은 이것을 그대로 따른다)
@@ -66,7 +66,14 @@
 색: 바탕 #F4F2EC, 글자 #1D2622, 주색 #1F4E3D, 경고 #FBEFD5/#7A4F00, 나쁨 #F8E1D8/#9A3216. 글꼴 Noto Sans KR. 터치 영역 ≥44px. 이모지 금지. 그룹 표기는 농장 안에서 '26-3'.
 브라우저 alert/confirm 금지 — 확인은 화면 안 버튼으로.
 
-## 농장 공유 화면 (묶음 6)
+## 농장 공유 화면 (별도 사이트)
+- 주소: `https://lor3791-boop.github.io/farm-view/#<열쇠>` — 열쇠는 농장마다 무작위 16자(설정 › 농장 공유 링크에서 발급·교체). 대시보드 주소와 농장 이름은 주소에 없다.
+- 코드: `src/share/` (ShareView는 대시보드 코드를 가져오지 않는다). 빌드 `npm run build:share` → `dist-share/`를 `lor3791-boop/farm-view` 저장소 main에 그대로 올린다(Pages: Deploy from a branch · main / root).
+- 자료: 대시보드가 열릴 때 `share/{열쇠}` 문서에 그 농장 자료만 올린다(`src/share/usePublish.ts`). 금액·지급율·정산·다른 농장 없음.
+- 폐사 등록: 공유 사이트 → `shareDeaths`(규칙: 올바른 열쇠·농장·정해진 칸만). 대시보드 입력 › 폐사의 '농장에서 등록한 폐사'에서 확인.
+- 설명 문구(사용법·계산식 안내)는 화면에 넣지 않는다 — 사용자 요청.
+
+## 농장 공유 화면 (묶음 6 원래 계획)
 링크 하나(사장님·직원 구분 없음), 한국어/네팔어 전환, 누구나 폐사 등록. 금액·지급율·정산 정보 표시 안 함. 네팔어 용어: 돼지 बंगुर, 돈사 खोर(동은 한국어), 폐사 मरेको, 구충제 जुकाको औषधि, 구제역 खोरेत खोप — 직원 검수 필요.
 
 ## 1단계 묶음과 완료 기준
