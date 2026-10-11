@@ -1,0 +1,17 @@
+rules_version = '2';
+// 담당농장 대시보드 보안 규칙 — Firebase 콘솔 > Firestore > 규칙 탭에 붙여넣고 [게시].
+// 만료 날짜 조건 없음 (루카 현황판 2026-09-28 만료 사고 재발 방지).
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in ['lor3791@gmail.com'];
+    }
+    // 묶음 1: 농장·설정·기록 — 관리자만 읽기/쓰기
+    match /farms/{id}  { allow read, write: if isAdmin(); }
+    match /config/{id} { allow read, write: if isAdmin(); }
+    match /logs/{id}   { allow read, create: if isAdmin(); }
+    // 묶음 6 농장 공유 화면 규칙은 그때 추가한다. 그 외 경로는 모두 거부.
+  }
+}
