@@ -11,24 +11,33 @@
 | 역할 | 도구 |
 |---|---|
 | 화면 | Vite + React 18 + TypeScript + Tailwind 3, shadcn 방식 컴포넌트(`src/components/ui`), TanStack Table **v8** |
-| 차트 (묶음 5) | Tremor 3 (Tailwind 3 호환) |
+| 차트 | 목업 v5처럼 표·히트맵을 직접 그림 (별도 차트 라이브러리 없음) |
 | 엑셀 | ExcelJS (내보내기), 업로드 파싱은 묶음 2에서 SheetJS 검토 |
 | 저장 | Firebase Firestore `farm-dashboard-2e9aa` (서울 asia-northeast3), 오프라인 캐시 |
 | 로그인 | Firebase Auth 구글 로그인. 관리자 = `lor3791@gmail.com` (`src/lib/firebaseConfig.ts` + `firestore.rules` 두 곳) |
 | 배포 | GitHub Actions → Pages `https://lor3791-boop.github.io/farm-dashboard/` (main push 시 테스트 통과해야 배포) |
 | 앱 설치 | PWA (vite-plugin-pwa) |
 
+## 현재 상태 (2026-10-12)
+- 목업 v5(Main.dc.html · Share.dc.html)를 화면·문구·계산까지 그대로 옮김. 데이터는 `src/data/snapshot.ts`(10/9 실제값 스냅샷: G·LOTS·LAST_SHIP·SHIP·WEEKLY).
+- 저장되는 것: 설정(농장·동·기준값·이름 맞춤표), 정산예정 추가/제외·작업 완료·폭염 인정두수·농장별 첫출하 체중(`config/ui`), 폐사 입력 기록(`deaths`).
+- 아직 화면만 있는 것: 등판서·피그온 파일 자동 인식, 백신비·중간투입 저장, 공유 화면 공개 링크(지금은 부장님 로그인으로만 열림).
+- 다음: 묶음 2 — 피그온 전입현황·돈수불 업로드가 snapshot을 대체.
+- 검산: `src/lib/calc/herd.test.ts`가 목업 원본 계산 결과(`__fixtures__/v5-reference.json`)와 40개 그룹 × 21개 항목, 작업 알림 103건, 홈 KPI를 비교한다.
+
 ## 폴더 규칙
 - `src/app/` 뼈대(메뉴 `menu.ts`, 레이아웃, 로그인 관문)
-- `src/features/<메뉴>/` 메뉴별 화면. **메뉴끼리 서로 import 하지 않는다.**
+- `src/features/<메뉴>/` 메뉴별 화면(home·input·herd·analysis·report·settings·share). **메뉴끼리 서로 import 하지 않는다.**
+- `src/lib/ui.tsx` 메뉴를 오가도 유지되는 화면 상태(필터·상세·탭) + 저장되는 체크값. `src/components/v5.tsx` 공통 부품(정렬 표, 세그먼트, 농장 선택 박스)
+- 스타일: `src/styles/index.css` 아래쪽에 목업 v5 CSS를 그대로 둠(.card .chip .btn .seg .gr …). v5 화면은 `.v5` 안.
 - `src/lib/repo.ts` 저장소 — 화면은 이 함수만 쓴다 (Firestore / 미리보기 두 구현)
-- `src/lib/calc/` 계산은 **한 곳**에 (묶음 2부터). 화면에서 계산식 직접 쓰지 않는다.
+- `src/lib/calc/` 계산은 **한 곳**에 (herd.ts 그룹·작업 알림, ship.ts 출하성적). 화면에서 계산식 직접 쓰지 않는다.
 - `src/data/types.ts` 데이터 구조, `seed.ts` 초기값, `thresholdMeta.ts` 기준값 화면 정의
 - 새 기준값 추가 = `types.ts` + `seed.ts` + `thresholdMeta.ts` 세 곳.
 - 검산 샘플은 `*.test.ts`. 배포 전에 자동 실행된다.
 
 ## Firestore 경로
-`farms/{farmId}`, `config/thresholds`, `config/nameMap`, `logs/{auto}` — 모든 기록에 `updatedAt`, `updatedBy`.
+`farms/{farmId}`, `config/thresholds`, `config/nameMap`, `config/ui`, `deaths/{auto}`, `logs/{auto}` — 모든 기록에 `updatedAt`, `updatedBy`.
 묶음 2부터: `groups`, `lots`, `placements`(동 배치), `deaths`, `shipments`, `shipSummary`, `heat`, `feed`, `tasks`, `vaccineCost`, `uploads`.
 
 ## 데이터 원천 (계산은 이것을 그대로 따른다)
@@ -63,7 +72,7 @@
 ## 1단계 묶음과 완료 기준
 | 묶음 | 내용 | 완료 기준 |
 |---|---|---|
-| 1 ✅ | 뼈대 + 설정(농장·동·위치·기준값·이름 맞춤표) + 로그인 + 백업 | 13개 농장과 동 목록이 맞게 뜨고, 폰에 설치된다 |
+| 1 ✅ (+ 목업 v5 전 화면 이식) | 뼈대 + 설정(농장·동·위치·기준값·이름 맞춤표) + 로그인 + 백업 | 13개 농장과 동 목록이 맞게 뜨고, 폰에 설치된다 |
 | 2 | 전입현황·돈수불 업로드, 동 배치표, 홈 재고, 작업 알림 | 그룹 재고가 돈수불 '현재'와 일치, 이번 주 작업 대상이 실제와 맞음 |
 | 3 | 폐사입력 통합 (기존 pyesa 흡수, 동→그룹 연결) | 카톡 사진 공유 → 재고 즉시 감소, 사진 드라이브 저장 |
 | 4 | 출하입력 + 출하성적 (등판서 2양식·그룹 분할, 종합 매칭) | 10/6 민서 68두를 13·17·38로 나누면 종합 3행과 등급이 같다 |

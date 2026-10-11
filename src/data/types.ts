@@ -61,8 +61,17 @@ export interface NameMapRow {
   memo: string;
 }
 
+// 화면에서 체크한 값 — 정산예정 수동 추가/제외, 작업 완료, 폭염 인정두수
+export interface UiSaved {
+  planned: Record<string, boolean>;  // '민서 26-7' → true(추가)/false(제외). 없으면 추천 규칙대로
+  done: Record<string, boolean>;     // '민서 26-8|구제역 백신|11-10' → 완료
+  heatVals: Record<string, string>;  // 그룹 → 폭염 인정두수
+  firstShipByFarm: Record<string, number>; // 농장별 첫출하 체중 (없으면 기준값)
+}
+
 export interface AppData {
   farms: Farm[];
   thresholds: Thresholds;
   nameMap: NameMapRow[];
+  ui: UiSaved;
 }

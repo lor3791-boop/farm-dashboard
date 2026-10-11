@@ -1,14 +1,16 @@
 import { HashRouter, Route, Routes, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/lib/auth';
 import { DataProvider } from '@/lib/data';
+import { UiProvider } from '@/lib/ui';
 import { Gate } from './Gate';
 import { Layout } from './Layout';
-import { Planned } from './Planned';
-import { MENU } from './menu';
 import { HomePage } from '@/features/home/HomePage';
+import { InputPage } from '@/features/input/InputPage';
+import { HerdPage } from '@/features/herd/HerdPage';
+import { AnalysisPage } from '@/features/analysis/AnalysisPage';
+import { ReportPage } from '@/features/report/ReportPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
-
-const m = (p: string) => MENU.find((x) => x.path === p)!;
+import { SharePage } from '@/features/share/SharePage';
 
 export function App() {
   return (
@@ -16,17 +18,24 @@ export function App() {
       <Gate>
         <DataProvider>
           <HashRouter>
-            <Layout>
+            <UiProvider>
               <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/input" element={<Planned m={m('/input')} />} />
-                <Route path="/herd" element={<Planned m={m('/herd')} />} />
-                <Route path="/analysis" element={<Planned m={m('/analysis')} />} />
-                <Route path="/report" element={<Planned m={m('/report')} />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route path="*" element={<Navigate to="/" />} />
+                <Route path="/share" element={<SharePage />} />
+                <Route path="*" element={
+                  <Layout>
+                    <Routes>
+                      <Route path="/" element={<HomePage />} />
+                      <Route path="/input" element={<InputPage />} />
+                      <Route path="/herd" element={<HerdPage />} />
+                      <Route path="/analysis" element={<AnalysisPage />} />
+                      <Route path="/report" element={<ReportPage />} />
+                      <Route path="/settings" element={<SettingsPage />} />
+                      <Route path="*" element={<Navigate to="/" />} />
+                    </Routes>
+                  </Layout>
+                } />
               </Routes>
-            </Layout>
+            </UiProvider>
           </HashRouter>
         </DataProvider>
       </Gate>

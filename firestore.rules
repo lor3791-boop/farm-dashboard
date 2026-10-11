@@ -12,6 +12,7 @@ service cloud.firestore {
     match /farms/{id}  { allow read, write: if isAdmin(); }
     match /config/{id} { allow read, write: if isAdmin(); }
     match /logs/{id}   { allow read, create: if isAdmin(); }
+    match /deaths/{id} { allow read, write: if isAdmin(); }
     // 묶음 6 농장 공유 화면 규칙은 그때 추가한다. 그 외 경로는 모두 거부.
   }
 }

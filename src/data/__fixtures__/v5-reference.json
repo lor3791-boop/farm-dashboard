@@ -1,0 +1,1819 @@
+{
+ "groups": [
+  {
+   "who": "골드피그 26-1",
+   "net": 1262,
+   "claim": 20,
+   "age": 151,
+   "prog": 0,
+   "surv": 96,
+   "expSurv": 96,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-11-05",
+   "firstOver": -25,
+   "exp": 1199,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 43,
+   "wkDiff": 8,
+   "marks": {
+    "2": "구충",
+    "3": "구충",
+    "5": "FMD",
+    "6": "FMD",
+    "7": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "골드피그 26-2",
+   "net": 433,
+   "claim": 9,
+   "age": 140,
+   "prog": 0,
+   "surv": 95.8,
+   "expSurv": 95.8,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-11-20",
+   "firstOver": -40,
+   "exp": 411,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 15,
+   "wkDiff": 3,
+   "marks": {
+    "5": "구충",
+    "9": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "골드피그 26-3",
+   "net": 174,
+   "claim": 3,
+   "age": 125,
+   "prog": 0,
+   "surv": 96.6,
+   "expSurv": 96.6,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-11-27",
+   "firstOver": -47,
+   "exp": 165,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 6,
+   "wkDiff": 0,
+   "marks": {
+    "5": "구충",
+    "9": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "명임 26-7",
+   "net": 396,
+   "claim": 0,
+   "age": 175,
+   "prog": 16,
+   "surv": 96.2,
+   "expSurv": 96.2,
+   "bad": false,
+   "last": "2026-09-23",
+   "since": 18,
+   "first": "2026-09-22",
+   "firstOver": 0,
+   "exp": 376,
+   "rec": false,
+   "recWhy": "",
+   "warn": [
+    "출하 멈춤 18일"
+   ],
+   "warnBad": false,
+   "wkSum": 15,
+   "wkDiff": 0,
+   "marks": {
+    "5": "구충",
+    "9": "FMD"
+   },
+   "stage": "출하 중"
+  },
+  {
+   "who": "명임 26-8",
+   "net": 148,
+   "claim": 0,
+   "age": 173,
+   "prog": 0,
+   "surv": 95.9,
+   "expSurv": 95.9,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-09-27",
+   "firstOver": 14,
+   "exp": 141,
+   "rec": false,
+   "recWhy": "",
+   "warn": [
+    "170일령 초과 · 출하 0두",
+    "첫출하예정 14일 경과"
+   ],
+   "warnBad": false,
+   "wkSum": 6,
+   "wkDiff": 0,
+   "marks": {
+    "5": "구충",
+    "9": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "명임 26-9",
+   "net": 298,
+   "claim": 0,
+   "age": 163,
+   "prog": 0,
+   "surv": 97.7,
+   "expSurv": 97.7,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-10-07",
+   "firstOver": 4,
+   "exp": 283,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 5,
+   "wkDiff": 2,
+   "marks": {
+    "5": "구충",
+    "9": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "명임 26-10",
+   "net": 546,
+   "claim": 0,
+   "age": 144,
+   "prog": 0,
+   "surv": 98,
+   "expSurv": 98,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-10-22",
+   "firstOver": -11,
+   "exp": 519,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 9,
+   "wkDiff": 2,
+   "marks": {
+    "5": "구충",
+    "6": "구충",
+    "9": "FMD",
+    "10": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "명임 26-11",
+   "net": 199,
+   "claim": 0,
+   "age": 135,
+   "prog": 0,
+   "surv": 98.5,
+   "expSurv": 98.5,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-11-04",
+   "firstOver": -24,
+   "exp": 189,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 3,
+   "wkDiff": 0,
+   "marks": {
+    "5": "구충",
+    "9": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "명임 26-12",
+   "net": 198,
+   "claim": 0,
+   "age": 80,
+   "prog": 0,
+   "surv": 99.5,
+   "expSurv": 99.5,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-12-27",
+   "firstOver": -77,
+   "exp": 188,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 1,
+   "wkDiff": 0,
+   "marks": {
+    "5": "구충",
+    "9": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "민서 26-6",
+   "net": 268,
+   "claim": 3,
+   "age": 164,
+   "prog": 0,
+   "surv": 94,
+   "expSurv": 94,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-10-10",
+   "firstOver": 1,
+   "exp": 248,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 15,
+   "wkDiff": 1,
+   "marks": {
+    "2": "구충",
+    "6": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "민서 26-7",
+   "net": 382,
+   "claim": 8,
+   "age": 185,
+   "prog": 79,
+   "surv": 94,
+   "expSurv": 94,
+   "bad": false,
+   "last": "2026-10-06",
+   "since": 5,
+   "first": "2026-09-17",
+   "firstOver": 0,
+   "exp": 354,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 20,
+   "wkDiff": 3,
+   "marks": {
+    "2": "구충·FMD·구충·FMD"
+   },
+   "stage": "출하 중"
+  },
+  {
+   "who": "민서 26-8",
+   "net": 376,
+   "claim": 5,
+   "age": 98,
+   "prog": 0,
+   "surv": 100,
+   "expSurv": 100,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-12-09",
+   "firstOver": -59,
+   "exp": 349,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 0,
+   "wkDiff": 0,
+   "marks": {
+    "3": "구충",
+    "8": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "산성농원 26-4",
+   "net": 250,
+   "claim": 0,
+   "age": 215,
+   "prog": 83,
+   "surv": 88.8,
+   "expSurv": 88.8,
+   "bad": true,
+   "last": "2026-09-17",
+   "since": 24,
+   "first": "2026-08-11",
+   "firstOver": 0,
+   "exp": 238,
+   "rec": true,
+   "recWhy": "마지막 출하 24일 경과",
+   "warn": [
+    "190일령 초과 · 재고 남음"
+   ],
+   "warnBad": true,
+   "wkSum": 28,
+   "wkDiff": 0,
+   "marks": {
+    "5": "구충",
+    "9": "FMD"
+   },
+   "stage": "출하 중"
+  },
+  {
+   "who": "산성농원 26-5",
+   "net": 648,
+   "claim": 0,
+   "age": 127,
+   "prog": 0,
+   "surv": 97.7,
+   "expSurv": 97.7,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-11-11",
+   "firstOver": -31,
+   "exp": 616,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 17,
+   "wkDiff": -2,
+   "marks": {
+    "5": "구충",
+    "9": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "산성농원 26-6",
+   "net": 648,
+   "claim": 0,
+   "age": 110,
+   "prog": 0,
+   "surv": 99.8,
+   "expSurv": 99.8,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-11-27",
+   "firstOver": -47,
+   "exp": 616,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 1,
+   "wkDiff": 0,
+   "marks": {
+    "5": "구충",
+    "9": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "산성농원 26-7",
+   "net": 544,
+   "claim": 0,
+   "age": 103,
+   "prog": 0,
+   "surv": 99.4,
+   "expSurv": 99.4,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-12-04",
+   "firstOver": -54,
+   "exp": 517,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 3,
+   "wkDiff": 0,
+   "marks": {
+    "5": "구충",
+    "9": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "산성농원 26-8",
+   "net": 544,
+   "claim": 0,
+   "age": 95,
+   "prog": 0,
+   "surv": 99.4,
+   "expSurv": 99.4,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-12-12",
+   "firstOver": -62,
+   "exp": 517,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 0,
+   "wkDiff": 3,
+   "marks": {
+    "5": "구충",
+    "9": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "세희 26-3",
+   "net": 298,
+   "claim": 0,
+   "age": 156,
+   "prog": 0,
+   "surv": 93.6,
+   "expSurv": 93.6,
+   "bad": true,
+   "last": null,
+   "since": null,
+   "first": "2026-10-13",
+   "firstOver": -2,
+   "exp": 283,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 19,
+   "wkDiff": 0,
+   "marks": {
+    "5": "구충",
+    "9": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "세희 26-4",
+   "net": 349,
+   "claim": 0,
+   "age": 134,
+   "prog": 0,
+   "surv": 98.3,
+   "expSurv": 98.3,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-11-05",
+   "firstOver": -25,
+   "exp": 332,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 6,
+   "wkDiff": 0,
+   "marks": {
+    "5": "구충",
+    "9": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "아멘 26-5",
+   "net": 288,
+   "claim": 6,
+   "age": 198,
+   "prog": 19,
+   "surv": 94.4,
+   "expSurv": 94.4,
+   "bad": false,
+   "last": "2026-09-22",
+   "since": 19,
+   "first": "2026-09-19",
+   "firstOver": 0,
+   "exp": 274,
+   "rec": false,
+   "recWhy": "",
+   "warn": [
+    "190일령 초과 · 재고 남음",
+    "출하 멈춤 19일"
+   ],
+   "warnBad": true,
+   "wkSum": 16,
+   "wkDiff": 0,
+   "marks": {
+    "5": "구충",
+    "9": "FMD"
+   },
+   "stage": "출하 중"
+  },
+  {
+   "who": "아멘 26-6",
+   "net": 235,
+   "claim": 5,
+   "age": 193,
+   "prog": 0,
+   "surv": 98.3,
+   "expSurv": 98.3,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-09-21",
+   "firstOver": 20,
+   "exp": 223,
+   "rec": false,
+   "recWhy": "",
+   "warn": [
+    "190일령 초과 · 재고 남음",
+    "첫출하예정 20일 경과"
+   ],
+   "warnBad": true,
+   "wkSum": 4,
+   "wkDiff": 0,
+   "marks": {
+    "2": "구충",
+    "4": "FMD",
+    "5": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "아멘 26-7",
+   "net": 194,
+   "claim": 3,
+   "age": 177,
+   "prog": 0,
+   "surv": 97.4,
+   "expSurv": 97.4,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-10-12",
+   "firstOver": -1,
+   "exp": 184,
+   "rec": false,
+   "recWhy": "",
+   "warn": [
+    "170일령 초과 · 출하 0두"
+   ],
+   "warnBad": false,
+   "wkSum": 4,
+   "wkDiff": 1,
+   "marks": {
+    "2": "구충",
+    "5": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "아멘 26-8",
+   "net": 292,
+   "claim": 4,
+   "age": 116,
+   "prog": 0,
+   "surv": 96.6,
+   "expSurv": 96.6,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-12-06",
+   "firstOver": -56,
+   "exp": 277,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 7,
+   "wkDiff": 3,
+   "marks": {
+    "5": "구충",
+    "9": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "욥 26-1",
+   "net": 980,
+   "claim": 20,
+   "age": 212,
+   "prog": 80,
+   "surv": 50,
+   "expSurv": 50,
+   "bad": true,
+   "last": "2026-09-29",
+   "since": 12,
+   "first": "2026-08-29",
+   "firstOver": 0,
+   "exp": 931,
+   "rec": false,
+   "recWhy": "",
+   "warn": [
+    "190일령 초과 · 재고 남음"
+   ],
+   "warnBad": true,
+   "wkSum": 451,
+   "wkDiff": 39,
+   "marks": {
+    "2": "구충",
+    "5": "FMD·구충·구충",
+    "7": "FMD",
+    "9": "FMD"
+   },
+   "stage": "출하 중"
+  },
+  {
+   "who": "욥 26-2",
+   "net": 435,
+   "claim": 3,
+   "age": 175,
+   "prog": 0,
+   "surv": 92.2,
+   "expSurv": 92.2,
+   "bad": true,
+   "last": null,
+   "since": null,
+   "first": "2026-10-15",
+   "firstOver": -4,
+   "exp": 413,
+   "rec": false,
+   "recWhy": "",
+   "warn": [
+    "170일령 초과 · 출하 0두"
+   ],
+   "warnBad": false,
+   "wkSum": 33,
+   "wkDiff": 1,
+   "marks": {
+    "2": "구충",
+    "5": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "욥 26-3",
+   "net": 481,
+   "claim": 10,
+   "age": 105,
+   "prog": 0,
+   "surv": 100,
+   "expSurv": 100,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-12-17",
+   "firstOver": -67,
+   "exp": 457,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 0,
+   "wkDiff": 0,
+   "marks": {
+    "5": "구충",
+    "9": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "용암 26-6",
+   "net": 961,
+   "claim": 20,
+   "age": 128,
+   "prog": 0,
+   "surv": 94.7,
+   "expSurv": 94.7,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-11-20",
+   "firstOver": -40,
+   "exp": 913,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 45,
+   "wkDiff": 6,
+   "marks": {
+    "5": "구충",
+    "6": "구충",
+    "9": "FMD",
+    "10": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "용암 26-7",
+   "net": 477,
+   "claim": 7,
+   "age": 118,
+   "prog": 0,
+   "surv": 94.8,
+   "expSurv": 94.8,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-12-02",
+   "firstOver": -52,
+   "exp": 453,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 22,
+   "wkDiff": 3,
+   "marks": {
+    "5": "구충",
+    "9": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "원가림 26-6",
+   "net": 270,
+   "claim": 5,
+   "age": 161,
+   "prog": 0,
+   "surv": 98.5,
+   "expSurv": 98.5,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-10-11",
+   "firstOver": 0,
+   "exp": 257,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 0,
+   "wkDiff": 4,
+   "marks": {
+    "2": "구충",
+    "6": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "원가림 26-7",
+   "net": 136,
+   "claim": 6,
+   "age": 156,
+   "prog": 0,
+   "surv": 99.3,
+   "expSurv": 99.3,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-10-24",
+   "firstOver": -13,
+   "exp": 129,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 0,
+   "wkDiff": 1,
+   "marks": {
+    "2": "구충",
+    "3": "구충",
+    "5": "FMD",
+    "8": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "원가림 26-8",
+   "net": 444,
+   "claim": 8,
+   "age": 126,
+   "prog": 0,
+   "surv": 98.4,
+   "expSurv": 98.4,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-11-08",
+   "firstOver": -28,
+   "exp": 422,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 0,
+   "wkDiff": 7,
+   "marks": {
+    "2": "구충",
+    "5": "구충",
+    "6": "FMD",
+    "9": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "원가림 26-9",
+   "net": 101,
+   "claim": 3,
+   "age": 119,
+   "prog": 0,
+   "surv": 98,
+   "expSurv": 98,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-11-23",
+   "firstOver": -43,
+   "exp": 96,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 0,
+   "wkDiff": 2,
+   "marks": {
+    "2": "구충",
+    "6": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "재성 26-4",
+   "net": 380,
+   "claim": 5,
+   "age": 171,
+   "prog": 0,
+   "surv": 93.2,
+   "expSurv": 93.2,
+   "bad": true,
+   "last": null,
+   "since": null,
+   "first": "2026-10-14",
+   "firstOver": -3,
+   "exp": 361,
+   "rec": false,
+   "recWhy": "",
+   "warn": [
+    "170일령 초과 · 출하 0두"
+   ],
+   "warnBad": false,
+   "wkSum": 26,
+   "wkDiff": 0,
+   "marks": {
+    "2": "구충",
+    "4": "FMD",
+    "5": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "재성 26-5",
+   "net": 724,
+   "claim": 28,
+   "age": 163,
+   "prog": 0,
+   "surv": 92.3,
+   "expSurv": 92.3,
+   "bad": true,
+   "last": null,
+   "since": null,
+   "first": "2026-10-24",
+   "firstOver": -13,
+   "exp": 688,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 51,
+   "wkDiff": 5,
+   "marks": {
+    "2": "구충",
+    "4": "FMD",
+    "5": "FMD·구충·구충",
+    "10": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "재성 26-6",
+   "net": 211,
+   "claim": 50,
+   "age": 137,
+   "prog": 0,
+   "surv": 92.4,
+   "expSurv": 92.4,
+   "bad": true,
+   "last": null,
+   "since": null,
+   "first": "2026-11-15",
+   "firstOver": -35,
+   "exp": 200,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 13,
+   "wkDiff": 3,
+   "marks": {
+    "5": "구충",
+    "9": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "재성 26-7",
+   "net": 355,
+   "claim": 8,
+   "age": 113,
+   "prog": 0,
+   "surv": 96.6,
+   "expSurv": 96.6,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-12-08",
+   "firstOver": -58,
+   "exp": 337,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 7,
+   "wkDiff": 5,
+   "marks": {
+    "5": "구충",
+    "9": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "재성 26-8",
+   "net": 146,
+   "claim": 2,
+   "age": 100,
+   "prog": 0,
+   "surv": 100,
+   "expSurv": 100,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-12-23",
+   "firstOver": -73,
+   "exp": 139,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 0,
+   "wkDiff": 0,
+   "marks": {
+    "5": "구충",
+    "9": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "정축산 26-3",
+   "net": 484,
+   "claim": 8,
+   "age": 203,
+   "prog": 71,
+   "surv": 96.1,
+   "expSurv": 96.1,
+   "bad": false,
+   "last": "2026-09-23",
+   "since": 18,
+   "first": "2026-09-13",
+   "firstOver": 0,
+   "exp": 460,
+   "rec": true,
+   "recWhy": "마지막 출하 18일 경과",
+   "warn": [
+    "190일령 초과 · 재고 남음"
+   ],
+   "warnBad": true,
+   "wkSum": 19,
+   "wkDiff": 0,
+   "marks": {
+    "5": "구충",
+    "9": "FMD"
+   },
+   "stage": "출하 중"
+  },
+  {
+   "who": "정축산 26-4",
+   "net": 492,
+   "claim": 9,
+   "age": 91,
+   "prog": 0,
+   "surv": 100,
+   "expSurv": 100,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-12-26",
+   "firstOver": -76,
+   "exp": 467,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 0,
+   "wkDiff": 0,
+   "marks": {
+    "5": "구충",
+    "9": "FMD"
+   },
+   "stage": "출하 전"
+  },
+  {
+   "who": "평지 26-1",
+   "net": 482,
+   "claim": 9,
+   "age": 162,
+   "prog": 0,
+   "surv": 94.2,
+   "expSurv": 94.2,
+   "bad": false,
+   "last": null,
+   "since": null,
+   "first": "2026-10-14",
+   "firstOver": -3,
+   "exp": 458,
+   "rec": false,
+   "recWhy": "",
+   "warn": [],
+   "warnBad": false,
+   "wkSum": 28,
+   "wkDiff": 0,
+   "marks": {
+    "5": "구충",
+    "9": "FMD"
+   },
+   "stage": "출하 전"
+  }
+ ],
+ "tasks": [
+  {
+   "d": "09-14",
+   "who": "골드피그 26-1",
+   "job": "구제역 백신",
+   "heads": "539두",
+   "sub": "1차 전입"
+  },
+  {
+   "d": "08-22",
+   "who": "골드피그 26-1",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "681두",
+   "sub": "1·2차 전입"
+  },
+  {
+   "d": "09-21",
+   "who": "골드피그 26-1",
+   "job": "구제역 백신",
+   "heads": "655두",
+   "sub": "2·4차 전입"
+  },
+  {
+   "d": "09-28",
+   "who": "골드피그 26-1",
+   "job": "구제역 백신",
+   "heads": "68두",
+   "sub": "3차 전입"
+  },
+  {
+   "d": "08-29",
+   "who": "골드피그 26-1",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "68두",
+   "sub": "3차 전입"
+  },
+  {
+   "d": "08-25",
+   "who": "골드피그 26-1",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "513두",
+   "sub": "4차 전입"
+  },
+  {
+   "d": "10-24",
+   "who": "골드피그 26-2",
+   "job": "구제역 백신",
+   "heads": "424두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "09-24",
+   "who": "골드피그 26-2",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "424두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "10-31",
+   "who": "골드피그 26-3",
+   "job": "구제역 백신",
+   "heads": "171두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "10-01",
+   "who": "골드피그 26-3",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "171두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "08-25",
+   "who": "명임 26-7",
+   "job": "구제역 백신",
+   "heads": "319두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "07-26",
+   "who": "명임 26-7",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "319두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "09-01",
+   "who": "명임 26-8",
+   "job": "구제역 백신",
+   "heads": "142두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "08-02",
+   "who": "명임 26-8",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "142두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "09-09",
+   "who": "명임 26-9",
+   "job": "구제역 백신",
+   "heads": "291두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "08-10",
+   "who": "명임 26-9",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "291두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "09-23",
+   "who": "명임 26-10",
+   "job": "구제역 백신",
+   "heads": "297두",
+   "sub": "1차 전입"
+  },
+  {
+   "d": "08-24",
+   "who": "명임 26-10",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "297두",
+   "sub": "1차 전입"
+  },
+  {
+   "d": "09-29",
+   "who": "명임 26-10",
+   "job": "구제역 백신",
+   "heads": "249두",
+   "sub": "2차 전입"
+  },
+  {
+   "d": "08-30",
+   "who": "명임 26-10",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "249두",
+   "sub": "2차 전입"
+  },
+  {
+   "d": "10-08",
+   "who": "명임 26-11",
+   "job": "구제역 백신",
+   "heads": "196두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "09-08",
+   "who": "명임 26-11",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "196두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "11-27",
+   "who": "명임 26-12",
+   "job": "구제역 백신",
+   "heads": "197두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "10-28",
+   "who": "명임 26-12",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "197두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "09-05",
+   "who": "민서 26-6",
+   "job": "구제역 백신",
+   "heads": "255두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "08-08",
+   "who": "민서 26-6",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "255두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "08-24",
+   "who": "민서 26-7",
+   "job": "구제역 백신",
+   "heads": "78두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "08-24",
+   "who": "민서 26-7",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "78두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "11-10",
+   "who": "민서 26-8",
+   "job": "구제역 백신",
+   "heads": "381두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "10-11",
+   "who": "민서 26-8",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "381두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "07-16",
+   "who": "산성농원 26-4",
+   "job": "구제역 백신",
+   "heads": "37두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "06-16",
+   "who": "산성농원 26-4",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "37두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "10-13",
+   "who": "산성농원 26-5",
+   "job": "구제역 백신",
+   "heads": "633두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "09-13",
+   "who": "산성농원 26-5",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "633두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "10-28",
+   "who": "산성농원 26-6",
+   "job": "구제역 백신",
+   "heads": "647두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "09-28",
+   "who": "산성농원 26-6",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "647두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "11-04",
+   "who": "산성농원 26-7",
+   "job": "구제역 백신",
+   "heads": "541두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "10-05",
+   "who": "산성농원 26-7",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "541두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "11-13",
+   "who": "산성농원 26-8",
+   "job": "구제역 백신",
+   "heads": "541두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "10-14",
+   "who": "산성농원 26-8",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "541두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "09-16",
+   "who": "세희 26-3",
+   "job": "구제역 백신",
+   "heads": "279두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "08-17",
+   "who": "세희 26-3",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "279두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "10-08",
+   "who": "세희 26-4",
+   "job": "구제역 백신",
+   "heads": "343두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "09-08",
+   "who": "세희 26-4",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "343두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "08-26",
+   "who": "아멘 26-5",
+   "job": "구제역 백신",
+   "heads": "226두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "07-27",
+   "who": "아멘 26-5",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "226두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "08-01",
+   "who": "아멘 26-6",
+   "job": "구제역 백신",
+   "heads": "36두",
+   "sub": "1차 전입"
+  },
+  {
+   "d": "07-14",
+   "who": "아멘 26-6",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "236두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "08-08",
+   "who": "아멘 26-6",
+   "job": "구제역 백신",
+   "heads": "199두",
+   "sub": "2차 전입"
+  },
+  {
+   "d": "08-23",
+   "who": "아멘 26-7",
+   "job": "구제역 백신",
+   "heads": "192두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "08-01",
+   "who": "아멘 26-7",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "192두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "11-09",
+   "who": "아멘 26-8",
+   "job": "구제역 백신",
+   "heads": "286두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "10-10",
+   "who": "아멘 26-8",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "286두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "07-11",
+   "who": "욥 26-1",
+   "job": "구제역 백신",
+   "heads": "276두",
+   "sub": "1차 전입"
+  },
+  {
+   "d": "06-15",
+   "who": "욥 26-1",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "276두",
+   "sub": "1차 전입"
+  },
+  {
+   "d": "07-21",
+   "who": "욥 26-1",
+   "job": "구제역 백신",
+   "heads": "262두",
+   "sub": "2차 전입"
+  },
+  {
+   "d": "06-21",
+   "who": "욥 26-1",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "262두",
+   "sub": "2차 전입"
+  },
+  {
+   "d": "08-08",
+   "who": "욥 26-1",
+   "job": "구제역 백신",
+   "heads": "442두",
+   "sub": "3·4차 전입"
+  },
+  {
+   "d": "07-09",
+   "who": "욥 26-1",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "442두",
+   "sub": "3·4차 전입"
+  },
+  {
+   "d": "08-23",
+   "who": "욥 26-2",
+   "job": "구제역 백신",
+   "heads": "255두",
+   "sub": "1차 전입"
+  },
+  {
+   "d": "08-02",
+   "who": "욥 26-2",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "404두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "08-29",
+   "who": "욥 26-2",
+   "job": "구제역 백신",
+   "heads": "180두",
+   "sub": "2차 전입"
+  },
+  {
+   "d": "11-20",
+   "who": "욥 26-3",
+   "job": "구제역 백신",
+   "heads": "491두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "10-21",
+   "who": "욥 26-3",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "491두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "10-24",
+   "who": "용암 26-6",
+   "job": "구제역 백신",
+   "heads": "578두",
+   "sub": "1·2차 전입"
+  },
+  {
+   "d": "09-24",
+   "who": "용암 26-6",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "578두",
+   "sub": "1·2차 전입"
+  },
+  {
+   "d": "10-30",
+   "who": "용암 26-6",
+   "job": "구제역 백신",
+   "heads": "383두",
+   "sub": "3차 전입"
+  },
+  {
+   "d": "09-30",
+   "who": "용암 26-6",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "383두",
+   "sub": "3차 전입"
+  },
+  {
+   "d": "11-03",
+   "who": "용암 26-7",
+   "job": "구제역 백신",
+   "heads": "459두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "10-04",
+   "who": "용암 26-7",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "459두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "09-08",
+   "who": "원가림 26-6",
+   "job": "구제역 백신",
+   "heads": "271두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "08-12",
+   "who": "원가림 26-6",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "137두",
+   "sub": "1차 전입"
+  },
+  {
+   "d": "08-10",
+   "who": "원가림 26-6",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "133두",
+   "sub": "2차 전입"
+  },
+  {
+   "d": "09-08",
+   "who": "원가림 26-7",
+   "job": "구제역 백신",
+   "heads": "100두",
+   "sub": "1차 전입"
+  },
+  {
+   "d": "08-17",
+   "who": "원가림 26-7",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "100두",
+   "sub": "1차 전입"
+  },
+  {
+   "d": "09-29",
+   "who": "원가림 26-7",
+   "job": "구제역 백신",
+   "heads": "36두",
+   "sub": "2차 전입"
+  },
+  {
+   "d": "08-30",
+   "who": "원가림 26-7",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "36두",
+   "sub": "2차 전입"
+  },
+  {
+   "d": "09-29",
+   "who": "원가림 26-8",
+   "job": "구제역 백신",
+   "heads": "151두",
+   "sub": "1차 전입"
+  },
+  {
+   "d": "08-30",
+   "who": "원가림 26-8",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "151두",
+   "sub": "1차 전입"
+  },
+  {
+   "d": "10-20",
+   "who": "원가림 26-8",
+   "job": "구제역 백신",
+   "heads": "293두",
+   "sub": "2·3차 전입"
+  },
+  {
+   "d": "09-20",
+   "who": "원가림 26-8",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "293두",
+   "sub": "2·3차 전입"
+  },
+  {
+   "d": "10-20",
+   "who": "원가림 26-9",
+   "job": "구제역 백신",
+   "heads": "102두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "09-20",
+   "who": "원가림 26-9",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "102두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "08-23",
+   "who": "재성 26-4",
+   "job": "구제역 백신",
+   "heads": "10두",
+   "sub": "1차 전입"
+  },
+  {
+   "d": "08-03",
+   "who": "재성 26-4",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "359두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "08-29",
+   "who": "재성 26-4",
+   "job": "구제역 백신",
+   "heads": "370두",
+   "sub": "2차 전입"
+  },
+  {
+   "d": "08-29",
+   "who": "재성 26-5",
+   "job": "구제역 백신",
+   "heads": "63두",
+   "sub": "1차 전입"
+  },
+  {
+   "d": "08-10",
+   "who": "재성 26-5",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "450두",
+   "sub": "1·2차 전입"
+  },
+  {
+   "d": "09-06",
+   "who": "재성 26-5",
+   "job": "구제역 백신",
+   "heads": "387두",
+   "sub": "2차 전입"
+  },
+  {
+   "d": "10-06",
+   "who": "재성 26-5",
+   "job": "구제역 백신",
+   "heads": "274두",
+   "sub": "3·4차 전입"
+  },
+  {
+   "d": "09-06",
+   "who": "재성 26-5",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "274두",
+   "sub": "3·4차 전입"
+  },
+  {
+   "d": "10-21",
+   "who": "재성 26-6",
+   "job": "구제역 백신",
+   "heads": "245두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "09-21",
+   "who": "재성 26-6",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "245두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "11-11",
+   "who": "재성 26-7",
+   "job": "구제역 백신",
+   "heads": "351두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "10-12",
+   "who": "재성 26-7",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "351두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "11-28",
+   "who": "재성 26-8",
+   "job": "구제역 백신",
+   "heads": "148두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "10-29",
+   "who": "재성 26-8",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "148두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "08-21",
+   "who": "정축산 26-3",
+   "job": "구제역 백신",
+   "heads": "138두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "07-22",
+   "who": "정축산 26-3",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "138두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "12-01",
+   "who": "정축산 26-4",
+   "job": "구제역 백신",
+   "heads": "501두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "11-01",
+   "who": "정축산 26-4",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "501두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "09-13",
+   "who": "평지 26-1",
+   "job": "구제역 백신",
+   "heads": "463두",
+   "sub": "현재 재고"
+  },
+  {
+   "d": "08-14",
+   "who": "평지 26-1",
+   "job": "구충제 · 사료 2호 변경",
+   "heads": "463두",
+   "sub": "현재 재고"
+  }
+ ],
+ "kpi": {
+  "stock": 14426,
+  "groups": 40,
+  "mort": 6.3,
+  "warn": 10,
+  "probFarms": 4,
+  "week": 4,
+  "past": 6,
+  "planned": [
+   "산성농원 26-4",
+   "정축산 26-3"
+  ]
+ }
+}

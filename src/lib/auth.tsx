@@ -20,7 +20,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [api, setApi] = useState<{ signIn: () => Promise<void>; signOut: () => Promise<void> }>({ signIn: async () => {}, signOut: async () => {} });
 
   useEffect(() => {
-    if (!firebaseConfig) {
+    if (!firebaseConfig || import.meta.env.VITE_PREVIEW === '1') {
       set({ status: 'ready', email: 'preview', name: '', repo: localRepo(), error: '' });
       return;
     }

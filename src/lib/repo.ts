@@ -1,6 +1,6 @@
 // 저장소 — 화면은 이 파일의 함수만 쓴다. Firestore / 미리보기(로컬) 두 가지 구현.
 // 경로: farms/{farmId}, config/thresholds, config/nameMap, logs/{auto}
-import type { AppData, Farm, Thresholds, NameMapRow } from '@/data/types';
+import type { AppData, Farm, Thresholds, NameMapRow, UiSaved } from '@/data/types';
 import { SEED_FARMS, SEED_THRESHOLDS, SEED_NAMEMAP } from '@/data/seed';
 import { nowIso } from './util';
 
@@ -11,14 +11,20 @@ export interface Repo {
   deleteFarm(id: string): Promise<void>;
   saveThresholds(t: Thresholds, by: string): Promise<void>;
   saveNameMap(rows: NameMapRow[], by: string): Promise<void>;
+  saveUi(patch: Partial<UiSaved>, by: string): Promise<void>;
   replaceAll(d: AppData, by: string): Promise<void>;
   log(action: string, detail: string, by: string): Promise<void>;
+  addDeath(d: DeathRec, by: string): Promise<void>;
 }
 
+export interface DeathRec { date: string; farm: string; dong: string; group: string; count: number }
+export const emptyUi = (): UiSaved => ({ planned: {}, done: {}, heatVals: {}, firstShipByFarm: {} });
+export const withUi = (u: Partial<UiSaved> | undefined): UiSaved => ({ ...emptyUi(), ...(u ?? {}) });
 export const seedData = (): AppData => ({
   farms: structuredClone(SEED_FARMS),
   thresholds: structuredClone(SEED_THRESHOLDS),
-  nameMap: structuredClone(SEED_NAMEMAP)
+  nameMap: structuredClone(SEED_NAMEMAP),
+  ui: emptyUi()
 });
 
 // 저장된 기준값에 새 항목이 없으면 기본값으로 채운다 (기준값 추가 시 안전)
@@ -33,7 +39,7 @@ export function localRepo(): Repo {
   const read = (): AppData => {
     try {
       const raw = localStorage.getItem(LS_KEY);
-      if (raw) { const d = JSON.parse(raw); return { farms: d.farms, thresholds: withDefaults(d.thresholds), nameMap: d.nameMap }; }
+      if (raw) { const d = JSON.parse(raw); return { farms: d.farms, thresholds: withDefaults(d.thresholds), nameMap: d.nameMap, ui: withUi(d.ui) }; }
     } catch { /* 비어 있음 */ }
     const s = seedData(); write(s); return s;
   };
@@ -47,8 +53,10 @@ export function localRepo(): Repo {
     deleteFarm: (id) => mut((d) => { d.farms = d.farms.filter((x) => x.id !== id); }),
     saveThresholds: (t) => mut((d) => { d.thresholds = t; }),
     saveNameMap: (rows) => mut((d) => { d.nameMap = rows; }),
-    replaceAll: (n) => mut((d) => { d.farms = n.farms; d.thresholds = withDefaults(n.thresholds); d.nameMap = n.nameMap; }),
-    log: async () => {}
+    saveUi: (p) => mut((d) => { d.ui = { ...d.ui, ...p }; }),
+    replaceAll: (n) => mut((d) => { d.farms = n.farms; d.thresholds = withDefaults(n.thresholds); d.nameMap = n.nameMap; if (n.ui) d.ui = withUi(n.ui); }),
+    log: async () => {},
+    addDeath: async (r, by) => { try { const k = 'farm-dashboard:deaths'; const L = JSON.parse(localStorage.getItem(k) || '[]'); L.push({ ...r, by, at: nowIso() }); localStorage.setItem(k, JSON.stringify(L)); } catch { /* 저장 불가 */ } }
   };
 }
 
@@ -62,14 +70,15 @@ export async function cloudRepo(config: Record<string, string>): Promise<Repo> {
   const farmsCol = collection(db, 'farms');
   const thrDoc = doc(db, 'config', 'thresholds');
   const nmDoc = doc(db, 'config', 'nameMap');
+  const uiDoc = doc(db, 'config', 'ui');
   void config;
 
   return {
     mode: 'cloud',
     subscribe(cb, onError) {
-      let farms: Farm[] | null = null, thr: Thresholds | null = null, nm: NameMapRow[] | null = null;
+      let farms: Farm[] | null = null, thr: Thresholds | null = null, nm: NameMapRow[] | null = null, ui: UiSaved | null = null;
       let seeded = false;
-      const push = () => { if (farms && thr && nm) cb({ farms: sortFarms(farms), thresholds: thr, nameMap: nm }); };
+      const push = () => { if (farms && thr && nm && ui) cb({ farms: sortFarms(farms), thresholds: thr, nameMap: nm, ui }); };
       const seedIfEmpty = async () => {
         if (seeded) return; seeded = true;
         const s = seedData(); const b = writeBatch(db);
@@ -84,12 +93,14 @@ export async function cloudRepo(config: Record<string, string>): Promise<Repo> {
       }, onError);
       const u2 = onSnapshot(thrDoc, (s) => { thr = withDefaults(s.exists() ? (s.data() as Thresholds) : undefined); push(); }, onError);
       const u3 = onSnapshot(nmDoc, (s) => { nm = s.exists() ? ((s.data().rows ?? []) as NameMapRow[]) : []; push(); }, onError);
-      return () => { u1(); u2(); u3(); };
+      const u4 = onSnapshot(uiDoc, (s) => { ui = withUi(s.exists() ? (s.data() as UiSaved) : undefined); push(); }, onError);
+      return () => { u1(); u2(); u3(); u4(); };
     },
     saveFarm: (f, by) => setDoc(doc(farmsCol, f.id), { ...f, updatedAt: nowIso(), updatedBy: by }),
     deleteFarm: (id) => deleteDoc(doc(farmsCol, id)),
     saveThresholds: (t, by) => setDoc(thrDoc, { ...t, updatedAt: nowIso(), updatedBy: by } as any),
     saveNameMap: (rows, by) => setDoc(nmDoc, { rows, updatedAt: nowIso(), updatedBy: by }),
+    saveUi: (p, by) => setDoc(uiDoc, { ...p, updatedAt: nowIso(), updatedBy: by }, { mergeFields: [...Object.keys(p), 'updatedAt', 'updatedBy'] }),
     async replaceAll(d, by) {
       const existing = await getDocs(farmsCol);
       const b = writeBatch(db);
@@ -97,8 +108,10 @@ export async function cloudRepo(config: Record<string, string>): Promise<Repo> {
       d.farms.forEach((f) => b.set(doc(farmsCol, f.id), { ...f, updatedAt: nowIso(), updatedBy: by }));
       b.set(thrDoc, { ...withDefaults(d.thresholds), updatedAt: nowIso(), updatedBy: by });
       b.set(nmDoc, { rows: d.nameMap, updatedAt: nowIso(), updatedBy: by });
+      if (d.ui) b.set(uiDoc, { ...withUi(d.ui), updatedAt: nowIso(), updatedBy: by });
       await b.commit();
     },
-    log: async (action, detail, by) => { await addDoc(collection(db, 'logs'), { action, detail, by, at: nowIso() }); }
+    log: async (action, detail, by) => { await addDoc(collection(db, 'logs'), { action, detail, by, at: nowIso() }); },
+    addDeath: async (r, by) => { await addDoc(collection(db, 'deaths'), { ...r, by, at: nowIso(), checked: false }); }
   };
 }
