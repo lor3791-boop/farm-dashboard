@@ -67,7 +67,7 @@
 브라우저 alert/confirm 금지 — 확인은 화면 안 버튼으로.
 
 ## 농장 공유 화면 (별도 사이트)
-- 주소: `https://lor3791-boop.github.io/farm-view/#<열쇠>` — 열쇠는 농장마다 무작위 16자(설정 › 농장 공유 링크에서 발급·교체). 대시보드 주소와 농장 이름은 주소에 없다.
+- 주소: `https://lor3791-boop.github.io/farm-view/#<열쇠>` (2026-10-12 저장소 생성·Pages 켬, Firestore 규칙 게시 완료) — 열쇠는 농장마다 무작위 16자(설정 › 농장 공유 링크에서 발급·교체). 대시보드 주소와 농장 이름은 주소에 없다.
 - 코드: `src/share/` (ShareView는 대시보드 코드를 가져오지 않는다). 빌드 `npm run build:share` → `dist-share/`를 `lor3791-boop/farm-view` 저장소 main에 그대로 올린다(Pages: Deploy from a branch · main / root).
 - 자료: 대시보드가 열릴 때 `share/{열쇠}` 문서에 그 농장 자료만 올린다(`src/share/usePublish.ts`). 금액·지급율·정산·다른 농장 없음.
 - 폐사 등록: 공유 사이트 → `shareDeaths`(규칙: 올바른 열쇠·농장·정해진 칸만). 대시보드 입력 › 폐사의 '농장에서 등록한 폐사'에서 확인.
