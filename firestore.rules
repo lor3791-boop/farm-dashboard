@@ -19,7 +19,27 @@ service cloud.firestore {
       allow get: if true;
       allow list: if isAdmin();
       allow write: if isAdmin();
+      // 농장 앱 폐사: 열쇠를 아는 사람이 그 농장 폐사를 보고·등록하고·고친다 (삭제는 관리자만).
+      // 고치면 피그온 등록완료(checked)는 항상 false로 돌아간다.
+      match /deaths/{id} {
+        function okDeath(d) {
+          return d.count is int && d.count >= 1 && d.count <= 300
+            && d.date is string && d.date.matches('^20[0-9]{2}-[0-9]{2}-[0-9]{2}$')
+            && d.dong is string && d.group is string && d.group.size() <= 20
+            && d.farm == get(/databases/$(database)/documents/share/$(key)).data.farm;
+        }
+        allow read: if isAdmin() || exists(/databases/$(database)/documents/share/$(key));
+        allow create: if isAdmin() || (exists(/databases/$(database)/documents/share/$(key))
+          && request.resource.data.keys().hasOnly(['farm', 'date', 'dong', 'group', 'count', 'src', 'checked', 'at'])
+          && request.resource.data.checked == false && okDeath(request.resource.data));
+        allow update: if isAdmin() || (exists(/databases/$(database)/documents/share/$(key))
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['date', 'dong', 'group', 'count', 'checked', 'editedAt'])
+          && request.resource.data.checked == false && okDeath(request.resource.data));
+        allow delete: if isAdmin();
+      }
     }
+    // 대시보드가 모든 폐사(deaths + share/{열쇠}/deaths)를 한 번에 읽는다
+    match /{path=**}/deaths/{id} { allow read: if isAdmin(); }
     // 공유 화면 폐사 등록: 올바른 열쇠 + 그 농장 이름 + 정해진 칸만 + 두수 1~300
     match /shareDeaths/{id} {
       allow create: if request.resource.data.keys().hasOnly(['token', 'farm', 'date', 'dong', 'group', 'count', 'at'])
@@ -27,7 +47,7 @@ service cloud.firestore {
         && request.resource.data.token is string
         && exists(/databases/$(database)/documents/share/$(request.resource.data.token))
         && get(/databases/$(database)/documents/share/$(request.resource.data.token)).data.farm == request.resource.data.farm;
-      allow read, delete: if isAdmin();
+      allow read, update, delete: if isAdmin();
     }
     // 그 외 경로는 모두 거부.
   }

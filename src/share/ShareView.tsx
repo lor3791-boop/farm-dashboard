@@ -1,10 +1,11 @@
 // 농장 공유 화면 본체 — 사장님·직원이 함께 보는 한 농장 화면. 한국어/네팔어.
 // 대시보드 미리보기와 공유 사이트가 같은 화면을 쓴다. (이 파일은 대시보드 코드를 가져오지 않는다)
 import { useState } from 'react';
-import type { SharePayload } from './payload';
+import type { SharePayload, ShareGroup } from './payload';
+import { applyDeaths, survOf } from './applyDeaths';
 
-const KO = { tabHome: '홈', tabStatus: '돈군', tabDeath: '폐사 등록', tabShip: '출하', tabTask: '작업', stock: '현재 두수', groups: '돈군', deathAll: '누적 폐사', matrix: '돈군별 주차 폐사', month: '개월차', wk: '주', issue: '이번 주 확인할 것', inn: '전입', death: '폐사', sold: '출하', surv: '육성률', photo: '폐사 사진', addPhoto: '사진', dong: '어느 동인가요?', group: '어느 그룹인가요?', auto: '자동 연결', count: '몇 두인가요?', unit: '두', save: '등록', saved: '등록했습니다', recent: '최근 등록', heads: '두수', avgw: '평균체중', out: '등외', avgTitle: '평균 출하 성적', aN: '출하두수', aW: '평균체중', aYield: '지육율', aGrade: '등급율 (1+·1)', g1p: '1+ 등급', aOut: '등외', times: '회', recentShip: '최근 출하', date: '날짜', yield: '지육율', jobDew: '구충제 · 사료 2호 변경', jobFmd: '구제역 백신', farmSfx: ' 농장', asOf: (d: string) => d + ' 기준', noIssue: '특별히 확인할 것이 없습니다', iDeath: (g: string, d: string, w: number, n: number) => `${g} (${d}): ${w}주차에 ${n}두 폐사 → 원인 확인`, iJob: (g: string, d: string, dt: string, j: string) => `${g} (${d}): ${dt} ${j}`, meta: (d: string, a: number, w: number) => `${d} 전입 · ${a}일령 · ${w}주차`, shipTotal: (g: string, s: number, k: number) => `${g}: 지금까지 ${s}두 출하 · ${k}두 남음`, avgSub: (f: string, t: string, n: number) => `${f}~${t} · ${n}회 출하`, noShip: '아직 출하가 없습니다', noTask: '예정된 작업이 없습니다', fail: '등록하지 못했습니다. 인터넷 연결을 확인하세요' };
-const NE: typeof KO = { tabHome: 'होम', tabStatus: 'बंगुर समूह', tabDeath: 'मरेको दर्ता', tabShip: 'बिक्री', tabTask: 'काम', stock: 'अहिले भएका बंगुर', groups: 'समूह', deathAll: 'जम्मा मरेका', matrix: 'हप्ता अनुसार मरेका बंगुर', month: 'महिना', wk: 'हप्ता', issue: 'यो हप्ता हेर्नुपर्ने कुरा', inn: 'ल्याएको', death: 'मरेको', sold: 'बिक्री', surv: 'बाँचेको', photo: 'मरेको बंगुरको फोटो', addPhoto: 'फोटो', dong: 'कुन खोर (동)?', group: 'कुन समूह?', auto: 'समूह आफैं मिल्यो', count: 'कति वटा?', unit: 'वटा', save: 'दर्ता गर्नुहोस्', saved: 'दर्ता भयो', recent: 'भर्खरको दर्ता', heads: 'संख्या', avgw: 'औसत तौल', out: 'ग्रेड बाहिर', avgTitle: 'बिक्रीको औसत नतिजा', aN: 'बिक्री संख्या', aW: 'औसत तौल', aYield: 'मासु प्रतिशत', aGrade: 'ग्रेड 1+ र 1', g1p: 'ग्रेड 1+', aOut: 'ग्रेड बाहिर', times: 'पटक', recentShip: 'हालको बिक्री', date: 'मिति', yield: 'मासु %', jobDew: 'जुकाको औषधि · दाना 2 नम्बर', jobFmd: 'खोरेत खोप', farmSfx: ' फार्म', asOf: (d) => d + ' सम्मको', noIssue: 'विशेष हेर्नुपर्ने कुरा छैन', iDeath: (g, d, w, n) => `${g} (${d}): हप्ता ${w} मा ${n} वटा मरे → कारण हेर्नुहोस्`, iJob: (g, d, dt, j) => `${g} (${d}): ${dt} मा ${j}`, meta: (d, a, w) => `${d} मा ल्याएको · ${a} दिनको · हप्ता ${w}`, shipTotal: (g, s, k) => `${g}: अहिलेसम्म ${s} वटा बिक्री · ${k} वटा बाँकी`, avgSub: (f, t, n) => `${f}~${t} · ${n} पटक बिक्री`, noShip: 'अहिलेसम्म बिक्री छैन', noTask: 'कुनै काम छैन', fail: 'दर्ता भएन। इन्टरनेट जाँच गर्नुहोस्' };
+const KO = { tabHome: '홈', tabStatus: '돈군', tabDeath: '폐사 등록', tabShip: '출하', tabTask: '작업', stock: '현재 두수', groups: '돈군', deathAll: '누적 폐사', matrix: '돈군별 주차 폐사', month: '개월차', wk: '주', issue: '이번 주 확인할 것', inn: '전입', death: '폐사', sold: '출하', surv: '육성률', photo: '폐사 사진', addPhoto: '사진', dong: '어느 동인가요?', group: '어느 그룹인가요?', auto: '자동 연결', count: '몇 두인가요?', unit: '두', save: '등록', saved: '등록했습니다', recent: '최근 등록', heads: '두수', avgw: '평균체중', out: '등외', avgTitle: '평균 출하 성적', aN: '출하두수', aW: '평균체중', aYield: '지육율', aGrade: '등급율 (1+·1)', g1p: '1+ 등급', aOut: '등외', times: '회', recentShip: '최근 출하', date: '날짜', yield: '지육율', jobDew: '구충제 · 사료 2호 변경', jobFmd: '구제역 백신', farmSfx: ' 농장', asOf: (d: string) => d + ' 기준', noIssue: '특별히 확인할 것이 없습니다', iDeath: (g: string, d: string, w: number, n: number) => `${g} (${d}): ${w}주차에 ${n}두 폐사 → 원인 확인`, iJob: (g: string, d: string, dt: string, j: string) => `${g} (${d}): ${dt} ${j}`, meta: (d: string, a: number, w: number) => `${d} 전입 · ${a}일령 · ${w}주차`, shipTotal: (g: string, s: number, k: number) => `${g}: 지금까지 ${s}두 출하 · ${k}두 남음`, avgSub: (f: string, t: string, n: number) => `${f}~${t} · ${n}회 출하`, noShip: '아직 출하가 없습니다', noTask: '예정된 작업이 없습니다', fail: '등록하지 못했습니다. 인터넷 연결을 확인하세요', list: '등록한 폐사', edit: '수정', cancel: '취소', keep: '저장', del: '삭제', dongGroup: '동 (그룹)', when: '날짜', more: '더 보기', none: '등록한 폐사가 없습니다', edited: '수정했습니다', done: '확인 완료' };
+const NE: typeof KO = { tabHome: 'होम', tabStatus: 'बंगुर समूह', tabDeath: 'मरेको दर्ता', tabShip: 'बिक्री', tabTask: 'काम', stock: 'अहिले भएका बंगुर', groups: 'समूह', deathAll: 'जम्मा मरेका', matrix: 'हप्ता अनुसार मरेका बंगुर', month: 'महिना', wk: 'हप्ता', issue: 'यो हप्ता हेर्नुपर्ने कुरा', inn: 'ल्याएको', death: 'मरेको', sold: 'बिक्री', surv: 'बाँचेको', photo: 'मरेको बंगुरको फोटो', addPhoto: 'फोटो', dong: 'कुन खोर (동)?', group: 'कुन समूह?', auto: 'समूह आफैं मिल्यो', count: 'कति वटा?', unit: 'वटा', save: 'दर्ता गर्नुहोस्', saved: 'दर्ता भयो', recent: 'भर्खरको दर्ता', heads: 'संख्या', avgw: 'औसत तौल', out: 'ग्रेड बाहिर', avgTitle: 'बिक्रीको औसत नतिजा', aN: 'बिक्री संख्या', aW: 'औसत तौल', aYield: 'मासु प्रतिशत', aGrade: 'ग्रेड 1+ र 1', g1p: 'ग्रेड 1+', aOut: 'ग्रेड बाहिर', times: 'पटक', recentShip: 'हालको बिक्री', date: 'मिति', yield: 'मासु %', jobDew: 'जुकाको औषधि · दाना 2 नम्बर', jobFmd: 'खोरेत खोप', farmSfx: ' फार्म', asOf: (d) => d + ' सम्मको', noIssue: 'विशेष हेर्नुपर्ने कुरा छैन', iDeath: (g, d, w, n) => `${g} (${d}): हप्ता ${w} मा ${n} वटा मरे → कारण हेर्नुहोस्`, iJob: (g, d, dt, j) => `${g} (${d}): ${dt} मा ${j}`, meta: (d, a, w) => `${d} मा ल्याएको · ${a} दिनको · हप्ता ${w}`, shipTotal: (g, s, k) => `${g}: अहिलेसम्म ${s} वटा बिक्री · ${k} वटा बाँकी`, avgSub: (f, t, n) => `${f}~${t} · ${n} पटक बिक्री`, noShip: 'अहिलेसम्म बिक्री छैन', noTask: 'कुनै काम छैन', fail: 'दर्ता भएन। इन्टरनेट जाँच गर्नुहोस्', list: 'दर्ता गरिएका मरेका', edit: 'सच्याउनुहोस्', cancel: 'रद्द', keep: 'सेभ', del: 'हटाउनुहोस्', dongGroup: 'खोर (समूह)', when: 'मिति', more: 'अझै हेर्नुहोस्', none: 'दर्ता छैन', edited: 'सच्याइयो', done: 'जाँच भयो' };
 
 const addIso = (d: string, n: number) => { const t = new Date(d + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
 const md = (s: string) => s.slice(5).replace('-', '/');
@@ -22,8 +23,12 @@ function heat(v: number | null) {
 }
 
 export interface DeathInput { date: string; dong: string; group: string; count: number }
+export interface ShareDeath extends DeathInput { id: string; checked: boolean; at?: string }
 
-export function ShareView({ p, onSaveDeath }: { p: SharePayload; onSaveDeath: (d: DeathInput) => Promise<void> }) {
+// 동·그룹 선택지: '3동 · 26-7' (동 없이 관리하는 그룹은 그룹만)
+export const dongGroupOpts = (G: { group: string; dong: string }[]) => G.flatMap((r) => { const ds = dongsOf(r.dong); return ds.length ? ds.map((d) => ({ v: d + '|' + r.group, l: d + '동 · ' + r.group })) : [{ v: '|' + r.group, l: r.group }]; });
+
+export function ShareView({ p, deaths = [], onSaveDeath, onEditDeath }: { p: SharePayload; deaths?: ShareDeath[]; onSaveDeath: (d: DeathInput) => Promise<void>; onEditDeath?: (id: string, d: DeathInput) => Promise<void> }) {
   const [lang, setLang] = useState<'ko' | 'ne'>('ko');
   const [tab, setTab] = useState<'home' | 'status' | 'death' | 'ship' | 'task'>('home');
   const [dong, setDong] = useState<string | null>(null);
@@ -32,8 +37,20 @@ export function ShareView({ p, onSaveDeath }: { p: SharePayload; onSaveDeath: (d
   const [saved, setSaved] = useState<{ ok: boolean; t: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [recent, setRecent] = useState<{ date: string; dong: string; group: string; n: number }[]>([]);
+  const [day, setDay] = useState(p.today);
+  const [ed, setEd] = useState<{ id: string; date: string; dg: string; count: string } | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const t = lang === 'ko' ? KO : NE;
-  const G = p.groups;
+  // 이 농장 앱에서 등록한 폐사를 기준값에 더한다 (크레임 먼저 차감)
+  const base: Record<string, { death: number; stock: number; claimLeft: number }> = {};
+  p.groups.forEach((r) => { base[r.group] = { death: r.death, stock: r.stock, claimLeft: r.claimLeft ?? 0 }; });
+  const sp = applyDeaths(base, deaths.map((d) => ({ ...d, farm: p.farm })), p.asOf, (d) => d.group);
+  const G: ShareGroup[] = p.groups.map((r) => {
+    const b = base[r.group], weekly = [...r.weekly];
+    deaths.forEach((d) => { const x = sp[d.id]; if (!x || !x.death || d.group !== r.group) return; const w = Math.floor((Date.parse(d.date) - Date.parse(r.date)) / 6048e5); if (w < 0) return; while (weekly.length <= w) weekly.push(0); weekly[w] += x.death; });
+    const surv = survOf(r.net, b.death);
+    return { ...r, death: b.death, stock: b.stock, claimLeft: b.claimLeft, surv, bad: surv < (p.badPct ?? 94), weekly, week: Math.max(r.week, weekly.length) };
+  });
   const noDong = G.every((r) => r.dong === '—');
   const dongs = [...new Set(G.flatMap((r) => dongsOf(r.dong)))].sort();
   const cover = noDong ? G : G.filter((r) => dong !== null && dongsOf(r.dong).includes(dong));
@@ -62,10 +79,19 @@ export function ShareView({ p, onSaveDeath }: { p: SharePayload; onSaveDeath: (d
     if (!chosen || busy) return;
     setBusy(true);
     try {
-      await onSaveDeath({ date: today, dong: dong ?? '', group: chosen, count: cnt });
+      await onSaveDeath({ date: day, dong: dong ?? '', group: chosen, count: cnt });
       setSaved({ ok: true, t: t.saved + ' · ' + (dong ? dong + '동 ' : '') + '(' + chosen + ') · ' + cnt + ' ' + t.unit });
-      setRecent([{ date: md(today), dong: dong ? dong + '동' : '—', group: chosen, n: cnt }, ...recent].slice(0, 5)); setCnt(1);
+      setRecent([{ date: md(day), dong: dong ? dong + '동' : '—', group: chosen, n: cnt }, ...recent].slice(0, 5)); setCnt(1);
     } catch { setSaved({ ok: false, t: t.fail }); } finally { setBusy(false); }
+  };
+  const opts = dongGroupOpts(p.groups);
+  const list = deaths.length || onEditDeath ? [...deaths].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (a.at ?? '') < (b.at ?? '') ? 1 : -1)) : recent.map((x, i) => ({ id: 'r' + i, date: today.slice(0, 5) + x.date.replace('/', '-'), dong: x.dong === '—' ? '' : x.dong.replace('동', ''), group: x.group, count: x.n, checked: false }));
+  const saveEdit = async () => {
+    if (!ed || !onEditDeath || busy) return;
+    const [d, g] = ed.dg.split('|');
+    setBusy(true);
+    try { await onEditDeath(ed.id, { date: ed.date, dong: d, group: g, count: Math.round(Number(ed.count)) }); setEd(null); setSaved({ ok: true, t: t.edited }); }
+    catch { setSaved({ ok: false, t: t.fail }); } finally { setBusy(false); }
   };
   const tabs: [typeof tab, string][] = [['home', t.tabHome], ['status', t.tabStatus], ['death', t.tabDeath], ['ship', t.tabShip], ['task', t.tabTask]];
   const shipping = G.filter((r) => r.sold > 0);
@@ -142,6 +168,8 @@ export function ShareView({ p, onSaveDeath }: { p: SharePayload; onSaveDeath: (d
               </>
             )}
             {!noDong && cover.length === 1 && <div style={{ marginTop: 8 }}><span className="chip ok">{t.auto}: {cover[0].group} ({dong}동)</span></div>}
+            <div style={{ fontWeight: 700, marginTop: 16 }}>{t.when}</div>
+            <input type="date" value={day} max={p.today} onChange={(e) => { setDay(e.target.value || p.today); setSaved(null); }} style={{ fontSize: 16, minHeight: 44, marginTop: 8 }} />
             <div style={{ fontWeight: 700, marginTop: 16 }}>{t.count}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 8 }}>
               <button className="step" onClick={() => { setCnt(Math.max(1, cnt - 1)); setSaved(null); }} aria-label="−1">−</button>
@@ -152,12 +180,27 @@ export function ShareView({ p, onSaveDeath }: { p: SharePayload; onSaveDeath: (d
             <button className="sbtn" style={{ marginTop: 18 }} disabled={!chosen || busy} onClick={save}>{t.save}</button>
             {saved && <div style={{ marginTop: 10 }}><span className={saved.ok ? 'chip ok' : 'chip bad'} style={{ fontSize: 14 }}>{saved.t}</span></div>}
           </div>
-          {recent.length > 0 && (
-            <div className="card" style={{ marginTop: 12 }}>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>{t.recent}</div>
-              {recent.map((x, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, padding: '6px 0', borderBottom: '1px solid #EFEBE3' }}><span>{x.date} · {x.dong} ({x.group})</span><b>{x.n} {t.unit}</b></div>)}
-            </div>
-          )}
+          <div className="card" style={{ marginTop: 12 }}>
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>{t.list}</div>
+            {list.length === 0 && <div className="muted" style={{ fontSize: 14 }}>{t.none}</div>}
+            {(showAll ? list : list.slice(0, 10)).map((x) => ed && ed.id === x.id ? (
+              <div key={x.id} style={{ padding: '10px 0', borderBottom: '1px solid #EFEBE3', display: 'grid', gap: 8 }}>
+                <label style={{ fontSize: 14 }}>{t.when}<br /><input type="date" value={ed.date} max={p.today} onChange={(e) => setEd({ ...ed, date: e.target.value })} style={{ fontSize: 16, minHeight: 44, width: '100%' }} /></label>
+                <label style={{ fontSize: 14 }}>{t.dongGroup}<br /><select value={ed.dg} onChange={(e) => setEd({ ...ed, dg: e.target.value })} style={{ fontSize: 16, minHeight: 44, width: '100%' }}>{opts.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}</select></label>
+                <label style={{ fontSize: 14 }}>{t.count}<br /><input type="number" inputMode="numeric" min={1} max={300} value={ed.count} onChange={(e) => setEd({ ...ed, count: e.target.value })} style={{ fontSize: 16, minHeight: 44, width: '100%' }} /></label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <button className="pill" style={{ minHeight: 44 }} onClick={() => setEd(null)}>{t.cancel}</button>
+                  <button className="pill on" style={{ minHeight: 44 }} disabled={busy || !(Number(ed.count) >= 1 && Number(ed.count) <= 300) || !ed.date} onClick={saveEdit}>{t.keep}</button>
+                </div>
+              </div>
+            ) : (
+              <div key={x.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, padding: '6px 0', borderBottom: '1px solid #EFEBE3' }}>
+                <span style={{ flex: 1 }}>{md(x.date)} · {x.dong ? x.dong + '동 ' : ''}({x.group})</span><b>{x.count} {t.unit}</b>
+                {onEditDeath && <button className="pill" style={{ minHeight: 40, fontSize: 14 }} onClick={() => { setEd({ id: x.id, date: x.date, dg: (x.dong ?? '') + '|' + x.group, count: String(x.count) }); setSaved(null); }}>{t.edit}</button>}
+              </div>
+            ))}
+            {!showAll && list.length > 10 && <button className="pill" style={{ marginTop: 8, minHeight: 44, width: '100%' }} onClick={() => setShowAll(true)}>{t.more}</button>}
+          </div>
         </>
       )}
       {tab === 'ship' && (

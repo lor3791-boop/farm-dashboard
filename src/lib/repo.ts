@@ -14,7 +14,11 @@ export interface Repo {
   saveUi(patch: Partial<UiSaved>, by: string): Promise<void>;
   replaceAll(d: AppData, by: string): Promise<void>;
   log(action: string, detail: string, by: string): Promise<void>;
-  addDeath(d: DeathRec, by: string): Promise<void>;
+  // 폐사 — 대시보드 입력(deaths)과 농장 앱 입력(share/{열쇠}/deaths)을 한 목록으로 본다
+  watchDeaths(cb: (rows: DeathRow[]) => void, onError?: (e: Error) => void): () => void;
+  addDeath(d: DeathRec, by: string, key?: string): Promise<void>;
+  updateDeath(row: DeathRow, patch: DeathPatch, by: string): Promise<void>;
+  removeDeath(row: DeathRow): Promise<void>;
   // 기록 묶음(컬렉션) — shipments(출하 직접 입력), shareDeaths(공유 화면 폐사), share(공유 화면 자료)
   watch<T>(col: string, cb: (rows: (T & { id: string })[]) => void, onError?: (e: Error) => void): () => void;
   add(col: string, data: Record<string, unknown>, by: string): Promise<void>;
@@ -23,6 +27,12 @@ export interface Repo {
 }
 
 export interface DeathRec { date: string; farm: string; dong: string; group: string; count: number }
+// src: 입력한 곳(dash 대시보드 / share 농장 앱), checked: 피그온 등록완료, key: 농장 앱 열쇠(있으면)
+export interface DeathRow extends DeathRec { id: string; path: string; src: 'dash' | 'share'; checked: boolean; key: string; at: string; by?: string; editedAt?: string }
+export type DeathPatch = Partial<DeathRec> & { checked?: boolean };
+// 날짜·두수·동·그룹을 고치면 피그온 등록완료가 풀린다 (다시 미등록)
+export const editResetsCheck = (p: DeathPatch) => ['date', 'farm', 'dong', 'group', 'count'].some((k) => k in p);
+const normAt = (v: any): string => (typeof v === 'string' ? v : v?.toDate ? v.toDate().toISOString() : '');
 export const emptyUi = (): UiSaved => ({ planned: {}, done: {}, heatVals: {}, firstShipByFarm: {}, shareLinks: {} });
 export const withUi = (u: Partial<UiSaved> | undefined): UiSaved => ({ ...emptyUi(), ...(u ?? {}) });
 export const seedData = (): AppData => ({
@@ -62,7 +72,7 @@ export function localRepo(): Repo {
     replaceAll: (n) => mut((d) => { d.farms = n.farms; d.thresholds = withDefaults(n.thresholds); d.nameMap = n.nameMap; if (n.ui) d.ui = withUi(n.ui); }),
     log: async () => {},
     ...localCols(),
-    addDeath: async (r, by) => { try { const k = 'farm-dashboard:deaths'; const L = JSON.parse(localStorage.getItem(k) || '[]'); L.push({ ...r, by, at: nowIso() }); localStorage.setItem(k, JSON.stringify(L)); } catch { /* 저장 불가 */ } }
+    ...localDeaths()
   };
 }
 
@@ -80,9 +90,40 @@ function localCols() {
   };
 }
 
+// 목업 빌드에서만 쓰는 예시 폐사 기록
+const MOCK_DEATHS = [
+  { id: 'm1', date: '2026-10-13', farm: '민서', dong: '1', group: '26-8', count: 2, src: 'dash', checked: true, key: '', at: '2026-10-13T09:00:00Z' },
+  { id: 'm2', date: '2026-10-16', farm: '민서', dong: '1', group: '26-8', count: 4, src: 'share', checked: false, key: '', at: '2026-10-16T08:10:00Z' },
+  { id: 'm3', date: '2026-10-19', farm: '산성농원', dong: '2', group: '26-6', count: 3, src: 'share', checked: false, key: '', at: '2026-10-19T07:40:00Z' },
+  { id: 'm4', date: '2026-10-20', farm: '명임', dong: '', group: '26-8', count: 1, src: 'share', checked: false, key: '', at: '2026-10-20T07:20:00Z' },
+  { id: 'm5', date: '2026-10-21', farm: '산성농원', dong: '4', group: '26-7', count: 2, src: 'dash', checked: false, key: '', at: '2026-10-21T10:00:00Z' }
+];
+
+// 미리보기 모드의 폐사: localStorage 'farm-dashboard:col:deaths' (예전 'farm-dashboard:deaths'는 옮겨 담음)
+function localDeaths() {
+  const K = 'farm-dashboard:col:deaths';
+  let subs: ((r: DeathRow[]) => void)[] = [];
+  const read = (): DeathRow[] => {
+    try {
+      if (import.meta.env.VITE_MOCK === '1' && localStorage.getItem(K) === null) localStorage.setItem(K, JSON.stringify(MOCK_DEATHS));
+      const old = localStorage.getItem('farm-dashboard:deaths');
+      const cur: any[] = JSON.parse(localStorage.getItem(K) || '[]');
+      if (old) { JSON.parse(old).forEach((x: any) => cur.push({ ...x, id: Math.random().toString(36).slice(2, 12) })); localStorage.setItem(K, JSON.stringify(cur)); localStorage.removeItem('farm-dashboard:deaths'); }
+      return cur.map((x) => ({ src: 'dash', checked: false, key: '', at: '', ...x, path: 'deaths/' + x.id }));
+    } catch { return []; }
+  };
+  const write = (rows: DeathRow[]) => { try { localStorage.setItem(K, JSON.stringify(rows.map(({ path, ...r }) => { void path; return r; }))); } catch { /* 저장 불가 */ } const v = read(); subs.forEach((f) => f(v)); };
+  return {
+    watchDeaths: (cb: (r: DeathRow[]) => void) => { subs.push(cb); setTimeout(() => cb(read()), 0); return () => { subs = subs.filter((f) => f !== cb); }; },
+    addDeath: async (r: DeathRec, by: string, key = '') => { write([...read(), { ...r, id: Math.random().toString(36).slice(2, 12), path: '', src: by === 'share' ? 'share' : 'dash', checked: false, key, at: nowIso(), by }]); },
+    updateDeath: async (row: DeathRow, p: DeathPatch, by: string) => { write(read().map((x) => (x.id === row.id ? { ...x, ...p, ...(editResetsCheck(p) ? { checked: false, editedAt: nowIso(), editedBy: by } : {}) } : x))); },
+    removeDeath: async (row: DeathRow) => { write(read().filter((x) => x.id !== row.id)); }
+  };
+}
+
 // ---------- 클라우드 모드: Firestore ----------
 export async function cloudRepo(config: Record<string, string>): Promise<Repo> {
-  const { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, addDoc, getDocs, initializeFirestore, persistentLocalCache } = await import('firebase/firestore');
+  const { getFirestore, collection, collectionGroup, doc, onSnapshot, setDoc, updateDoc, deleteDoc, writeBatch, addDoc, getDocs, initializeFirestore, persistentLocalCache } = await import('firebase/firestore');
   const { getApp } = await import('firebase/app');
   const app = getApp();
   let db;
@@ -132,7 +173,23 @@ export async function cloudRepo(config: Record<string, string>): Promise<Repo> {
       await b.commit();
     },
     log: async (action, detail, by) => { await addDoc(collection(db, 'logs'), { action, detail, by, at: nowIso() }); },
-    addDeath: async (r, by) => { await addDoc(collection(db, 'deaths'), { ...r, by, at: nowIso(), checked: false }); },
+    watchDeaths(cb, onError) {
+      // 대시보드 입력(deaths) + 농장 앱 입력(share/{열쇠}/deaths) = 컬렉션 그룹 'deaths', 예전 농장 앱 입력(shareDeaths)
+      let a: DeathRow[] = [], b: DeathRow[] = [];
+      const emit = () => cb([...a, ...b]);
+      const u1 = onSnapshot(collectionGroup(db, 'deaths'), (s) => {
+        a = s.docs.map((d) => { const x = d.data() as any; const seg = d.ref.path.split('/'); const key = seg[0] === 'share' ? seg[1] : ''; return { ...x, id: d.id, path: d.ref.path, src: x.src ?? (key ? 'share' : 'dash'), checked: !!x.checked, key, at: normAt(x.at) }; });
+        emit();
+      }, (e) => onError?.(e));
+      const u2 = onSnapshot(collection(db, 'shareDeaths'), (s) => {
+        b = s.docs.map((d) => { const x = d.data() as any; return { ...x, id: d.id, path: d.ref.path, src: 'share', checked: !!x.checked, key: x.token ?? '', at: normAt(x.at) }; });
+        emit();
+      }, () => {});
+      return () => { u1(); u2(); };
+    },
+    addDeath: async (r, by, key) => { await addDoc(key ? collection(db, 'share', key, 'deaths') : collection(db, 'deaths'), { ...r, src: 'dash', by, at: nowIso(), checked: false }); },
+    updateDeath: async (row, p, by) => { await updateDoc(doc(db, row.path), { ...p, ...(editResetsCheck(p) ? { checked: false, editedAt: nowIso(), by } : {}) }); },
+    removeDeath: async (row) => { await deleteDoc(doc(db, row.path)); },
     watch: (c, cb, onError) => onSnapshot(collection(db, c), (s) => cb(s.docs.map((d) => ({ ...(d.data() as any), id: d.id }))), (e) => onError?.(e)),
     add: async (c, d, by) => { await addDoc(collection(db, c), { ...d, by, at: nowIso() }); },
     put: async (c, id, d) => { await setDoc(doc(db, c, id), d); },

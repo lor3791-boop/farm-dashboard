@@ -82,4 +82,6 @@ export interface ManualShip {
   id: string; farm: string; group: string; date: string; dest: string;
   n: number; live: number; yld: number; pay: number | null; price: number | null;
   g1p: number; g1: number; g2: number; out: number; lowReason: string; writer: string; by?: string; at?: string;
+  // 등판서 업로드분: kind 'grade', 도체중 합(carc), 같은 파일 묶음(batch), 도체번호 구간(range)
+  kind?: 'manual' | 'grade'; carc?: number; batch?: string; file?: string; range?: string; plant?: string;
 }

@@ -6,6 +6,8 @@ import { useCol } from '@/lib/useCol';
 import type { ManualShip } from '@/data/types';
 import { fmt, md, r1 } from '@/lib/calc/dates';
 import { todayKST } from '@/lib/util';
+import { REF } from '@/lib/calc/herd';
+import { shortDest } from '@/lib/calc/ship';
 
 const DESTS = ['일호', '참푸른', '신선', '중앙축산', '논산축협', '도도농장'];
 const LOW_KG = 110;
@@ -107,12 +109,12 @@ export function ShipManualList() {
   const g = '72px minmax(90px,1fr) 70px 52px 78px 64px 56px 56px 110px 84px';
   return (
     <div className="card" style={{ marginTop: 16 }}>
-      <h2 className="h2" style={{ marginBottom: 8 }}>직접 입력한 출하 · {rows.length}건</h2>
+      <h2 className="h2" style={{ marginBottom: 8 }}>등록한 출하 기록 (등판서·직접 입력) · {rows.length}건</h2>
       <div className="gt"><div style={{ minWidth: 820 }}>
         <div className="gr gh small muted" style={{ gridTemplateColumns: g }}><div>출하일</div><div>농장 · 그룹</div><div>거래처</div><div className="r">두수</div><div className="r">평체</div><div className="r">지육율</div><div className="r">지급율</div><div className="r">1+·1</div><div>등록자</div><div /></div>
         {sorted.map((x) => (
           <div key={x.id} className="gr" style={{ gridTemplateColumns: g }}>
-            <div>{md(x.date)}</div><div><b>{x.farm}</b> {x.group}</div><div className="small">{x.dest}</div><div className="r b">{fmt(x.n)}</div><div className="r">{r1(x.live / x.n)}kg</div><div className="r">{x.yld}%</div><div className="r">{x.pay ? x.pay + '%' : '—'}</div><div className="r">{x.g1p}·{x.g1}</div><div className="small">{x.writer}{x.lowReason ? <div className="sub">저체중: {x.lowReason}</div> : null}</div>
+            <div>{md(x.date)}</div><div><b>{x.farm}</b> {x.group}</div><div className="small">{shortDest(x.dest)}<div className="sub">{x.kind === 'grade' ? '등판서 ' + (x.range ?? '') : '직접 입력'}</div></div><div className="r b">{fmt(x.n)}</div><div className="r">{r1(x.live / x.n)}kg</div><div className="r">{x.yld}%</div><div className="r">{x.pay ? x.pay + '%' : '—'}</div><div className="r">{x.g1p}·{x.g1}</div><div className="small">{x.writer}{x.kind === 'grade' && x.date > REF ? <div className="sub">재고 차감</div> : null}{x.lowReason ? <div className="sub">저체중: {x.lowReason}</div> : null}</div>
             <div className="r">{del === x.id ? <button className="btn sm" style={{ borderColor: '#9A3216', color: '#9A3216' }} onClick={async () => { await repo!.remove('shipments', x.id); setDel(null); }}>정말 삭제</button> : <button className="btn sm ghost" onClick={() => setDel(x.id)}>삭제</button>}</div>
           </div>
         ))}

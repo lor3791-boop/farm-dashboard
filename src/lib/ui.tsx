@@ -6,6 +6,7 @@ import type { UiSaved } from '@/data/types';
 import { useAuth } from './auth';
 import { useData } from './data';
 import { buildGroups, type Group } from './calc/herd';
+import type { Split } from '@/share/applyDeaths';
 
 export interface UiState {
   fSel: string[] | null; fOpen: boolean; fQ: string; fStatus: 'all' | 'bad' | 'ok';
@@ -50,9 +51,14 @@ export function UiProvider({ children }: { children: ReactNode }) {
 
 // 필터가 적용된 그룹·농장 — 홈·돈군·분석이 함께 쓴다
 export function useHerd() {
-  const { data } = useData();
+  const { data, deaths, ships } = useData();
   const { s, set, saved, save } = useUi();
-  const all = useMemo<Group[]>(() => (data ? buildGroups(data.thresholds, saved.firstShipByFarm) : []), [data, saved.firstShipByFarm]);
+  // 기준일 이후 폐사·출하를 반영한 그룹 + 폐사 기록별 나눔(크레임/폐사)
+  const { all, split } = useMemo(() => {
+    const sp: Record<string, Split> = {};
+    const g: Group[] = data ? buildGroups(data.thresholds, saved.firstShipByFarm, { deaths, ships: ships.map((x) => ({ farm: x.farm, group: x.group, date: x.date, n: x.n })) }, sp) : [];
+    return { all: g, split: sp };
+  }, [data, saved.firstShipByFarm, deaths, ships]);
   const farms = useMemo(() => [...new Set(all.map((r) => r.farm))], [all]);
   const farmBad = useMemo(() => { const m: Record<string, boolean> = {}; farms.forEach((f) => { m[f] = all.some((r) => r.farm === f && r.bad); }); return m; }, [all, farms]);
   const selSet = s.fSel === null ? farms : s.fSel;
@@ -61,5 +67,5 @@ export function useHerd() {
   const isPlanned = (r: Group) => (saved.planned[r.who] === undefined ? r.rec : saved.planned[r.who]);
   const setPlanned = (r: Group, v: boolean) => save({ planned: { ...saved.planned, [r.who]: v } });
   const togglePlan = (r: Group) => () => setPlanned(r, !isPlanned(r));
-  return { all, farms, farmBad, selSet, passFarm, rows, isPlanned, setPlanned, togglePlan, s, set, saved, save, T: data?.thresholds };
+  return { all, split, deaths, ships, farms, farmBad, selSet, passFarm, rows, isPlanned, setPlanned, togglePlan, s, set, saved, save, T: data?.thresholds };
 }

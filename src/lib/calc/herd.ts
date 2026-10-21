@@ -3,11 +3,16 @@
 import type { Thresholds } from '@/data/types';
 import { G, LOTS, LAST_SHIP, WEEKLY, REF, TODAY, FARM_SURV, type Lot } from '@/data/snapshot';
 import { iso, days, addIso, r1 } from './dates';
+import { applyDeaths, type DeathLike, type Split, type DeathBase } from '@/share/applyDeaths';
+
+// 기준일(스냅샷/돈수불) 이후 입력분 — 폐사와 출하(등판서·직접 입력)
+export interface LiveShip { farm: string; group: string; date: string; n: number }
+export interface Live { deaths: DeathLike[]; ships: LiveShip[] }
 
 export interface Group {
   farm: string; group: string; dong: string; date: string; who: string;
   inn: number; death: number; sold: number; stock: number; week: number; avgw: number;
-  lots: Lot[]; claim: number; net: number; age: number; prog: number; surv: number; expSurv: number; bad: boolean;
+  lots: Lot[]; claim: number; claimLeft: number; claimDead: number; liveDeath: number; liveSold: number; net: number; age: number; prog: number; surv: number; expSurv: number; bad: boolean;
   last: string | null; since: number | null; first: string; firstOver: number; exp: number;
   rec: boolean; recWhy: string; warn: string[]; warnBad: boolean;
   weekly: number[]; wkSum: number; wkDiff: number; marks: Record<number, string>; stage: '출하 중' | '출하 전';
@@ -16,7 +21,13 @@ export interface Group {
 export const dongsOf = (s: string) => (s === '—' ? [] : s.replace('동', '').split('·'));
 export { REF, TODAY };
 
-export function buildGroups(T: Thresholds, firstShipByFarm: Record<string, number> = {}): Group[] {
+export function buildGroups(T: Thresholds, firstShipByFarm: Record<string, number> = {}, live?: Live, splitOut?: Record<string, Split>): Group[] {
+  const base: Record<string, DeathBase & { inDeath: number }> = {};
+  G.forEach((r) => { const who = r[0] + ' ' + r[1]; const claim = (LOTS[who] ?? []).reduce((a, l) => a + l[2], 0); base[who] = { death: r[5], stock: r[7], claimLeft: claim, inDeath: r[5] }; });
+  const split = live ? applyDeaths(base, live.deaths, REF, (d) => d.farm + ' ' + d.group) : {};
+  if (splitOut) Object.assign(splitOut, split);
+  const shipped: Record<string, number> = {};
+  live?.ships.forEach((x) => { if (x.date > REF && x.n > 0) shipped[x.farm + ' ' + x.group] = (shipped[x.farm + ' ' + x.group] ?? 0) + x.n; });
   return G.map((r) => {
     const farm = r[0], group = r[1], who = farm + ' ' + group;
     const lots = LOTS[who] ?? [];
@@ -24,10 +35,13 @@ export function buildGroups(T: Thresholds, firstShipByFarm: Record<string, numbe
     const tot = lots.reduce((a, l) => a + l[1], 0) || 1;
     o.claim = lots.reduce((a, l) => a + l[2], 0);
     o.net = o.inn - o.claim;
+    const b = base[who];
+    o.liveDeath = b.death - b.inDeath; o.death = b.death; o.claimLeft = b.claimLeft; o.claimDead = o.claim - b.claimLeft;
+    o.liveSold = shipped[who] ?? 0; o.sold += o.liveSold; o.stock = b.stock - o.liveSold;
     o.age = Math.round(lots.reduce((a, l) => a + l[1] * (l[3] + days(iso(l[0]), REF)), 0) / tot);
     o.prog = o.sold + o.stock ? Math.round((o.sold / (o.sold + o.stock)) * 100) : 0;
     o.surv = r1(((o.net - o.death) / o.net) * 100);
-    o.expSurv = r1(((o.sold + o.stock - o.claim) / o.net) * 100);
+    o.expSurv = r1(((o.sold + o.stock - o.claimLeft) / o.net) * 100);
     o.bad = o.surv < T.problemSurvivalPct;
     o.last = LAST_SHIP[who] || null;
     o.since = o.last ? days(o.last, TODAY) : null;
@@ -46,7 +60,9 @@ export function buildGroups(T: Thresholds, firstShipByFarm: Record<string, numbe
     if (o.sold === 0 && o.firstOver >= T.firstShipOverdueDays) why.push(`첫출하예정 ${o.firstOver}일 경과`);
     o.warn = why;
     o.warnBad = o.age > T.delayRemainAge && o.stock > 0;
-    o.weekly = WEEKLY[who] || [];
+    o.weekly = [...(WEEKLY[who] || [])];
+    live?.deaths.forEach((d) => { const sp = split[d.id]; if (!sp || !sp.death || d.farm + ' ' + d.group !== who) return; const w = Math.floor(days(o.date, d.date) / 7); if (w < 0) return; while (o.weekly.length <= w) o.weekly.push(0); o.weekly[w] += sp.death; });
+    if (o.weekly.length > o.week) o.week = o.weekly.length;
     o.wkSum = o.weekly.reduce((a, v) => a + v, 0);
     o.wkDiff = o.death - o.wkSum;
     o.marks = {};
@@ -61,11 +77,11 @@ export function buildGroups(T: Thresholds, firstShipByFarm: Record<string, numbe
   });
 }
 
-export interface Agg { net: number; death: number; sold: number; stock: number; claim: number; exp: number; surv: number; prog: number; mort: number }
+export interface Agg { net: number; death: number; sold: number; stock: number; claim: number; claimLeft: number; exp: number; surv: number; prog: number; mort: number }
 export function agg(g: Group[]): Agg {
   const s = (k: keyof Group) => g.reduce((a, r) => a + (r[k] as number), 0);
   const net = s('net'), death = s('death'), sold = s('sold'), stock = s('stock');
-  return { net, death, sold, stock, claim: s('claim'), exp: s('exp'), surv: net ? r1(((net - death) / net) * 100) : 0, prog: sold + stock ? Math.round((sold / (sold + stock)) * 100) : 0, mort: net ? r1((death / net) * 100) : 0 };
+  return { net, death, sold, stock, claim: s('claim'), claimLeft: s('claimLeft'), exp: s('exp'), surv: net ? r1(((net - death) / net) * 100) : 0, prog: sold + stock ? Math.round((sold / (sold + stock)) * 100) : 0, mort: net ? r1((death / net) * 100) : 0 };
 }
 
 // 작업 알림 — 로트별 예정일(전입현황)을 날짜·작업별로 묶는다
