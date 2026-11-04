@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useHerd } from '@/lib/ui';
 import { useAuth } from '@/lib/auth';
 import { fmt, md, r1 } from '@/lib/calc/dates';
-import { allShips, shipAgg, shortDest, type ShipAgg } from '@/lib/calc/ship';
+import { shipAgg, shortDest, type ShipAgg } from '@/lib/calc/ship';
 import { MONTHS } from '@/data/snapshot';
 import { Grid, Lnk, Num, Segs, sortRows, useSorts, type Col } from '@/components/v5';
 import { downloadXlsx } from '@/lib/xlsx';
@@ -11,9 +11,9 @@ import { downloadXlsx } from '@/lib/xlsx';
 const monthOpts = MONTHS.map((m) => ({ v: m, l: m.slice(0, 4) + '년 ' + Number(m.slice(5)) + '월' }));
 
 export function ShipGrade() {
-  const { farms, passFarm, ships } = useHerd();
+  const { farms, passFarm, ships, shipRows, liveShips } = useHerd();
   const sorts = useSorts();
-  const SHIP = allShips(ships);
+  const SHIP = shipRows;
   const [g, setG] = useState({ from: '2026-08', to: '2026-10', view: 'farm' as 'farm' | 'all', farm: '민서', setOpen: false });
   // 출하성적
   const shipIn = SHIP.filter((x) => x[0].slice(0, 7) >= g.from && x[0].slice(0, 7) <= g.to && passFarm(x[1]));

@@ -38,12 +38,13 @@
 - 검산 샘플은 `*.test.ts`. 배포 전에 자동 실행된다.
 
 ## Firestore 경로
-`farms/{farmId}`, `config/thresholds`, `config/nameMap`, `config/ui`(정산예정·작업완료·폭염·첫출하·공유 열쇠), `deaths`(대시보드 입력, 열쇠 없는 농장), `share/{열쇠}/deaths`(농장 앱 입력 + 열쇠 있는 농장의 대시보드 입력 — 대시보드는 컬렉션 그룹 'deaths'로 함께 읽음), `shipments`(출하 직접 입력 + 등판서 kind:'grade'), `share/{열쇠}`(공개 읽기), `shareDeaths`(예전 농장 앱 입력, 읽기·수정만), `groups`(그룹 직접 등록), `feed`(피그온 그룹 사료 업로드, 한 줄 = 탭으로 이은 문자열), `feedMid`(정산월 중간투입), `vaccine`(구제역 백신비 + 첨부 data URL, 700KB 이하), `logs` — 모든 기록에 `updatedAt`, `updatedBy`.
+`farms/{farmId}`, `config/thresholds`, `config/nameMap`, `config/ui`(정산예정·작업완료·폭염·첫출하·공유 열쇠), `deaths`(대시보드 입력, 열쇠 없는 농장), `share/{열쇠}/deaths`(농장 앱 입력 + 열쇠 있는 농장의 대시보드 입력 — 대시보드는 컬렉션 그룹 'deaths'로 함께 읽음), `shipments`(출하 직접 입력 + 등판서 kind:'grade'), `share/{열쇠}`(공개 읽기), `shareDeaths`(예전 농장 앱 입력, 읽기·수정만), `groups`(그룹 직접 등록), `feed`(피그온 그룹 사료 업로드, 한 줄 = 탭으로 이은 문자열), `feedMid`(정산월 중간투입), `vaccine`(구제역 백신비 + 첨부 data URL, 700KB 이하), `shipImport`(피그온 출하·팀 대시보드 출하기록 업로드, `src/lib/shipImport.ts`), `logs` — 모든 기록에 `updatedAt`, `updatedBy`.
 묶음 2부터: `groups`, `lots`, `placements`(동 배치), `deaths`, `shipments`, `shipSummary`, `heat`, `feed`, `tasks`, `vaccineCost`, `uploads`.
 
 ## 데이터 원천 (계산은 이것을 그대로 따른다)
 - 피그온 **전입현황**(차수별 실두수·클레임·평균일령·평체), **돈수불**(전입/폐사/판매/재고 — 재고 기준), **그룹 사료 사용**.
 - **출하실적종합** = 출하·정산 기준. 값 재계산·재배분 금지, 적힌 값 그대로 표시.
+- 출하 우선순위(같은 날·농장): 출하실적종합 > 올린 출하 자료(피그온 그룹 행 + 팀 대시보드 지급율) > 등판서·직접 입력. 팀 대시보드 자료는 그룹이 없어 재고 차감에 쓰지 않는다.
 - **등판서**(도축장/축평원 양식): 두당 1행, 도체번호 순서로 그룹 분할. 생체중 없음 → 업로드 때 계근중량 입력 후 종합과 대조.
 - 10월 사육현황 시트: 주차별 손실(히트맵 초기값), E열 '동(그룹명)' = 동 배치 초기값.
 

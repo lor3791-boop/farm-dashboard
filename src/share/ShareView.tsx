@@ -1,6 +1,6 @@
 // 농장 공유 화면 본체 — 사장님·직원이 함께 보는 한 농장 화면. 한국어/네팔어.
 // 대시보드 미리보기와 공유 사이트가 같은 화면을 쓴다. (이 파일은 대시보드 코드를 가져오지 않는다)
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { SharePayload, ShareGroup } from './payload';
 import { applyDeaths, survOf } from './applyDeaths';
 
@@ -118,8 +118,26 @@ export function ShareView({ p, deaths = [], onSaveDeath, onEditDeath }: { p: Sha
   const tabs: [typeof tab, string][] = [['home', t.tabHome], ['status', t.tabStatus], ['death', t.tabDeath], ['ship', t.tabShip], ['task', t.tabTask]];
   const shipping = G.filter((r) => r.sold > 0);
 
+  // 좌우로 밀면 옆 탭으로 (가로로 스크롤되는 표·입력칸 위에서는 무시)
+  const touch = useRef<{ x: number; y: number; ok: boolean } | null>(null);
+  const canSwipe = (el: EventTarget | null) => {
+    for (let n = el as HTMLElement | null; n && n !== document.body; n = n.parentElement) {
+      if (/^(INPUT|SELECT|TEXTAREA)$/.test(n.tagName)) return false;
+      const ox = getComputedStyle(n).overflowX;
+      if ((ox === 'auto' || ox === 'scroll') && n.scrollWidth > n.clientWidth + 2) return false;
+    }
+    return true;
+  };
+  const onTouchStart = (e: React.TouchEvent) => { const t = e.touches[0]; touch.current = { x: t.clientX, y: t.clientY, ok: e.touches.length === 1 && canSwipe(e.target) }; };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const s0 = touch.current; touch.current = null; if (!s0?.ok) return;
+    const t = e.changedTouches[0], dx = t.clientX - s0.x, dy = t.clientY - s0.y;
+    if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.6) return;
+    const i = tabs.findIndex(([k]) => k === tab), j = dx < 0 ? i + 1 : i - 1;
+    if (j >= 0 && j < tabs.length) { setTab(tabs[j][0]); setEd(null); window.scrollTo(0, 0); }
+  };
   return (
-    <div className="v5 share" style={{ maxWidth: 480, margin: '0 auto', padding: '16px 14px 40px', boxSizing: 'border-box', minHeight: '100vh' }}>
+    <div className="v5 share" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ maxWidth: 480, margin: '0 auto', padding: '16px 14px 40px', boxSizing: 'border-box', minHeight: '100vh' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
         <div><div style={{ fontSize: 21, fontWeight: 700 }}>{p.farm}{t.farmSfx}</div><div className="muted" style={{ fontSize: 12 }}>{t.asOf(short(p.asOf))}</div></div>
         <div className="segs" role="group" aria-label="언어"><button className={lang === 'ko' ? 'seg on' : 'seg'} onClick={() => setLang('ko')}>한국어</button><button className={lang === 'ne' ? 'seg on' : 'seg'} onClick={() => setLang('ne')}>नेपाली</button></div>

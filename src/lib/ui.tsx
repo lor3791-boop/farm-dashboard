@@ -6,6 +6,7 @@ import type { UiSaved } from '@/data/types';
 import { useAuth } from './auth';
 import { useData } from './data';
 import { buildGroups, type Group } from './calc/herd';
+import { allShips, liveShipsOf } from './calc/ship';
 import type { Split } from '@/share/applyDeaths';
 
 export interface UiState {
@@ -39,7 +40,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
   const nav = useNavigate();
   // 저장 대기 중 화면이 바로 바뀌도록 낙관적 값
   const [opt, setOpt] = useState<Partial<UiSaved>>({});
-  const saved: UiSaved = useMemo(() => ({ planned: {}, done: {}, heatVals: {}, firstShipByFarm: {}, shareLinks: {}, ...(data?.ui ?? {}), ...opt }), [data, opt]);
+  const saved: UiSaved = useMemo(() => ({ planned: {}, done: {}, heatVals: {}, firstShipByFarm: {}, shareLinks: {}, settled: {}, sowFarms: [], ...(data?.ui ?? {}), ...opt }), [data, opt]);
   const set = useCallback((p: Partial<UiState>) => setS((o) => ({ ...o, ...p })), []);
   const save = useCallback((p: Partial<UiSaved>) => {
     setOpt((o) => ({ ...o, ...p }));
@@ -51,14 +52,16 @@ export function UiProvider({ children }: { children: ReactNode }) {
 
 // 필터가 적용된 그룹·농장 — 홈·돈군·분석이 함께 쓴다
 export function useHerd() {
-  const { data, deaths, ships, groups } = useData();
+  const { data, deaths, ships, groups, imports } = useData();
   const { s, set, saved, save } = useUi();
   // 기준일 이후 폐사·출하를 반영한 그룹 + 폐사 기록별 나눔(크레임/폐사)
   const { all, split } = useMemo(() => {
     const sp: Record<string, Split> = {};
-    const g: Group[] = data ? buildGroups(data.thresholds, saved.firstShipByFarm, { deaths, groups, ships: ships.map((x) => ({ farm: x.farm, group: x.group, date: x.date, n: x.n })) }, sp) : [];
+    const g: Group[] = data ? buildGroups(data.thresholds, saved.firstShipByFarm, { deaths, groups, ships: liveShipsOf(ships, imports) }, sp) : [];
     return { all: g, split: sp };
-  }, [data, saved.firstShipByFarm, deaths, ships, groups]);
+  }, [data, saved.firstShipByFarm, deaths, ships, groups, imports]);
+  const shipRows = useMemo(() => allShips(ships, imports), [ships, imports]);
+  const liveShips = useMemo(() => liveShipsOf(ships, imports), [ships, imports]);
   const farms = useMemo(() => [...new Set(all.map((r) => r.farm))], [all]);
   const farmBad = useMemo(() => { const m: Record<string, boolean> = {}; farms.forEach((f) => { m[f] = all.some((r) => r.farm === f && r.bad); }); return m; }, [all, farms]);
   const selSet = s.fSel === null ? farms : s.fSel;
@@ -67,5 +70,5 @@ export function useHerd() {
   const isPlanned = (r: Group) => (saved.planned[r.who] === undefined ? r.rec : saved.planned[r.who]);
   const setPlanned = (r: Group, v: boolean) => save({ planned: { ...saved.planned, [r.who]: v } });
   const togglePlan = (r: Group) => () => setPlanned(r, !isPlanned(r));
-  return { all, split, deaths, ships, groups, farms, farmBad, selSet, passFarm, rows, isPlanned, setPlanned, togglePlan, s, set, saved, save, T: data?.thresholds };
+  return { all, split, deaths, ships, groups, imports, shipRows, liveShips, farms, farmBad, selSet, passFarm, rows, isPlanned, setPlanned, togglePlan, s, set, saved, save, T: data?.thresholds };
 }

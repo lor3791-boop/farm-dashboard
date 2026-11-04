@@ -27,14 +27,14 @@ export interface Repo {
   remove(col: string, id: string): Promise<void>;
 }
 
-export interface DeathRec { date: string; farm: string; dong: string; group: string; count: number }
+export interface DeathRec { date: string; farm: string; dong: string; group: string; count: number; photos?: string[] }
 // src: 입력한 곳(dash 대시보드 / share 농장 앱), checked: 피그온 등록완료, key: 농장 앱 열쇠(있으면)
 export interface DeathRow extends DeathRec { id: string; path: string; src: 'dash' | 'share'; checked: boolean; key: string; at: string; by?: string; editedAt?: string }
 export type DeathPatch = Partial<DeathRec> & { checked?: boolean };
 // 날짜·두수·동·그룹을 고치면 피그온 등록완료가 풀린다 (다시 미등록)
 export const editResetsCheck = (p: DeathPatch) => ['date', 'farm', 'dong', 'group', 'count'].some((k) => k in p);
 const normAt = (v: any): string => (typeof v === 'string' ? v : v?.toDate ? v.toDate().toISOString() : '');
-export const emptyUi = (): UiSaved => ({ planned: {}, done: {}, heatVals: {}, firstShipByFarm: {}, shareLinks: {} });
+export const emptyUi = (): UiSaved => ({ planned: {}, done: {}, heatVals: {}, firstShipByFarm: {}, shareLinks: {}, settled: {}, sowFarms: [] });
 export const withUi = (u: Partial<UiSaved> | undefined): UiSaved => ({ ...emptyUi(), ...(u ?? {}) });
 export const seedData = (): AppData => ({
   farms: structuredClone(SEED_FARMS),

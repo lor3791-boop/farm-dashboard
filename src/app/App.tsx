@@ -6,7 +6,7 @@ import { Gate } from './Gate';
 import { Layout } from './Layout';
 import { HomePage } from '@/features/home/HomePage';
 import { ShipPage } from '@/features/ship/ShipPage';
-import { DeathPage } from '@/features/death/DeathPage';
+import { DeathPage, UnregPopup } from '@/features/death/DeathPage';
 import { SettlePage } from '@/features/settle/SettlePage';
 import { HerdPage } from '@/features/herd/HerdPage';
 import { AnalysisPage } from '@/features/analysis/AnalysisPage';
@@ -22,6 +22,7 @@ export function App() {
             <UiProvider>
               <Routes>
                 <Route path="/share" element={<SharePage />} />
+                <Route path="/popup/unreg" element={<UnregPopup />} />
                 <Route path="*" element={
                   <Layout>
                     <Routes>

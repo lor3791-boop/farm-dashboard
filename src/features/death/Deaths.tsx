@@ -58,14 +58,34 @@ function EditRow({ r, onDone }: { r: DeathRow; onDone: () => void }) {
 }
 
 // 미등록(피그온에 아직 안 올린) 폐사 — 등록완료를 누르면 목록에서 빠진다
-export function UnregisteredDeaths() {
+// 사진 보기 — 썸네일을 누르면 크게
+export function Photos({ r }: { r: DeathRow }) {
+  const [big, setBig] = useState<number | null>(null);
+  if (!r.photos?.length) return null;
+  return (
+    <div style={{ width: '100%', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      {r.photos.map((p, i) => <button key={i} onClick={() => setBig(big === i ? null : i)} aria-label={'사진 ' + (i + 1)} style={{ padding: 0, border: big === i ? '2px solid #1F4E3D' : '1px solid #E2DDD2', borderRadius: 6 }}><img src={p} alt="" style={{ width: 54, height: 54, objectFit: 'cover', borderRadius: 5, display: 'block' }} /></button>)}
+      {big !== null && <img src={r.photos[big]} alt={'폐사 사진 ' + (big + 1)} style={{ width: '100%', maxHeight: 520, objectFit: 'contain', borderRadius: 8, background: '#000' }} onClick={() => setBig(null)} />}
+    </div>
+  );
+}
+
+// 미등록 폐사를 작은 새 창으로 — 피그온 옆에 띄워 두고 입력하기 위함
+export const openUnregWindow = () => {
+  const w = Math.min(600, Math.round(screen.availWidth / 2));
+  window.open(location.href.split('#')[0] + '#/popup/unreg', 'unregDeaths', `width=${w},height=${screen.availHeight},left=${screen.availWidth - w},top=0`);
+};
+
+export function UnregisteredDeaths({ popup = false }: { popup?: boolean }) {
   const { deaths, passFarm } = useHerd();
   const { repo, email } = useAuth();
   const [edit, setEdit] = useState<string | null>(null);
   const [allOk, setAllOk] = useState(false);
   const [del, setDel] = useState<string | null>(null);
-  const rows = deaths.filter((r) => !r.checked && passFarm(r.farm)).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.farm.localeCompare(b.farm, 'ko')));
-  const byFarm = useMemo(() => { const m: Record<string, number> = {}; rows.forEach((r) => { m[r.farm] = (m[r.farm] ?? 0) + r.count; }); return m; }, [rows]);
+  const [only, setOnly] = useState('');
+  const rows0 = deaths.filter((r) => !r.checked && (popup || passFarm(r.farm)));
+  const rows = rows0.filter((r) => !only || r.farm === only).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.farm.localeCompare(b.farm, 'ko')));
+  const byFarm = useMemo(() => { const m: Record<string, number> = {}; rows0.forEach((r) => { m[r.farm] = (m[r.farm] ?? 0) + r.count; }); return m; }, [rows0]);
   const mark = (r: DeathRow) => repo!.updateDeath(r, { checked: true }, email);
   return (
     <div className="card">
@@ -74,18 +94,22 @@ export function UnregisteredDeaths() {
         {rows.length > 1 && (allOk
           ? <span style={{ display: 'flex', gap: 6 }}><button className="btn sm ghost" onClick={() => setAllOk(false)}>취소</button><button className="btn sm pri" onClick={async () => { setAllOk(false); for (const r of rows) await mark(r); }}>{rows.length}건 모두 등록완료</button></span>
           : <button className="btn sm" onClick={() => setAllOk(true)}>모두 등록완료</button>)}
+        {!popup && <button className="btn sm" onClick={openUnregWindow}>새 창으로 열기</button>}
       </div>
-      {rows.length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '8px 0 4px' }}>{Object.entries(byFarm).map(([f, n]) => <span key={f} className="chip warn">{f} {n}두</span>)}</div>}
+      {rows0.length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '8px 0 4px' }}>{Object.entries(byFarm).map(([f, n]) => <button key={f} className={only === f ? 'chip ok' : 'chip warn'} style={{ border: 0, cursor: 'pointer', font: 'inherit', fontSize: 13 }} onClick={() => setOnly(only === f ? '' : f)}>{f} {n}두</button>)}</div>}
       {rows.length === 0 && <div className="muted" style={{ marginTop: 8 }}>미등록 폐사가 없습니다</div>}
       {rows.map((r) => edit === r.id ? <EditRow key={r.id} r={r} onDone={() => setEdit(null)} /> : (
         <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid #EFEBE3', fontSize: 14, flexWrap: 'wrap' }}>
           <span style={{ width: 66 }}>{md(r.date)}({wd(r.date)})</span>
-          <div style={{ flex: 1, minWidth: 140 }}><b>{r.farm}</b> {dgLabel(r)}{r.editedAt ? <span className="muted" style={{ fontSize: 12 }}> · 수정됨</span> : null}</div>
+          <div style={{ flex: 1, minWidth: 120 }}><b>{r.farm}</b> {dgLabel(r)}{r.editedAt ? <span className="muted" style={{ fontSize: 12 }}> · 수정됨</span> : null}</div>
           <div style={{ textAlign: 'right' }}><b>{r.count}두</b><SplitTxt r={r} /></div>
-          {srcChip(r)}
-          <button className="btn sm ghost" onClick={() => { setEdit(r.id); setDel(null); }}>수정</button>
-          {del === r.id ? <button className="btn sm" style={{ borderColor: '#9A3216', color: '#9A3216' }} onClick={async () => { await repo!.removeDeath(r); setDel(null); }}>정말 삭제</button> : <button className="btn sm ghost" onClick={() => setDel(r.id)}>삭제</button>}
-          <button className="btn sm pri" onClick={() => mark(r)}>등록완료</button>
+          <span style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: 'auto' }}>
+            {srcChip(r)}
+            <button className="btn sm ghost" onClick={() => { setEdit(r.id); setDel(null); }}>수정</button>
+            {del === r.id ? <button className="btn sm" style={{ borderColor: '#9A3216', color: '#9A3216' }} onClick={async () => { await repo!.removeDeath(r); setDel(null); }}>정말 삭제</button> : <button className="btn sm ghost" onClick={() => setDel(r.id)}>삭제</button>}
+            <button className="btn sm pri" onClick={() => mark(r)}>등록완료</button>
+          </span>
+          <Photos r={r} />
         </div>
       ))}
     </div>
@@ -123,7 +147,7 @@ export function DeathList() {
           {shown.map((r) => edit === r.id ? <EditRow key={r.id} r={r} onDone={() => setEdit(null)} /> : (
             <div key={r.id} className="gr" style={{ gridTemplateColumns: g }}>
               <div>{md(r.date)}({wd(r.date)})</div>
-              <div><b>{r.farm}</b> {dgLabel(r)}{r.editedAt ? <div className="sub" style={{ fontSize: 12 }}>수정 {md(r.editedAt.slice(0, 10))}</div> : null}</div>
+              <div><b>{r.farm}</b> {dgLabel(r)}{r.photos?.length ? <span className="muted small"> · 사진 {r.photos.length}</span> : null}{r.editedAt ? <div className="sub" style={{ fontSize: 12 }}>수정 {md(r.editedAt.slice(0, 10))}</div> : null}</div>
               <div className="r"><b>{r.count}</b><SplitTxt r={r} /></div>
               <div>{srcChip(r)}</div>
               <div><button className={r.checked ? 'chip ok' : 'chip warn'} style={{ border: 0, cursor: 'pointer', font: 'inherit', fontSize: 12 }} onClick={() => repo!.updateDeath(r, { checked: !r.checked }, email)}>{r.checked ? '등록완료' : '미등록'}</button></div>

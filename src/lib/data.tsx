@@ -3,10 +3,12 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import type { AppData, ManualShip } from '@/data/types';
 import type { DeathRow } from './repo';
 import type { ManualGroup } from './calc/herd';
+import { mergeImports, type ShipImport, type ImpRow } from './shipImport';
+import { useMemo } from 'react';
 import { useAuth } from './auth';
 
-interface DataState { data: AppData | null; error: string; deaths: DeathRow[]; ships: (ManualShip & { id: string })[]; groups: (ManualGroup & { id: string })[] }
-const Ctx = createContext<DataState>({ data: null, error: '', deaths: [], ships: [], groups: [] });
+interface DataState { data: AppData | null; error: string; deaths: DeathRow[]; ships: (ManualShip & { id: string })[]; groups: (ManualGroup & { id: string })[]; uploads: (ShipImport & { id: string })[]; imports: ImpRow[] }
+const Ctx = createContext<DataState>({ data: null, error: '', deaths: [], ships: [], groups: [], uploads: [], imports: [] });
 export const useData = () => useContext(Ctx);
 
 export function DataProvider({ children }: { children: ReactNode }) {
@@ -15,13 +17,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [deaths, setDeaths] = useState<DeathRow[]>([]);
   const [ships, setShips] = useState<(ManualShip & { id: string })[]>([]);
   const [groups, setGroups] = useState<(ManualGroup & { id: string })[]>([]);
+  const [uploads, setUploads] = useState<(ShipImport & { id: string })[]>([]);
+  const imports = useMemo(() => mergeImports(uploads), [uploads]);
   useEffect(() => {
     if (!repo) return;
     const u1 = repo.subscribe((d) => set({ data: d, error: '' }), (e) => set((p) => ({ ...p, error: e.message })));
     const u2 = repo.watchDeaths(setDeaths, (e) => set((p) => ({ ...p, error: e.message })));
     const u3 = repo.watch<ManualShip>('shipments', setShips);
     const u4 = repo.watch<ManualGroup>('groups', setGroups);
-    return () => { u1(); u2(); u3(); u4(); };
+    const u5 = repo.watch<ShipImport>('shipImport', setUploads);
+    return () => { u1(); u2(); u3(); u4(); u5(); };
   }, [repo]);
-  return <Ctx.Provider value={{ ...st, deaths, ships, groups }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ ...st, deaths, ships, groups, uploads, imports }}>{children}</Ctx.Provider>;
 }

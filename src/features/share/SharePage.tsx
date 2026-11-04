@@ -3,21 +3,20 @@ import { useSearchParams } from 'react-router-dom';
 import { useHerd } from '@/lib/ui';
 import { useAuth } from '@/lib/auth';
 import { buildGroups, buildTasks, REF, TODAY } from '@/lib/calc/herd';
-import { allShips } from '@/lib/calc/ship';
 import { ShareView } from '@/share/ShareView';
 import { buildSharePayload } from '@/share/payload';
 import { todayKST } from '@/lib/util';
 
 export function SharePage() {
   const [sp] = useSearchParams();
-  const { all, farms, deaths, ships, groups, saved, T } = useHerd();
+  const { all, farms, deaths, ships, shipRows, liveShips, groups, saved, T } = useHerd();
   const { repo, email } = useAuth();
   const farm = sp.get('farm') && farms.includes(sp.get('farm')!) ? sp.get('farm')! : farms[0];
   if (!farm || !T) return null;
   // 이 농장 폐사는 농장 앱 화면이 직접 더하므로 빼고 계산
   const mine = deaths.filter((d) => d.farm === farm);
-  const g = buildGroups(T, saved.firstShipByFarm, { deaths: deaths.filter((d) => d.farm !== farm), ships: ships.map((x) => ({ farm: x.farm, group: x.group, date: x.date, n: x.n })), groups });
-  const p = { ...buildSharePayload(farm, g, buildTasks(all), allShips(ships), REF, TODAY, T.problemSurvivalPct), today: todayKST() };
+  const g = buildGroups(T, saved.firstShipByFarm, { deaths: deaths.filter((d) => d.farm !== farm), ships: liveShips, groups });
+  const p = { ...buildSharePayload(farm, g, buildTasks(all), shipRows, REF, TODAY, T.problemSurvivalPct), today: todayKST() };
   const key = saved.shareLinks[farm] ?? '';
   return (
     <>

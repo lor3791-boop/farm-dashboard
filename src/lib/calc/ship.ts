@@ -2,6 +2,7 @@
 import { r1 } from './dates';
 import { SHIP, type ShipRow } from '@/data/snapshot';
 import type { ManualShip } from '@/data/types';
+import type { ImpRow } from '@/lib/shipImport';
 export interface ShipAgg { n: number; trucks: number; avgw: number; yld: number; pay: number; g11: number; gp: number; out: number }
 const sum = (L: ShipRow[], i: number) => L.reduce((a, x) => a + (x[i] as number), 0);
 export function shipAgg(L: ShipRow[]): ShipAgg {
@@ -17,7 +18,19 @@ export const manualToRow = (m: ManualShip): ShipRow => [m.date, m.farm, m.dest +
 export const shipKey = (date: string, farm: string) => date + '|' + farm;
 export const SHIP_KEYS = new Set(SHIP.map((x) => shipKey(x[0], x[1])));
 export const pendingManual = <T extends ManualShip>(manual: T[]) => manual.filter((m) => !SHIP_KEYS.has(shipKey(m.date, m.farm)));
-export const allShips = (manual: ManualShip[]): ShipRow[] => SHIP.concat(pendingManual(manual).map(manualToRow));
+export const impToRow = (r: ImpRow): ShipRow => [r.date, r.farm, r.dest + (r.src === 'pigon' ? ' (피그온)' : ' (팀 대시보드)'), r.n, r.live, r.carc > 0 ? r.carc : 0, r.pay ? r.pay / 100 : 0, r.g1p, r.g1, r.g2, r.out];
+// 우선순위: 출하실적종합 > 올린 출하 자료(피그온·팀 대시보드) > 등판서·직접 입력 — 같은 날·같은 농장 기준
+export const pendingImports = (imp: ImpRow[]) => imp.filter((r) => !SHIP_KEYS.has(shipKey(r.date, r.farm)));
+export const allShips = (manual: ManualShip[], imp: ImpRow[] = []): ShipRow[] => {
+  const ik = new Set(imp.map((r) => shipKey(r.date, r.farm)));
+  return SHIP.concat(pendingImports(imp).map(impToRow), pendingManual(manual).filter((m) => !ik.has(shipKey(m.date, m.farm))).map(manualToRow));
+};
+// 재고 차감용 출하(기준일 이후): 그룹이 있는 피그온 자료가 있으면 그 날·농장은 피그온, 아니면 등판서·직접 입력
+export const liveShipsOf = (manual: ManualShip[], imp: ImpRow[]) => {
+  const pk = new Set(imp.filter((r) => r.group).map((r) => shipKey(r.date, r.farm)));
+  return imp.filter((r) => r.group).map((r) => ({ farm: r.farm, group: r.group, date: r.date, n: r.n }))
+    .concat(manual.filter((m) => !pk.has(shipKey(m.date, m.farm))).map((m) => ({ farm: m.farm, group: m.group, date: m.date, n: m.n })));
+};
 // 종합이 아직 없는 출하의 예상 지급율: 같은 출하처의 최근 60일 종합 지급율(지육중량 가중)
 export function estPay(dest: string, date: string): number | null {
   const sd = shortDest(dest), from = new Date(Date.parse(date) - 60 * 864e5).toISOString().slice(0, 10);

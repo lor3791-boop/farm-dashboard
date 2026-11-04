@@ -1,15 +1,14 @@
 // 정산자료 엑셀 — 그룹 하나를 골라 1파일 5시트 (정산요약·출하실적·사료·폭염·구제역 백신비)
 import { useState } from 'react';
 import { useHerd } from '@/lib/ui';
-import { allShips } from '@/lib/calc/ship';
 import { downloadXlsx } from '@/lib/xlsx';
 import { useCol } from '@/lib/useCol';
 import { mergeFeed, type FeedMid, type Vaccine, type FeedUpload } from '@/lib/feedSheet';
 
 export function SettleExcel() {
-  const { all, isPlanned, s, set, ships, saved } = useHerd();
+  const { all, isPlanned, s, set, ships, shipRows, liveShips, saved } = useHerd();
   const [xMsg, setXMsg] = useState('');
-  const SHIP = allShips(ships);
+  const SHIP = shipRows;
   const mids = useCol<FeedMid>('feedMid');
   const vacs = useCol<Vaccine>('vaccine');
   const feed = useCol<FeedUpload>('feed');

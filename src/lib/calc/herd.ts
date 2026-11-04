@@ -8,7 +8,7 @@ import { applyDeaths, type DeathLike, type Split, type DeathBase } from '@/share
 // 기준일(스냅샷/돈수불) 이후 입력분 — 폐사와 출하(등판서·직접 입력)
 export interface LiveShip { farm: string; group: string; date: string; n: number }
 // 직접 등록한 그룹 (피그온 전입현황 업로드 전) — dongs: ['1','2'] (동 없이 관리면 빈 배열)
-export interface ManualGroup { id?: string; farm: string; group: string; dongs: string[]; date: string; inn: number; claim: number; avgw: number; age: number; memo?: string }
+export interface ManualGroup { id?: string; farm: string; group: string; dongs: string[]; date: string; inn: number; claim: number; avgw: number; age: number; totalKg?: number; source?: string; memo?: string }
 export interface Live { deaths: DeathLike[]; ships: LiveShip[]; groups?: ManualGroup[] }
 const mmdd = (d: string) => d.slice(5);
 // 직접 등록 그룹 → 스냅샷과 같은 모양(GRow + 로트)

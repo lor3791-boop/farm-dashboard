@@ -9,6 +9,8 @@ import { todayKST } from '@/lib/util';
 import { survOf } from '@/share/applyDeaths';
 import { UnregisteredDeaths, DeathList } from './Deaths';
 import { DeathDaily } from './DeathDaily';
+import { useRef } from 'react';
+import { shrinkImage } from '@/lib/image';
 
 export function DeathPage() {
   const { s, set } = useHerd();
@@ -36,6 +38,14 @@ function DeathEntry() {
   const [date, setDate] = useState(todayKST());
   const [saved, setSaved] = useState('');
   const [savedOk, setSavedOk] = useState(true);
+  const [photos, setPhotos] = useState<string[]>([]);
+  const pref = useRef<HTMLInputElement>(null);
+  const addPhotos = async (L: FileList) => {
+    const room = 3 - photos.length; const out: string[] = [];
+    try { for (const f of [...L].slice(0, room)) out.push(await shrinkImage(f, 220 * 1024, [[1280, 0.7], [1024, 0.6], [800, 0.55]])); setSaved(L.length > room ? '사진은 한 건에 3장까지 붙습니다' : ''); setSavedOk(true); }
+    catch (e) { setSavedOk(false); setSaved((e as Error).message); }
+    setPhotos([...photos, ...out]);
+  };
   if (!all.length) return null;
   const pill = (on: boolean) => (on ? 'pill on' : 'pill');
   const dRows = all.filter((r) => r.farm === s.dFarm);
@@ -47,7 +57,8 @@ function DeathEntry() {
   const save = async () => {
     if (!chosen) { setSavedOk(false); setSaved('그룹을 먼저 골라야 저장됩니다'); return; }
     const before = cur;
-    await repo!.addDeath({ date, farm: s.dFarm, dong: s.dDong ?? '', group: chosen, count: cnt }, email, ui.shareLinks[s.dFarm] ?? '');
+    await repo!.addDeath({ date, farm: s.dFarm, dong: s.dDong ?? '', group: chosen, count: cnt, ...(photos.length ? { photos } : {}) }, email, ui.shareLinks[s.dFarm] ?? '');
+    setPhotos([]);
     setSavedOk(true); setSaved(`저장됨: ${s.dFarm} ${chosen} ${cnt}두 · ${md(date)}` + (before && before.claimLeft > 0 ? ` (크레임 ${Math.min(cnt, before.claimLeft)}두 먼저 차감)` : ''));
     setCnt(1);
   };
@@ -55,7 +66,15 @@ function DeathEntry() {
   const after = cur ? (() => { const c = Math.min(cnt, cur.claimLeft); const d = cur.death + cnt - c; return { c, d, stock: cur.stock - cnt, surv: survOf(cur.net, d) }; })() : null;
   return (
           <div className="card" style={{ maxWidth: 520 }}>
-      <h2 className="h2">폐사 입력</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+        <h2 className="h2">폐사 입력</h2>
+        <span><input ref={pref} type="file" accept="image/*" multiple hidden onChange={(e) => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = ''; }} /><button className="btn" disabled={photos.length >= 3} onClick={() => pref.current?.click()}>사진 등록{photos.length ? ` (${photos.length}/3)` : ''}</button></span>
+      </div>
+      {photos.length > 0 && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+          {photos.map((p, i) => <div key={i} style={{ position: 'relative' }}><img src={p} alt={'폐사 사진 ' + (i + 1)} style={{ width: 84, height: 84, objectFit: 'cover', borderRadius: 8 }} /><button aria-label="사진 빼기" onClick={() => setPhotos(photos.filter((_, j) => j !== i))} style={{ position: 'absolute', top: 2, right: 2, width: 26, height: 26, borderRadius: 13, background: 'rgba(0,0,0,.55)', color: '#fff' }}>✕</button></div>)}
+        </div>
+      )}
       <div style={{ fontWeight: 700, margin: '14px 0 8px' }}>① 농장</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 6 }}>
         {farms.map((f) => <button key={f} className={pill(s.dFarm === f)} onClick={() => { set({ dFarm: f, dDong: null, dGroup: null }); setCnt(1); setSaved(''); }}>{f}</button>)}
@@ -93,6 +112,15 @@ function DeathEntry() {
         <button className="btn" onClick={() => { setSaved('한 사진에 여러 동: 이 동을 저장한 뒤 동을 바꿔 한 번 더 저장하세요'); setSavedOk(true); }}>+ 동 추가 (한 사진에 여러 동)</button>
       </div>
       {saved && <div style={{ marginTop: 12 }}><span className={savedOk ? 'chip ok' : 'chip bad'} style={{ whiteSpace: 'normal' }}>{saved}</span></div>}
+    </div>
+  );
+}
+
+// 새 창 — 미등록 폐사만 (피그온 옆에 화면 분할로 띄움)
+export function UnregPopup() {
+  return (
+    <div className="v5" style={{ padding: '12px 12px 32px', minHeight: '100vh', boxSizing: 'border-box' }}>
+      <UnregisteredDeaths popup />
     </div>
   );
 }

@@ -6,22 +6,9 @@ import { useCol } from '@/lib/useCol';
 import type { Vaccine } from '@/lib/feedSheet';
 import { fmt, md } from '@/lib/calc/dates';
 import { todayKST } from '@/lib/util';
+import { readUrl, shrinkImage } from '@/lib/image';
 
 const MAX = 700 * 1024;
-const readUrl = (f: Blob) => new Promise<string>((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = () => no(r.error); r.readAsDataURL(f); });
-// 사진은 긴 변 1600px · JPEG로 줄인다
-async function shrinkImage(f: File): Promise<string> {
-  const url = await readUrl(f);
-  const img = await new Promise<HTMLImageElement>((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => no(new Error('사진을 열 수 없습니다 (HEIC는 JPG로 바꿔 올려주세요)')); i.src = url; });
-  for (const [side, q] of [[1600, 0.75], [1200, 0.65], [900, 0.6]] as const) {
-    const k = Math.min(1, side / Math.max(img.width, img.height));
-    const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
-    c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
-    const d = c.toDataURL('image/jpeg', q);
-    if (d.length * 0.75 < MAX) return d;
-  }
-  throw new Error('사진이 너무 큽니다');
-}
 const toBlobUrl = (d: string) => { const [h, b] = d.split(','); const bin = atob(b); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return URL.createObjectURL(new Blob([u], { type: h.slice(5, h.indexOf(';')) })); };
 
 function Attachment({ v }: { v: Vaccine }) {

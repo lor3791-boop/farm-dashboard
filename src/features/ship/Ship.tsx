@@ -6,7 +6,9 @@ import { useAuth } from '@/lib/auth';
 import { useData } from '@/lib/data';
 import { parseGradeSheet, segRows, segsByTrace, type GradeSheet, type Seg } from '@/lib/gradeSheet';
 import { SHIP } from '@/data/snapshot';
-import { shortDest, shipKey, SHIP_KEYS, estPay } from '@/lib/calc/ship';
+import { shortDest, shipKey, SHIP_KEYS, estPay, pendingImports } from '@/lib/calc/ship';
+import { parseShipImport, type ShipImport } from '@/lib/shipImport';
+import { makeResolver } from '@/lib/names';
 import { fmt, md, r1 } from '@/lib/calc/dates';
 import type { ManualShip } from '@/data/types';
 import { ShipManualButton } from './ShipManual';
@@ -141,20 +143,23 @@ export function ShipUpload() {
   );
 }
 
-interface Row { key: string; date: string; farm: string; group: string; dest: string; n: number; live: number; carc: number; pay: number | null; payEst: boolean; g1p: number; g1: number; g2: number; out: number; src: '종합' | '등판서' | '직접 입력' }
+interface Row { key: string; date: string; farm: string; group: string; dest: string; n: number; live: number; carc: number; pay: number | null; payEst: boolean; g1p: number; g1: number; g2: number; out: number; src: '종합' | '등판서' | '직접 입력' | '피그온' | '팀 대시보드' }
 
 export function ShipStatus() {
-  const { ships, farms } = useHerd();
+  const { ships, farms, imports } = useHerd();
   const rows = useMemo<Row[]>(() => {
     const a: Row[] = SHIP.map((x, i) => ({ key: 's' + i, date: x[0], farm: x[1], group: '', dest: x[2], n: x[3], live: x[4], carc: x[5], pay: x[6] > 0 ? r1(x[6] * 100) : null, payEst: false, g1p: x[7], g1: x[8], g2: x[9], out: x[10], src: '종합' }));
-    ships.filter((m) => !SHIP_KEYS.has(shipKey(m.date, m.farm))).forEach((m) => {
+    const P = pendingImports(imports), ik = new Set(P.map((r) => shipKey(r.date, r.farm)));
+    P.forEach((r, i) => { const pay = r.pay ?? estPay(r.dest, r.date); a.push({ key: 'i' + i, date: r.date, farm: r.farm, group: r.group, dest: r.dest, n: r.n, live: r.live, carc: r.carc > 0 ? r.carc : r.live * 0.77, pay, payEst: r.pay == null && pay != null, g1p: r.g1p, g1: r.g1, g2: r.g2, out: r.out, src: r.src === 'pigon' ? '피그온' : '팀 대시보드' }); });
+    ships.filter((m) => !SHIP_KEYS.has(shipKey(m.date, m.farm)) && !ik.has(shipKey(m.date, m.farm))).forEach((m) => {
       const pay = m.pay ?? estPay(m.dest, m.date);
       a.push({ key: m.id, date: m.date, farm: m.farm, group: m.group, dest: m.dest, n: m.n, live: m.live, carc: m.carc ?? r1((m.live * m.yld) / 100), pay, payEst: m.pay == null && pay != null, g1p: m.g1p, g1: m.g1, g2: m.g2, out: m.out, src: m.kind === 'grade' ? '등판서' : '직접 입력' });
     });
     return a;
-  }, [ships]);
+  }, [ships, imports]);
   const months = useMemo(() => [...new Set(rows.map((r) => r.date.slice(0, 7)))].sort().reverse(), [rows]);
-  const [mon, setMon] = useState(months[0] ?? '');
+  const [monSel, setMon] = useState<string | null>(null);
+  const mon = monSel ?? months[0] ?? '';
   const [dest, setDest] = useState('');
   const [farm, setFarm] = useState('');
   const [sort, setSort] = useState<'date' | 'n' | 'avgw' | 'yld'>('date');
@@ -226,5 +231,49 @@ export function ShipStatus() {
         </div>
       )}
     </>
+  );
+}
+
+// 출하 자료 올리기 — 피그온 출하 엑셀 / 팀 대시보드 출하기록 엑셀. 올린 파일은 합쳐서 출하 현황·출하성적·정산자료에 반영
+export function ShipImportCard() {
+  const { farms } = useHerd();
+  const { data, uploads } = useData();
+  const { repo, email } = useAuth();
+  const ref = useRef<HTMLInputElement>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
+  const [del, setDel] = useState<string | null>(null);
+  const onFile = async (file: File) => {
+    setMsg(null);
+    try {
+      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      const rf = makeResolver(farms, data?.nameMap);
+      let res: ReturnType<typeof parseShipImport> | null = null, last = '';
+      for (const n of wb.SheetNames) { try { res = parseShipImport(XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: '', raw: true }) as unknown[][], rf); break; } catch (e) { last = (e as Error).message; } }
+      if (!res) throw new Error(last);
+      if (!res.rows.length) throw new Error('담당 농장 출하가 없습니다' + (res.skipped.length ? ' (제외: ' + res.skipped.join(', ') + ')' : ''));
+      const rec: ShipImport = { file: file.name, kind: res.kind, rows: res.rows };
+      await repo!.add('shipImport', rec as any, email);
+      const ds = [...new Set(res.rows.map((r) => r.date))].sort();
+      setMsg({ ok: true, t: `${res.kind === 'pigon' ? '피그온' : '팀 대시보드'} · ${res.rows.length}건 · ${fmt(res.rows.reduce((a, r) => a + r.n, 0))}두 · ${md(ds[0])}~${md(ds[ds.length - 1])}` + (res.skipped.length ? ` · 담당 아님(제외): ${res.skipped.join(', ')}` : '') });
+    } catch (e) { setMsg({ ok: false, t: '읽지 못했습니다: ' + (e as Error).message }); }
+  };
+  return (
+    <div className="card" style={{ marginTop: 16 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'space-between' }}>
+        <h2 className="h2">출하 자료 올리기 <span className="muted" style={{ fontSize: 13, fontWeight: 400 }}>피그온 출하 · 팀 대시보드 출하기록</span></h2>
+        <div><input ref={ref} type="file" accept=".xls,.xlsx" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }} /><button className="btn pri" onClick={() => ref.current?.click()}>파일 올리기</button></div>
+      </div>
+      {msg && <div style={{ marginTop: 10 }}><span className={msg.ok ? 'chip ok' : 'chip bad'} style={{ whiteSpace: 'normal' }}>{msg.t}</span></div>}
+      {uploads.length > 0 && (
+        <div style={{ marginTop: 10, display: 'grid', gap: 4 }}>
+          {[...uploads].sort((a, b) => ((a.at ?? '') < (b.at ?? '') ? 1 : -1)).map((u) => (
+            <div key={u.id} className="small" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span className="muted">{u.at ? md(u.at.slice(0, 10)) : ''}</span><span className={u.kind === 'pigon' ? 'chip info' : 'chip'} style={{ fontSize: 12 }}>{u.kind === 'pigon' ? '피그온' : '팀 대시보드'}</span><b>{u.file}</b><span className="muted">{u.rows.length}건</span>
+              {del === u.id ? <button className="btn sm" style={{ borderColor: '#9A3216', color: '#9A3216' }} onClick={async () => { await repo!.remove('shipImport', u.id); setDel(null); }}>정말 삭제</button> : <button className="btn sm ghost" onClick={() => setDel(u.id)}>삭제</button>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

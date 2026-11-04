@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useHerd } from '@/lib/ui';
 import { agg, type Group } from '@/lib/calc/herd';
 import { fmt, r1 } from '@/lib/calc/dates';
-import { allShips, shipAgg } from '@/lib/calc/ship';
+import { shipAgg } from '@/lib/calc/ship';
 import { MONTHS, WEEKLY } from '@/data/snapshot';
 import { FarmPicker, Segs } from '@/components/v5';
 import { downloadXlsx } from '@/lib/xlsx';
@@ -11,9 +11,9 @@ import { downloadXlsx } from '@/lib/xlsx';
 const monthOpts = MONTHS.map((m) => ({ v: m, l: m.slice(0, 4) + '년 ' + Number(m.slice(5)) + '월' }));
 
 export function ReportTab() {
-  const { all, farms, ships, T } = useHerd();
+  const { all, farms, ships, shipRows, liveShips, T } = useHerd();
   const [r, setR] = useState({ mode: 'compare' as 'single' | 'compare', sel: ['재성', '산성농원', '민서'], open: false, q: '', from: '2026-07', to: '2026-10', msg: '', money: false });
-  const SHIP = allShips(ships);
+  const SHIP = shipRows;
   if (!T) return null;
   const rMax = r.mode === 'single' ? 1 : 3;
   const rSel = r.sel.slice(0, rMax);
