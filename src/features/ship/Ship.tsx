@@ -250,11 +250,12 @@ export function ShipImportCard() {
       let res: ReturnType<typeof parseShipImport> | null = null, last = '';
       for (const n of wb.SheetNames) { try { res = parseShipImport(XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: '', raw: true }) as unknown[][], rf); break; } catch (e) { last = (e as Error).message; } }
       if (!res) throw new Error(last);
-      if (!res.rows.length) throw new Error('담당 농장 출하가 없습니다' + (res.skipped.length ? ' (제외: ' + res.skipped.join(', ') + ')' : ''));
+      const unknown = res.skipped.filter((n) => !rf.excluded(n));
+      if (!res.rows.length) throw new Error('담당 농장 출하가 없습니다' + (unknown.length ? ' (이름 확인 필요: ' + unknown.join(', ') + ')' : ''));
       const rec: ShipImport = { file: file.name, kind: res.kind, rows: res.rows };
       await repo!.add('shipImport', rec as any, email);
       const ds = [...new Set(res.rows.map((r) => r.date))].sort();
-      setMsg({ ok: true, t: `${res.kind === 'pigon' ? '피그온' : '팀 대시보드'} · ${res.rows.length}건 · ${fmt(res.rows.reduce((a, r) => a + r.n, 0))}두 · ${md(ds[0])}~${md(ds[ds.length - 1])}` + (res.skipped.length ? ` · 담당 아님(제외): ${res.skipped.join(', ')}` : '') });
+      setMsg({ ok: true, t: `${res.kind === 'pigon' ? '피그온' : '팀 대시보드'} · ${res.rows.length}건 · ${fmt(res.rows.reduce((a, r) => a + r.n, 0))}두 · ${md(ds[0])}~${md(ds[ds.length - 1])}` + (unknown.length ? ` · 이름 확인 필요(설정 › 이름 맞춤표): ${unknown.join(', ')}` : '') });
     } catch (e) { setMsg({ ok: false, t: '읽지 못했습니다: ' + (e as Error).message }); }
   };
   return (

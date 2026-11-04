@@ -53,7 +53,10 @@ export const SEED_NAMEMAP: NameMapRow[] = [
   { id: 'n3', kind: '농가', source: '재성(박상배)', sourceFile: '피그온', target: '재성', excluded: false, memo: '' },
   { id: 'n4', kind: '농가', source: '용암농장', sourceFile: '피그온', target: '용암', excluded: false, memo: '' },
   { id: 'n5', kind: '농가', source: '피그팜(금종찬)', sourceFile: '출하실적종합', target: '', excluded: true, memo: '골드피그와 같은 사장님의 다른 농장' },
-  { id: 'n6', kind: '출하처', source: '음성신선공장(팜스코)', sourceFile: '출하실적종합', target: '신선', excluded: false, memo: '' }
+  { id: 'n6', kind: '출하처', source: '음성신선공장(팜스코)', sourceFile: '출하실적종합', target: '신선', excluded: false, memo: '' },
+  { id: 'n7', kind: '농장주', source: '정성조', sourceFile: '팀 대시보드 출하기록', target: '정축산', excluded: false, memo: '정축산 농장주' },
+  { id: 'n8', kind: '농가', source: '예성', sourceFile: '팀 대시보드 출하기록', target: '', excluded: true, memo: '담당 아님' },
+  { id: 'n9', kind: '농가', source: '희망2', sourceFile: '피그온', target: '', excluded: true, memo: '담당 아님' }
 ];
 
 // 이름이 바뀐 적 있는 키 목록 — 테스트용 기대값
