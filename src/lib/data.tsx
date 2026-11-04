@@ -2,10 +2,11 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { AppData, ManualShip } from '@/data/types';
 import type { DeathRow } from './repo';
+import type { ManualGroup } from './calc/herd';
 import { useAuth } from './auth';
 
-interface DataState { data: AppData | null; error: string; deaths: DeathRow[]; ships: (ManualShip & { id: string })[] }
-const Ctx = createContext<DataState>({ data: null, error: '', deaths: [], ships: [] });
+interface DataState { data: AppData | null; error: string; deaths: DeathRow[]; ships: (ManualShip & { id: string })[]; groups: (ManualGroup & { id: string })[] }
+const Ctx = createContext<DataState>({ data: null, error: '', deaths: [], ships: [], groups: [] });
 export const useData = () => useContext(Ctx);
 
 export function DataProvider({ children }: { children: ReactNode }) {
@@ -13,12 +14,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [st, set] = useState<{ data: AppData | null; error: string }>({ data: null, error: '' });
   const [deaths, setDeaths] = useState<DeathRow[]>([]);
   const [ships, setShips] = useState<(ManualShip & { id: string })[]>([]);
+  const [groups, setGroups] = useState<(ManualGroup & { id: string })[]>([]);
   useEffect(() => {
     if (!repo) return;
     const u1 = repo.subscribe((d) => set({ data: d, error: '' }), (e) => set((p) => ({ ...p, error: e.message })));
     const u2 = repo.watchDeaths(setDeaths, (e) => set((p) => ({ ...p, error: e.message })));
     const u3 = repo.watch<ManualShip>('shipments', setShips);
-    return () => { u1(); u2(); u3(); };
+    const u4 = repo.watch<ManualGroup>('groups', setGroups);
+    return () => { u1(); u2(); u3(); u4(); };
   }, [repo]);
-  return <Ctx.Provider value={{ ...st, deaths, ships }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ ...st, deaths, ships, groups }}>{children}</Ctx.Provider>;
 }

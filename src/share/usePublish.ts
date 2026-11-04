@@ -8,7 +8,7 @@ import { allShips } from '@/lib/calc/ship';
 import { buildSharePayload } from './payload';
 
 export function useSharePublisher() {
-  const { all, saved, deaths, ships, T } = useHerd();
+  const { all, saved, deaths, ships, groups, T } = useHerd();
   const { repo } = useAuth();
   const last = useRef<Record<string, string>>({});
   useEffect(() => {
@@ -17,12 +17,12 @@ export function useSharePublisher() {
     const liveShips = ships.map((x) => ({ farm: x.farm, group: x.group, date: x.date, n: x.n }));
     Object.entries(saved.shareLinks).forEach(([farm, key]) => {
       if (!key) return;
-      const g = buildGroups(T, saved.firstShipByFarm, { deaths: deaths.filter((d) => d.key !== key || d.path.startsWith('shareDeaths/')), ships: liveShips });
+      const g = buildGroups(T, saved.firstShipByFarm, { deaths: deaths.filter((d) => d.key !== key || d.path.startsWith('shareDeaths/')), ships: liveShips, groups });
       const p = buildSharePayload(farm, g, tasks, rows, REF, TODAY, T.problemSurvivalPct);
       const j = JSON.stringify(p);
       if (last.current[key] === j) return;
       last.current[key] = j;
       repo.put('share', key, { ...p, updatedAt: new Date().toISOString() }).catch(() => { delete last.current[key]; });
     });
-  }, [repo, all, saved.shareLinks, saved.firstShipByFarm, deaths, ships, T]);
+  }, [repo, all, saved.shareLinks, saved.firstShipByFarm, deaths, ships, groups, T]);
 }

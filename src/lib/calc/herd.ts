@@ -1,13 +1,27 @@
 // 그룹 계산 — 목업 v5의 rec()/agg()를 그대로 옮기고, 숫자 기준은 설정(thresholds)에서 읽는다.
 // 화면은 계산식을 직접 쓰지 않고 이 파일의 결과만 쓴다.
 import type { Thresholds } from '@/data/types';
-import { G, LOTS, LAST_SHIP, WEEKLY, REF, TODAY, FARM_SURV, type Lot } from '@/data/snapshot';
+import { G as G0, LOTS as LOTS0, LAST_SHIP, WEEKLY, REF, TODAY, FARM_SURV, type Lot, type GRow } from '@/data/snapshot';
 import { iso, days, addIso, r1 } from './dates';
 import { applyDeaths, type DeathLike, type Split, type DeathBase } from '@/share/applyDeaths';
 
 // 기준일(스냅샷/돈수불) 이후 입력분 — 폐사와 출하(등판서·직접 입력)
 export interface LiveShip { farm: string; group: string; date: string; n: number }
-export interface Live { deaths: DeathLike[]; ships: LiveShip[] }
+// 직접 등록한 그룹 (피그온 전입현황 업로드 전) — dongs: ['1','2'] (동 없이 관리면 빈 배열)
+export interface ManualGroup { id?: string; farm: string; group: string; dongs: string[]; date: string; inn: number; claim: number; avgw: number; age: number; memo?: string }
+export interface Live { deaths: DeathLike[]; ships: LiveShip[]; groups?: ManualGroup[] }
+const mmdd = (d: string) => d.slice(5);
+// 직접 등록 그룹 → 스냅샷과 같은 모양(GRow + 로트)
+export function manualRows(T: Thresholds, L: ManualGroup[]): { row: GRow; lot: Lot }[] {
+  return L.map((m) => {
+    const light = m.avgw < T.workWeightKg;
+    const dew = light ? addIso(m.date, T.dewormDaysAfterEntry) : addIso(m.date, Math.max(T.minDaysAfterEntry, T.dewormAgeHeavy - m.age));
+    const fmd = light ? addIso(m.date, T.fmdDaysAfterEntry) : addIso(m.date, Math.max(T.minDaysAfterEntry, T.fmdAgeHeavy - m.age));
+    const week = Math.max(1, Math.floor(days(m.date, REF) / 7) + 1);
+    const row: GRow = [m.farm, m.group, m.dongs.length ? m.dongs.join('·') + '동' : '—', m.date, m.inn, 0, 0, m.inn, m.age, week, m.avgw, []];
+    return { row, lot: [mmdd(m.date), m.inn, m.claim, m.age, mmdd(fmd), mmdd(dew), m.avgw] as Lot };
+  });
+}
 
 export interface Group {
   farm: string; group: string; dong: string; date: string; who: string;
@@ -22,6 +36,10 @@ export const dongsOf = (s: string) => (s === '—' ? [] : s.replace('동', '').s
 export { REF, TODAY };
 
 export function buildGroups(T: Thresholds, firstShipByFarm: Record<string, number> = {}, live?: Live, splitOut?: Record<string, Split>): Group[] {
+  const extra = manualRows(T, (live?.groups ?? []).filter((m) => !G0.some((r) => r[0] === m.farm && r[1] === m.group)));
+  const G = G0.concat(extra.map((x) => x.row));
+  const LOTS: Record<string, Lot[]> = { ...LOTS0 };
+  extra.forEach((x) => { LOTS[x.row[0] + ' ' + x.row[1]] = [x.lot]; });
   const base: Record<string, DeathBase & { inDeath: number }> = {};
   G.forEach((r) => { const who = r[0] + ' ' + r[1]; const claim = (LOTS[who] ?? []).reduce((a, l) => a + l[2], 0); base[who] = { death: r[5], stock: r[7], claimLeft: claim, inDeath: r[5] }; });
   const split = live ? applyDeaths(base, live.deaths, REF, (d) => d.farm + ' ' + d.group) : {};

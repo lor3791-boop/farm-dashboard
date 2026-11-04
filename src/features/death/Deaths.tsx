@@ -63,6 +63,7 @@ export function UnregisteredDeaths() {
   const { repo, email } = useAuth();
   const [edit, setEdit] = useState<string | null>(null);
   const [allOk, setAllOk] = useState(false);
+  const [del, setDel] = useState<string | null>(null);
   const rows = deaths.filter((r) => !r.checked && passFarm(r.farm)).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.farm.localeCompare(b.farm, 'ko')));
   const byFarm = useMemo(() => { const m: Record<string, number> = {}; rows.forEach((r) => { m[r.farm] = (m[r.farm] ?? 0) + r.count; }); return m; }, [rows]);
   const mark = (r: DeathRow) => repo!.updateDeath(r, { checked: true }, email);
@@ -82,7 +83,8 @@ export function UnregisteredDeaths() {
           <div style={{ flex: 1, minWidth: 140 }}><b>{r.farm}</b> {dgLabel(r)}{r.editedAt ? <span className="muted" style={{ fontSize: 12 }}> · 수정됨</span> : null}</div>
           <div style={{ textAlign: 'right' }}><b>{r.count}두</b><SplitTxt r={r} /></div>
           {srcChip(r)}
-          <button className="btn sm ghost" onClick={() => setEdit(r.id)}>수정</button>
+          <button className="btn sm ghost" onClick={() => { setEdit(r.id); setDel(null); }}>수정</button>
+          {del === r.id ? <button className="btn sm" style={{ borderColor: '#9A3216', color: '#9A3216' }} onClick={async () => { await repo!.removeDeath(r); setDel(null); }}>정말 삭제</button> : <button className="btn sm ghost" onClick={() => setDel(r.id)}>삭제</button>}
           <button className="btn sm pri" onClick={() => mark(r)}>등록완료</button>
         </div>
       ))}

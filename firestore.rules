@@ -14,6 +14,10 @@ service cloud.firestore {
     match /logs/{id}   { allow read, create: if isAdmin(); }
     match /deaths/{id} { allow read, write: if isAdmin(); }
     match /shipments/{id} { allow read, write: if isAdmin(); }
+    match /groups/{id} { allow read, write: if isAdmin(); }
+    match /feed/{id} { allow read, write: if isAdmin(); }
+    match /feedMid/{id} { allow read, write: if isAdmin(); }
+    match /vaccine/{id} { allow read, write: if isAdmin(); }
     // 농장 공유 화면: 열쇠(문서 이름)를 아는 사람만 그 농장 문서 1개를 읽는다. 목록 조회는 불가.
     match /share/{key} {
       allow get: if true;

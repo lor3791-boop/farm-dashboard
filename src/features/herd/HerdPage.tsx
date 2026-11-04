@@ -3,10 +3,27 @@ import { useState, type ReactNode } from 'react';
 import { useHerd, useUi } from '@/lib/ui';
 import { agg, dongsOf, heat, type Group } from '@/lib/calc/herd';
 import { addIso, fmt, md } from '@/lib/calc/dates';
-import { Chip, Grid, Lnk, Num, Segs, Txt, sortRows, useSorts, type Col, type GRowView } from '@/components/v5';
+import { Chip, Grid, Lnk, Num, Segs, Tabs, Txt, sortRows, useSorts, type Col, type GRowView } from '@/components/v5';
+import { EntryTab } from './EntryTab';
+import { DelayTab } from './DelayTab';
+import { FcrTab } from './FcrTab';
 import { exportHerd } from './exportHerd';
 
 export function HerdPage() {
+  const { s, set } = useHerd();
+  const open = (who: string) => set({ herdTab: 'herd', det: who });
+  return (
+    <>
+      <Tabs opts={[['herd', '돈군'], ['entry', '전입등록'], ['warn', '출하지연'], ['fcr', 'FCR 추이']]} value={s.herdTab} onPick={(k) => set({ herdTab: k })} />
+      {s.herdTab === 'herd' && <HerdTable />}
+      {s.herdTab === 'entry' && <EntryTab />}
+      {s.herdTab === 'warn' && <DelayTab onOpen={open} />}
+      {s.herdTab === 'fcr' && <FcrTab onOpen={open} />}
+    </>
+  );
+}
+
+function HerdTable() {
   const H = useHerd();
   const { rows, s, set, isPlanned, togglePlan, T } = H;
   const { go } = useUi();
@@ -144,7 +161,7 @@ export function HerdPage() {
         )}
         {s.hView === 'heat' && hRows0.length > 0 && <Heatmap farms={hFarmSorted} rows={hRows0} mode={s.hMode} setMode={(m) => set({ hMode: m })} det={s.det} onOpen={goDet} />}
       </div>
-      {s.det && <Detail who={s.det} order={detOrder} onDeath={(g) => go('/input', { inTab: 'death', dFarm: g.farm, dDong: dongsOf(g.dong)[0] || null, dGroup: g.group })} />}
+      {s.det && <Detail who={s.det} order={detOrder} onDeath={(g) => go('/death', { deathTab: 'input', dFarm: g.farm, dDong: dongsOf(g.dong)[0] || null, dGroup: g.group })} />}
     </div>
   );
 }

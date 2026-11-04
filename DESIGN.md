@@ -27,7 +27,8 @@
 
 ## 폴더 규칙
 - `src/app/` 뼈대(메뉴 `menu.ts`, 레이아웃, 로그인 관문)
-- `src/features/<메뉴>/` 메뉴별 화면(home·input·herd·analysis·report·settings·share). **메뉴끼리 서로 import 하지 않는다.**
+- `src/features/<메뉴>/` 메뉴별 화면: home · herd(사육현황: 돈군·전입등록·출하지연·FCR 추이) · ship(출하관리) · death(폐사관리) · analysis(성적분석: 예상육성률·폐사율 순위·보고자료) · settle(정산자료: 정산예정·엑셀·사료 사용·구제역 백신비) · settings · share. **메뉴끼리 서로 import 하지 않는다** (공용은 `src/lib`).
+- 사료: `src/lib/feedSheet.ts`(피그온 그룹 사료 읽기·합치기). 추정 FCR = 누적 사료 ÷ (살아 있는 두수 × 일당증체 기준값 × 전입 후 일수) — 정산용 사료(중간투입)와 따로 본다.
 - `src/lib/ui.tsx` 메뉴를 오가도 유지되는 화면 상태(필터·상세·탭) + 저장되는 체크값. `src/components/v5.tsx` 공통 부품(정렬 표, 세그먼트, 농장 선택 박스)
 - 스타일: `src/styles/index.css` 아래쪽에 목업 v5 CSS를 그대로 둠(.card .chip .btn .seg .gr …). v5 화면은 `.v5` 안.
 - `src/lib/repo.ts` 저장소 — 화면은 이 함수만 쓴다 (Firestore / 미리보기 두 구현)
@@ -37,7 +38,7 @@
 - 검산 샘플은 `*.test.ts`. 배포 전에 자동 실행된다.
 
 ## Firestore 경로
-`farms/{farmId}`, `config/thresholds`, `config/nameMap`, `config/ui`(정산예정·작업완료·폭염·첫출하·공유 열쇠), `deaths`(대시보드 입력, 열쇠 없는 농장), `share/{열쇠}/deaths`(농장 앱 입력 + 열쇠 있는 농장의 대시보드 입력 — 대시보드는 컬렉션 그룹 'deaths'로 함께 읽음), `shipments`(출하 직접 입력 + 등판서 kind:'grade'), `share/{열쇠}`(공개 읽기), `shareDeaths`(예전 농장 앱 입력, 읽기·수정만), `logs` — 모든 기록에 `updatedAt`, `updatedBy`.
+`farms/{farmId}`, `config/thresholds`, `config/nameMap`, `config/ui`(정산예정·작업완료·폭염·첫출하·공유 열쇠), `deaths`(대시보드 입력, 열쇠 없는 농장), `share/{열쇠}/deaths`(농장 앱 입력 + 열쇠 있는 농장의 대시보드 입력 — 대시보드는 컬렉션 그룹 'deaths'로 함께 읽음), `shipments`(출하 직접 입력 + 등판서 kind:'grade'), `share/{열쇠}`(공개 읽기), `shareDeaths`(예전 농장 앱 입력, 읽기·수정만), `groups`(그룹 직접 등록), `feed`(피그온 그룹 사료 업로드, 한 줄 = 탭으로 이은 문자열), `feedMid`(정산월 중간투입), `vaccine`(구제역 백신비 + 첨부 data URL, 700KB 이하), `logs` — 모든 기록에 `updatedAt`, `updatedBy`.
 묶음 2부터: `groups`, `lots`, `placements`(동 배치), `deaths`, `shipments`, `shipSummary`, `heat`, `feed`, `tasks`, `vaccineCost`, `uploads`.
 
 ## 데이터 원천 (계산은 이것을 그대로 따른다)

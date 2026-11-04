@@ -10,19 +10,19 @@ import { todayKST } from '@/lib/util';
 
 export function SharePage() {
   const [sp] = useSearchParams();
-  const { all, farms, deaths, ships, saved, T } = useHerd();
+  const { all, farms, deaths, ships, groups, saved, T } = useHerd();
   const { repo, email } = useAuth();
   const farm = sp.get('farm') && farms.includes(sp.get('farm')!) ? sp.get('farm')! : farms[0];
   if (!farm || !T) return null;
   // 이 농장 폐사는 농장 앱 화면이 직접 더하므로 빼고 계산
   const mine = deaths.filter((d) => d.farm === farm);
-  const g = buildGroups(T, saved.firstShipByFarm, { deaths: deaths.filter((d) => d.farm !== farm), ships: ships.map((x) => ({ farm: x.farm, group: x.group, date: x.date, n: x.n })) });
+  const g = buildGroups(T, saved.firstShipByFarm, { deaths: deaths.filter((d) => d.farm !== farm), ships: ships.map((x) => ({ farm: x.farm, group: x.group, date: x.date, n: x.n })), groups });
   const p = { ...buildSharePayload(farm, g, buildTasks(all), allShips(ships), REF, TODAY, T.problemSurvivalPct), today: todayKST() };
   const key = saved.shareLinks[farm] ?? '';
   return (
     <>
       <div style={{ background: '#1F4E3D', color: '#fff', fontSize: 13, padding: '8px 14px', display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-        <span>농장 앱 미리보기 · {farm}</span><a href="#/input" style={{ color: '#FCE3A6' }}>대시보드로</a>
+        <span>농장 앱 미리보기 · {farm}</span><a href="#/death" style={{ color: '#FCE3A6' }}>대시보드로</a>
       </div>
       <ShareView key={farm} p={p} deaths={mine}
         onSaveDeath={(d) => repo!.addDeath({ ...d, farm }, repo!.mode === 'local' ? 'share' : email, key)}

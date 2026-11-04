@@ -5,10 +5,11 @@ import { UiProvider } from '@/lib/ui';
 import { Gate } from './Gate';
 import { Layout } from './Layout';
 import { HomePage } from '@/features/home/HomePage';
-import { InputPage } from '@/features/input/InputPage';
+import { ShipPage } from '@/features/ship/ShipPage';
+import { DeathPage } from '@/features/death/DeathPage';
+import { SettlePage } from '@/features/settle/SettlePage';
 import { HerdPage } from '@/features/herd/HerdPage';
 import { AnalysisPage } from '@/features/analysis/AnalysisPage';
-import { ReportPage } from '@/features/report/ReportPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { SharePage } from '@/features/share/SharePage';
 
@@ -25,10 +26,13 @@ export function App() {
                   <Layout>
                     <Routes>
                       <Route path="/" element={<HomePage />} />
-                      <Route path="/input" element={<InputPage />} />
+                      <Route path="/ship" element={<ShipPage />} />
+                      <Route path="/death" element={<DeathPage />} />
+                      <Route path="/settle" element={<SettlePage />} />
+                      <Route path="/input" element={<Navigate to="/death" />} />
+                      <Route path="/report" element={<Navigate to="/analysis" />} />
                       <Route path="/herd" element={<HerdPage />} />
                       <Route path="/analysis" element={<AnalysisPage />} />
-                      <Route path="/report" element={<ReportPage />} />
                       <Route path="/settings" element={<SettingsPage />} />
                       <Route path="*" element={<Navigate to="/" />} />
                     </Routes>

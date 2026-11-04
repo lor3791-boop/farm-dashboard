@@ -3,6 +3,7 @@
 import type { AppData, Farm, Thresholds, NameMapRow, UiSaved } from '@/data/types';
 import { SEED_FARMS, SEED_THRESHOLDS, SEED_NAMEMAP } from '@/data/seed';
 import { nowIso } from './util';
+import { G } from '@/data/snapshot';
 
 export interface Repo {
   mode: 'cloud' | 'local';
@@ -80,7 +81,7 @@ export function localRepo(): Repo {
 function localCols() {
   const subs: Record<string, ((r: any[]) => void)[]> = {};
   const key = (c: string) => 'farm-dashboard:col:' + c;
-  const read = (c: string): any[] => { try { return JSON.parse(localStorage.getItem(key(c)) || '[]'); } catch { return []; } };
+  const read = (c: string): any[] => { try { if (import.meta.env.VITE_MOCK === '1' && c === 'feed' && localStorage.getItem(key(c)) === null) localStorage.setItem(key(c), JSON.stringify([mockFeed()])); return JSON.parse(localStorage.getItem(key(c)) || '[]'); } catch { return []; } };
   const write = (c: string, rows: any[]) => { try { localStorage.setItem(key(c), JSON.stringify(rows)); } catch { /* 저장 불가 */ } (subs[c] || []).forEach((f) => f(rows)); };
   return {
     watch: (c: string, cb: (r: any[]) => void) => { (subs[c] ||= []).push(cb); setTimeout(() => cb(read(c)), 0); return () => { subs[c] = subs[c].filter((f) => f !== cb); }; },
@@ -91,13 +92,31 @@ function localCols() {
 }
 
 // 목업 빌드에서만 쓰는 예시 폐사 기록
+const mockDay = (n: number) => { const t = new Date(Date.now() + 9 * 3600e3); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
 const MOCK_DEATHS = [
-  { id: 'm1', date: '2026-10-13', farm: '민서', dong: '1', group: '26-8', count: 2, src: 'dash', checked: true, key: '', at: '2026-10-13T09:00:00Z' },
-  { id: 'm2', date: '2026-10-16', farm: '민서', dong: '1', group: '26-8', count: 4, src: 'share', checked: false, key: '', at: '2026-10-16T08:10:00Z' },
-  { id: 'm3', date: '2026-10-19', farm: '산성농원', dong: '2', group: '26-6', count: 3, src: 'share', checked: false, key: '', at: '2026-10-19T07:40:00Z' },
-  { id: 'm4', date: '2026-10-20', farm: '명임', dong: '', group: '26-8', count: 1, src: 'share', checked: false, key: '', at: '2026-10-20T07:20:00Z' },
-  { id: 'm5', date: '2026-10-21', farm: '산성농원', dong: '4', group: '26-7', count: 2, src: 'dash', checked: false, key: '', at: '2026-10-21T10:00:00Z' }
+  { id: 'm1', date: mockDay(-9), farm: '민서', dong: '1', group: '26-8', count: 2, src: 'dash', checked: true, key: '', at: '2026-10-13T09:00:00Z' },
+  { id: 'm2', date: mockDay(-6), farm: '민서', dong: '1', group: '26-8', count: 4, src: 'share', checked: false, key: '', at: '2026-10-16T08:10:00Z' },
+  { id: 'm3', date: mockDay(-3), farm: '산성농원', dong: '2', group: '26-6', count: 3, src: 'share', checked: false, key: '', at: '2026-10-19T07:40:00Z' },
+  { id: 'm4', date: mockDay(-2), farm: '명임', dong: '', group: '26-8', count: 1, src: 'share', checked: false, key: '', at: '2026-10-20T07:20:00Z' },
+  { id: 'm5', date: mockDay(-1), farm: '산성농원', dong: '4', group: '26-7', count: 2, src: 'dash', checked: false, key: '', at: '2026-10-21T10:00:00Z' }
 ];
+
+// 목업 빌드 예시 그룹 사료 (민서·산성농원·재성) — 실제 피그온 자료 아님
+function mockFeed() {
+  const rows: string[] = [];
+  G.filter((r) => ['민서', '산성농원', '재성'].includes(r[0])).forEach((r) => {
+    const heads = r[6] + r[7]; let d = new Date(r[3] + 'T00:00:00Z'); const age0 = r[8] - Math.round((Date.parse('2026-10-09') - d.getTime()) / 864e5);
+    while (d.toISOString() < '2026-10-31') {
+      const m = d.toISOString().slice(0, 7), end = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
+      const dd = Math.round((Math.min(end.getTime(), Date.parse('2026-10-22')) - d.getTime()) / 864e5); if (dd <= 0) break;
+      const age = age0 + Math.round((d.getTime() - Date.parse(r[3])) / 864e5);
+      const kg = Math.round(heads * dd * (1.05 + 0.019 * Math.max(0, age - 70)) * 10) / 10;
+      rows.push([r[0], r[1], m, age - age0 < 30 ? '윈맥스S트랜스' : '리더MF2호', kg].join('\t'));
+      d = end;
+    }
+  });
+  return { id: 'mockfeed', file: '그룹사료사용(예시).xlsx', rows, at: '2026-10-21T09:00:00Z' };
+}
 
 // 미리보기 모드의 폐사: localStorage 'farm-dashboard:col:deaths' (예전 'farm-dashboard:deaths'는 옮겨 담음)
 function localDeaths() {
