@@ -15,14 +15,14 @@ export interface UiState {
   hView: 'table' | 'heat'; hMode: 'entry' | 'cal'; stage: 'all' | 'pre' | 'ship'; warnOnly: boolean;
   hidden: Record<string, boolean>;
   anTab: 'surv' | 'rank' | 'report'; heat: boolean;
-  herdTab: 'herd' | 'entry' | 'warn' | 'fcr'; shipTab: 'input' | 'grade'; deathTab: 'input' | 'status'; setTab: 'plan' | 'excel' | 'feed' | 'vaccine';
+  herdTab: 'herd' | 'entry' | 'warn' | 'fcr'; shipTab: 'input' | 'grade'; deathTab: 'input' | 'status' | 'list'; setTab: 'plan' | 'excel' | 'feed' | 'vaccine';
   rpTab: 'report' | 'settle'; sGroup: string;
   dFarm: string; dDong: string | null; dGroup: string | null;
 }
 const init: UiState = {
   fSel: null, fOpen: false, fQ: '', fStatus: 'all', det: null, exp: {},
   hView: 'table', hMode: 'entry', stage: 'all', warnOnly: false, hidden: { claim: true, end: true, next: true },
-  anTab: 'surv', heat: false, rpTab: 'report', sGroup: '민서 26-3', herdTab: 'herd', shipTab: 'input', deathTab: 'input', setTab: 'plan', dFarm: '산성농원', dDong: '4', dGroup: null
+  anTab: 'surv', heat: false, rpTab: 'report', sGroup: '민서 26-3', herdTab: 'herd', shipTab: 'input', deathTab: 'status', setTab: 'plan', dFarm: '산성농원', dDong: '4', dGroup: null
 };
 
 interface Ctx {

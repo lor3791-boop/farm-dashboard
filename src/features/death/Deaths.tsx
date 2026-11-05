@@ -1,4 +1,5 @@
-// 폐사 — 미등록(피그온) 확인 + 등록한 폐사 목록·수정. 대시보드 입력과 농장 앱 입력이 한 목록이다.
+// 폐사입력현황 — 미등록 / 등록완료 / 전체를 한 목록에서. 줄을 누르면 수정·삭제, 오른쪽 버튼은 피그온 등록완료.
+// 대시보드·농장 앱·폐사입력 앱(구글시트) 입력이 한 목록이다 (어디서 넣었는지는 표시하지 않음).
 import { useMemo, useState } from 'react';
 import { useHerd } from '@/lib/ui';
 import { useAuth } from '@/lib/auth';
@@ -9,7 +10,6 @@ import type { DeathRow } from '@/lib/repo';
 
 const WD = ['일', '월', '화', '수', '목', '금', '토'];
 const wd = (d: string) => WD[new Date(d + 'T00:00:00Z').getUTCDay()];
-const srcChip = (r: DeathRow) => <span className={r.src === 'share' ? 'chip info' : 'chip'} style={{ fontSize: 12 }}>{r.src === 'share' ? '농장 앱' : r.src === 'app' ? '폐사입력 앱' : '대시보드'}</span>;
 
 // 농장의 동·그룹 선택지 ('3동 · 26-7', 동 없이 관리하면 그룹만)
 export function useDongGroupOpts() {
@@ -17,16 +17,23 @@ export function useDongGroupOpts() {
   return (farm: string) => all.filter((r) => r.farm === farm).flatMap((r) => { const ds = dongsOf(r.dong); return ds.length ? ds.map((d) => ({ v: d + '|' + r.group, l: d + '동 · ' + r.group })) : [{ v: '|' + r.group, l: r.group }]; });
 }
 const dgLabel = (r: { dong: string; group: string }) => (r.dong ? r.dong + '동 · ' : '') + r.group;
+const nPhotos = (r: DeathRow) => r.photoUrls?.length || r.photos?.length || 0;
 
-function SplitTxt({ r }: { r: DeathRow }) {
-  const { split } = useHerd();
-  const x = split[r.id];
-  if (!x || !x.claim) return null;
-  return <div className="sub" style={{ fontSize: 12 }}>크레임 {x.claim}{x.death ? ' · 폐사 ' + x.death : ''}</div>;
+// 사진 — 드라이브 링크면 새 탭, 대시보드 사진이면 눌러서 크게
+export function Photos({ r }: { r: DeathRow }) {
+  const [big, setBig] = useState<number | null>(null);
+  if (r.photoUrls?.length) return <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{r.photoUrls.map((u, i) => <a key={u} href={u} target="_blank" rel="noopener noreferrer" className="btn sm ghost">사진 {i + 1}</a>)}</div>;
+  if (!r.photos?.length) return null;
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      {r.photos.map((p, i) => <button key={i} onClick={() => setBig(big === i ? null : i)} aria-label={'사진 ' + (i + 1)} style={{ padding: 0, border: big === i ? '2px solid #1F4E3D' : '1px solid #E2DDD2', borderRadius: 6 }}><img src={p} alt="" style={{ width: 54, height: 54, objectFit: 'cover', borderRadius: 5, display: 'block' }} /></button>)}
+      {big !== null && <img src={r.photos[big]} alt={'폐사 사진 ' + (big + 1)} style={{ width: '100%', maxHeight: 520, objectFit: 'contain', borderRadius: 8, background: '#000' }} onClick={() => setBig(null)} />}
+    </div>
+  );
 }
 
-// 한 줄 수정 — 날짜 · 동(그룹) · 두수. 저장하면 피그온 등록완료가 풀린다
-function EditRow({ r, onDone }: { r: DeathRow; onDone: () => void }) {
+// 펼친 줄 — 날짜·동(그룹)·두수 고치기, 사진, 삭제(두 번 눌러 확인)
+function EditPanel({ r, onDone }: { r: DeathRow; onDone: () => void }) {
   const { repo, email } = useAuth();
   const opts = useDongGroupOpts()(r.farm);
   const [date, setDate] = useState(r.date);
@@ -34,40 +41,63 @@ function EditRow({ r, onDone }: { r: DeathRow; onDone: () => void }) {
   const [cnt, setCnt] = useState(String(r.count));
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [del, setDel] = useState(false);
   const has = opts.some((o) => o.v === dg);
-  const save = async () => {
+  const dirty = date !== r.date || dg !== (r.dong ?? '') + '|' + r.group || cnt !== String(r.count);
+  const run = async (f: () => Promise<void>) => { setBusy(true); setErr(''); try { await f(); onDone(); } catch (e) { setErr((e as Error).message || String(e)); } finally { setBusy(false); } };
+  const save = () => {
     const n = Number(cnt);
     if (!date) return setErr('날짜를 넣으세요');
     if (!(Number.isInteger(n) && n >= 1 && n <= 300)) return setErr('두수는 1~300');
     const [dong, group] = dg.split('|');
-    setBusy(true);
-    try { await repo!.updateDeath(r, { date, dong, group, count: n }, email); onDone(); } catch (e) { setErr('저장하지 못했습니다: ' + String(e)); } finally { setBusy(false); }
+    run(() => repo!.updateDeath(r, { date, dong, group, count: n }, email));
   };
+  const lab = { fontSize: 13, color: '#6B6A63', display: 'grid', gap: 4 } as const;
+  const inp = { width: '100%', minHeight: 44, boxSizing: 'border-box' } as const;
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'end', padding: '10px 12px', background: '#F7F5F0', borderRadius: 8, margin: '4px 0' }}>
-      <b style={{ alignSelf: 'center', minWidth: 60 }}>{r.farm}</b>
-      <label style={{ fontSize: 13 }}>날짜<br /><input type="date" value={date} max={todayKST()} onChange={(e) => { setDate(e.target.value); setErr(''); }} /></label>
-      <label style={{ fontSize: 13 }}>동 (그룹)<br /><select value={dg} onChange={(e) => { setDg(e.target.value); setErr(''); }}>{!has && <option value={dg}>{dgLabel({ dong: dg.split('|')[0], group: dg.split('|')[1] })} (지금 값)</option>}{opts.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}</select></label>
-      <label style={{ fontSize: 13 }}>두수<br /><input type="number" inputMode="numeric" min={1} max={300} value={cnt} onChange={(e) => { setCnt(e.target.value); setErr(''); }} style={{ width: 90 }} /></label>
-      <button className="btn sm ghost" onClick={onDone}>취소</button>
-      <button className="btn sm pri" disabled={busy} onClick={save}>{busy ? '저장 중…' : '저장'}</button>
-      {r.checked && <span className="chip warn" style={{ fontSize: 12 }}>저장하면 다시 미등록</span>}
-      {err && <span className="chip bad">{err}</span>}
+    <div style={{ padding: '12px', background: '#F7F5F0', borderRadius: 10, margin: '0 0 8px', display: 'grid', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
+        <label style={lab}>날짜<input type="date" value={date} max={todayKST()} onChange={(e) => { setDate(e.target.value); setErr(''); }} style={inp} /></label>
+        <label style={lab}>동 · 그룹<select value={dg} onChange={(e) => { setDg(e.target.value); setErr(''); }} style={inp}>{!has && <option value={dg}>{dgLabel({ dong: dg.split('|')[0], group: dg.split('|')[1] })}</option>}{opts.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}</select></label>
+        <label style={lab}>두수<input type="number" inputMode="numeric" min={1} max={300} value={cnt} onChange={(e) => { setCnt(e.target.value); setErr(''); }} style={inp} /></label>
+      </div>
+      <Photos r={r} />
+      {r.checked && dirty && <div className="small" style={{ color: '#7A4F00' }}>고쳐 저장하면 미등록으로 돌아갑니다</div>}
+      {err && <div className="small" style={{ color: '#9A3216' }}>{err}</div>}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        {del
+          ? <><button className="btn" disabled={busy} style={{ background: '#9A3216', borderColor: '#9A3216', color: '#fff' }} onClick={() => run(() => repo!.removeDeath(r))}>삭제 확인</button><button className="btn ghost" onClick={() => setDel(false)}>그대로 두기</button></>
+          : <button className="btn ghost" style={{ color: '#9A3216', borderColor: '#E7C3B5' }} onClick={() => setDel(true)}>삭제</button>}
+        <div style={{ flex: 1 }} />
+        {!del && <><button className="btn ghost" onClick={onDone}>닫기</button><button className="btn pri" disabled={busy || !dirty} onClick={save}>{busy ? '저장 중…' : '저장'}</button></>}
+      </div>
     </div>
   );
 }
 
-// 미등록(피그온에 아직 안 올린) 폐사 — 등록완료를 누르면 목록에서 빠진다
-// 사진 보기 — 썸네일을 누르면 크게
-export function Photos({ r }: { r: DeathRow }) {
-  const [big, setBig] = useState<number | null>(null);
-  if (r.photoUrls?.length) return <span style={{ display: 'flex', gap: 8 }}>{r.photoUrls.map((u, i) => <a key={u} href={u} target="_blank" rel="noopener noreferrer" className="small">사진{i + 1}</a>)}</span>;
-  if (!r.photos?.length) return null;
+// 한 줄: [농장 · 동(그룹) · 사진/폭염] [두수] [등록완료 버튼]
+function Item({ r, open, onOpen, onCheck }: { r: DeathRow; open: boolean; onOpen: () => void; onCheck: () => void }) {
+  const { split } = useHerd();
+  const x = split[r.id];
+  const extra = [nPhotos(r) ? '사진 ' + nPhotos(r) : '', r.heat ? '폭염' : '', x?.claim ? '크레임 ' + x.claim : ''].filter(Boolean).join(' · ');
   return (
-    <div style={{ width: '100%', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-      {r.photos.map((p, i) => <button key={i} onClick={() => setBig(big === i ? null : i)} aria-label={'사진 ' + (i + 1)} style={{ padding: 0, border: big === i ? '2px solid #1F4E3D' : '1px solid #E2DDD2', borderRadius: 6 }}><img src={p} alt="" style={{ width: 54, height: 54, objectFit: 'cover', borderRadius: 5, display: 'block' }} /></button>)}
-      {big !== null && <img src={r.photos[big]} alt={'폐사 사진 ' + (big + 1)} style={{ width: '100%', maxHeight: 520, objectFit: 'contain', borderRadius: 8, background: '#000' }} onClick={() => setBig(null)} />}
-    </div>
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderBottom: open ? 0 : '1px solid #EFEBE3', background: open ? '#EEF3EF' : undefined, borderRadius: open ? '10px 10px 0 0' : 0 }}>
+        <button onClick={onOpen} aria-expanded={open} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', font: 'inherit', background: 'transparent', border: 0, padding: '10px 4px 10px 8px', cursor: 'pointer', minHeight: 52, color: 'inherit' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><b>{r.farm}</b> <span>{dgLabel(r)}</span></div>
+            {extra && <div className="muted" style={{ fontSize: 12 }}>{extra}</div>}
+          </div>
+          <b style={{ fontSize: 17, fontVariantNumeric: 'tabular-nums' }}>{r.count}<span style={{ fontSize: 13, fontWeight: 400 }}>두</span></b>
+        </button>
+        <button onClick={onCheck} aria-pressed={r.checked} aria-label={r.checked ? '등록완료 풀기' : '피그온 등록완료'}
+          style={{ minWidth: 64, minHeight: 40, borderRadius: 20, font: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer', marginRight: 4,
+            ...(r.checked ? { background: '#E6EFE9', color: '#1F4E3D', border: '1px solid #E6EFE9' } : { background: '#fff', color: '#1F4E3D', border: '1px solid #1F4E3D' }) }}>
+          {r.checked ? '✓ 완료' : '○ 등록'}
+        </button>
+      </div>
+      {open && <EditPanel r={r} onDone={onOpen} />}
+    </>
   );
 }
 
@@ -77,90 +107,65 @@ export const openUnregWindow = () => {
   window.open(location.href.split('#')[0] + '#/popup/unreg', 'unregDeaths', `width=${w},height=${screen.availHeight},left=${screen.availWidth - w},top=0`);
 };
 
-export function UnregisteredDeaths({ popup = false }: { popup?: boolean }) {
+type St = 'no' | 'ok' | 'all';
+export function DeathRecords({ popup = false }: { popup?: boolean }) {
   const { deaths, passFarm } = useHerd();
   const { repo, email } = useAuth();
-  const [edit, setEdit] = useState<string | null>(null);
-  const [allOk, setAllOk] = useState(false);
-  const [del, setDel] = useState<string | null>(null);
-  const [only, setOnly] = useState('');
-  const rows0 = deaths.filter((r) => !r.checked && (popup || passFarm(r.farm)));
-  const rows = rows0.filter((r) => !only || r.farm === only).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.farm.localeCompare(b.farm, 'ko')));
-  const byFarm = useMemo(() => { const m: Record<string, number> = {}; rows0.forEach((r) => { m[r.farm] = (m[r.farm] ?? 0) + r.count; }); return m; }, [rows0]);
-  const mark = (r: DeathRow) => repo!.updateDeath(r, { checked: true }, email);
-  return (
-    <div className="card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <h2 className="h2">피그온 미등록 · {rows.length}건 {rows.length > 0 && <span className="muted" style={{ fontSize: 14, fontWeight: 400 }}>({fmt(rows.reduce((a, r) => a + r.count, 0))}두)</span>}</h2>
-        {rows.length > 1 && (allOk
-          ? <span style={{ display: 'flex', gap: 6 }}><button className="btn sm ghost" onClick={() => setAllOk(false)}>취소</button><button className="btn sm pri" onClick={async () => { setAllOk(false); for (const r of rows) await mark(r); }}>{rows.length}건 모두 등록완료</button></span>
-          : <button className="btn sm" onClick={() => setAllOk(true)}>모두 등록완료</button>)}
-        {!popup && <button className="btn sm" onClick={openUnregWindow}>새 창으로 열기</button>}
-      </div>
-      {rows0.length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '8px 0 4px' }}>{Object.entries(byFarm).map(([f, n]) => <button key={f} className={only === f ? 'chip ok' : 'chip warn'} style={{ border: 0, cursor: 'pointer', font: 'inherit', fontSize: 13 }} onClick={() => setOnly(only === f ? '' : f)}>{f} {n}두</button>)}</div>}
-      {rows.length === 0 && <div className="muted" style={{ marginTop: 8 }}>미등록 폐사가 없습니다</div>}
-      {rows.map((r) => edit === r.id ? <EditRow key={r.id} r={r} onDone={() => setEdit(null)} /> : (
-        <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid #EFEBE3', fontSize: 14, flexWrap: 'wrap' }}>
-          <span style={{ width: 66 }}>{md(r.date)}({wd(r.date)})</span>
-          <div style={{ flex: 1, minWidth: 120 }}><b>{r.farm}</b> {dgLabel(r)}{r.editedAt ? <span className="muted" style={{ fontSize: 12 }}> · 수정됨</span> : null}</div>
-          <div style={{ textAlign: 'right' }}><b>{r.count}두</b><SplitTxt r={r} /></div>
-          <span style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: 'auto' }}>
-            {srcChip(r)}
-            <button className="btn sm ghost" onClick={() => { setEdit(r.id); setDel(null); }}>수정</button>
-            {del === r.id ? <button className="btn sm" style={{ borderColor: '#9A3216', color: '#9A3216' }} onClick={async () => { await repo!.removeDeath(r); setDel(null); }}>정말 삭제</button> : <button className="btn sm ghost" onClick={() => setDel(r.id)}>삭제</button>}
-            <button className="btn sm pri" onClick={() => mark(r)}>등록완료</button>
-          </span>
-          <Photos r={r} />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// 등록한 폐사 전체 목록 — 농장·월·상태로 거르고, 날짜·동(그룹)·두수 수정, 삭제(두 번 눌러 확인)
-export function DeathList() {
-  const { deaths, farms } = useHerd();
-  const { repo, email } = useAuth();
-  const months = useMemo(() => [...new Set(deaths.map((r) => r.date.slice(0, 7)))].sort().reverse(), [deaths]);
+  const [st, setSt] = useState<St>('no');
   const [farm, setFarm] = useState('');
   const [mon, setMon] = useState('');
-  const [st, setSt] = useState<'all' | 'no' | 'ok'>('all');
-  const [edit, setEdit] = useState<string | null>(null);
-  const [del, setDel] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  const [allOk, setAllOk] = useState(false);
+  const [undo, setUndo] = useState<DeathRow | null>(null);
   const [more, setMore] = useState(false);
-  const rows = deaths.filter((r) => (!farm || r.farm === farm) && (!mon || r.date.startsWith(mon)) && (st === 'all' || (st === 'ok') === r.checked))
-    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.at < b.at ? 1 : -1));
-  const shown = more ? rows : rows.slice(0, 30);
-  const g = '84px minmax(140px,1.4fr) 110px 80px 92px 150px';
+  const base = deaths.filter((r) => popup || passFarm(r.farm));
+  const unregN = base.filter((r) => !r.checked).length;
+  const inSt = base.filter((r) => st === 'all' || (st === 'ok') === r.checked);
+  const months = useMemo(() => [...new Set(base.map((r) => r.date.slice(0, 7)))].sort().reverse(), [base]);
+  const byFarm = useMemo(() => { const m: Record<string, number> = {}; inSt.filter((r) => !mon || r.date.startsWith(mon)).forEach((r) => { m[r.farm] = (m[r.farm] ?? 0) + r.count; }); return m; }, [inSt, mon]);
+  const rows = inSt.filter((r) => (!farm || r.farm === farm) && (!mon || r.date.startsWith(mon)))
+    .sort((a, b) => (st === 'no' ? (a.date < b.date ? -1 : a.date > b.date ? 1 : a.farm.localeCompare(b.farm, 'ko')) : (a.date < b.date ? 1 : a.date > b.date ? -1 : a.at < b.at ? 1 : -1)));
+  const lim = st === 'no' || more ? rows : rows.slice(0, 60);
+  const days = useMemo(() => { const m = new Map<string, DeathRow[]>(); lim.forEach((r) => { if (!m.has(r.date)) m.set(r.date, []); m.get(r.date)!.push(r); }); return [...m]; }, [lim]);
+  const check = async (r: DeathRow) => { await repo!.updateDeath(r, { checked: !r.checked }, email); if (!r.checked && st === 'no') setUndo(r); };
+  const total = rows.reduce((a, r) => a + r.count, 0);
+  const seg = (k: St, l: string) => <button key={k} className={st === k ? 'seg on' : 'seg'} onClick={() => { setSt(k); setOpen(null); setAllOk(false); setMore(false); }}>{l}</button>;
+
   return (
-    <div className="card" style={{ marginTop: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <h2 className="h2">등록한 폐사 · {rows.length}건 <span className="muted" style={{ fontSize: 14, fontWeight: 400 }}>({fmt(rows.reduce((a, r) => a + r.count, 0))}두)</span></h2>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <select aria-label="농장" value={farm} onChange={(e) => setFarm(e.target.value)}><option value="">농장 전체</option>{farms.map((f) => <option key={f}>{f}</option>)}</select>
-          <select aria-label="월" value={mon} onChange={(e) => setMon(e.target.value)}><option value="">기간 전체</option>{months.map((m) => <option key={m} value={m}>{m}</option>)}</select>
-          <select aria-label="상태" value={st} onChange={(e) => setSt(e.target.value as any)}><option value="all">상태 전체</option><option value="no">미등록</option><option value="ok">등록완료</option></select>
-        </div>
+    <div className="card">
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="segs" role="group" aria-label="상태">{seg('no', `미등록 ${unregN}`)}{seg('ok', '등록완료')}{seg('all', '전체')}</div>
+        <div style={{ flex: 1 }} />
+        {!popup && <button className="btn sm ghost" onClick={openUnregWindow}>새 창</button>}
       </div>
-      {rows.length === 0 ? <div className="muted" style={{ marginTop: 10 }}>해당하는 폐사 기록이 없습니다</div> : (
-        <div className="gt" style={{ marginTop: 10 }}><div style={{ minWidth: 720 }}>
-          <div className="gr gh small muted" style={{ gridTemplateColumns: g }}><div>날짜</div><div>농장 · 동(그룹)</div><div className="r">두수</div><div>입력</div><div>피그온</div><div /></div>
-          {shown.map((r) => edit === r.id ? <EditRow key={r.id} r={r} onDone={() => setEdit(null)} /> : (
-            <div key={r.id} className="gr" style={{ gridTemplateColumns: g }}>
-              <div>{md(r.date)}({wd(r.date)})</div>
-              <div><b>{r.farm}</b> {dgLabel(r)}{(r.photoUrls?.length || r.photos?.length) ? <span className="muted small"> · 사진 {r.photoUrls?.length || r.photos?.length}</span> : null}{r.heat ? <span className="chip warn" style={{ fontSize: 11, marginLeft: 4 }}>폭염</span> : null}{r.editedAt ? <div className="sub" style={{ fontSize: 12 }}>수정 {md(r.editedAt.slice(0, 10))}</div> : null}</div>
-              <div className="r"><b>{r.count}</b><SplitTxt r={r} /></div>
-              <div>{srcChip(r)}</div>
-              <div><button className={r.checked ? 'chip ok' : 'chip warn'} style={{ border: 0, cursor: 'pointer', font: 'inherit', fontSize: 12 }} onClick={() => repo!.updateDeath(r, { checked: !r.checked }, email)}>{r.checked ? '등록완료' : '미등록'}</button></div>
-              <div className="r" style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                <button className="btn sm ghost" onClick={() => { setEdit(r.id); setDel(null); }}>수정</button>
-                {del === r.id ? <button className="btn sm" style={{ borderColor: '#9A3216', color: '#9A3216' }} onClick={async () => { await repo!.removeDeath(r); setDel(null); }}>정말 삭제</button> : <button className="btn sm ghost" onClick={() => setDel(r.id)}>삭제</button>}
-              </div>
-            </div>
-          ))}
-        </div></div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', margin: '10px 0 4px' }}>
+        {st !== 'no' && <select aria-label="월" value={mon} onChange={(e) => setMon(e.target.value)} style={{ minHeight: 34 }}><option value="">기간 전체</option>{months.map((m) => <option key={m} value={m}>{m}</option>)}</select>}
+        {Object.entries(byFarm).map(([f, n]) => <button key={f} className={farm === f ? 'pill on' : 'pill'} style={{ minHeight: 34, padding: '4px 10px', fontSize: 13 }} onClick={() => setFarm(farm === f ? '' : f)}>{f} {fmt(n)}</button>)}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0 2px', minHeight: 34 }}>
+        <span className="muted small">{rows.length}건 · {fmt(total)}두</span>
+        <div style={{ flex: 1 }} />
+        {st === 'no' && rows.length > 1 && (allOk
+          ? <><button className="btn sm ghost" onClick={() => setAllOk(false)}>취소</button><button className="btn sm pri" onClick={async () => { setAllOk(false); for (const r of rows) await repo!.updateDeath(r, { checked: true }, email); }}>{rows.length}건 모두 완료</button></>
+          : <button className="btn sm ghost" onClick={() => setAllOk(true)}>모두 등록완료</button>)}
+      </div>
+      {undo && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#1D2622', color: '#fff', borderRadius: 10, padding: '6px 6px 6px 12px', margin: '6px 0', fontSize: 14 }}>
+          <span style={{ flex: 1 }}>{undo.farm} {dgLabel(undo)} {undo.count}두 등록완료</span>
+          <button className="btn sm" style={{ background: 'transparent', color: '#BFE3CF', borderColor: 'transparent' }} onClick={async () => { await repo!.updateDeath(undo, { checked: false }, email); setUndo(null); }}>되돌리기</button>
+          <button className="btn sm" aria-label="닫기" style={{ background: 'transparent', color: '#fff', borderColor: 'transparent' }} onClick={() => setUndo(null)}>✕</button>
+        </div>
       )}
-      {!more && rows.length > 30 && <button className="btn" style={{ marginTop: 10 }} onClick={() => setMore(true)}>{rows.length - 30}건 더 보기</button>}
+      {rows.length === 0 && <div className="muted" style={{ padding: '16px 4px' }}>{st === 'no' ? '미등록 폐사가 없습니다' : '해당하는 폐사 기록이 없습니다'}</div>}
+      {days.map(([d, L]) => (
+        <div key={d}>
+          <div style={{ position: 'sticky', top: 0, zIndex: 1, background: '#fff', display: 'flex', justifyContent: 'space-between', padding: '12px 8px 4px', fontSize: 13, fontWeight: 700, color: wd(d) === '일' ? '#9A3216' : '#6B6A63', borderBottom: '1px solid #E2DDD2' }}>
+            <span>{md(d)} ({wd(d)})</span><span>{fmt(L.reduce((a, r) => a + r.count, 0))}두</span>
+          </div>
+          {L.map((r) => <Item key={r.id} r={r} open={open === r.id} onOpen={() => setOpen(open === r.id ? null : r.id)} onCheck={() => check(r)} />)}
+        </div>
+      ))}
+      {st !== 'no' && !more && rows.length > 60 && <button className="btn" style={{ marginTop: 10, width: '100%' }} onClick={() => setMore(true)}>{rows.length - 60}건 더 보기</button>}
     </div>
   );
 }

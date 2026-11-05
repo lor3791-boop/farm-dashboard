@@ -1,4 +1,4 @@
-// 폐사관리 — 폐사입력(입력 + 피그온 미등록 + 등록 목록) / 폐사현황(일자별)
+// 폐사관리 — 폐사현황(일자별) / 폐사입력 / 폐사입력현황(미등록·등록완료 목록, 수정·삭제)
 import { useState } from 'react';
 import { useHerd } from '@/lib/ui';
 import { useAuth } from '@/lib/auth';
@@ -7,7 +7,7 @@ import { fmt, md } from '@/lib/calc/dates';
 import { Tabs } from '@/components/v5';
 import { todayKST } from '@/lib/util';
 import { survOf } from '@/share/applyDeaths';
-import { UnregisteredDeaths, DeathList } from './Deaths';
+import { DeathRecords } from './Deaths';
 import { DeathDaily } from './DeathDaily';
 import { useRef } from 'react';
 import { shrinkImage } from '@/lib/image';
@@ -19,17 +19,10 @@ export function DeathPage() {
   const { s, set } = useHerd();
   return (
     <>
-      <Tabs opts={[['input', '폐사입력'], ['status', '폐사현황']]} value={s.deathTab} onPick={(k) => set({ deathTab: k })} />
-      {s.deathTab === 'input' && (
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(360px, 100%), 1fr))', gap: 16 }}>
-            <DeathEntry />
-            <UnregisteredDeaths />
-          </div>
-          <DeathList />
-        </>
-      )}
+      <Tabs opts={[['status', '폐사현황'], ['input', '폐사입력'], ['list', '폐사입력현황']]} value={s.deathTab} onPick={(k) => set({ deathTab: k })} />
       {s.deathTab === 'status' && <DeathDaily />}
+      {s.deathTab === 'input' && <DeathEntry />}
+      {s.deathTab === 'list' && <DeathRecords />}
     </>
   );
 }
@@ -83,7 +76,7 @@ function DeathEntry() {
   const cur = chosen ? dRows.find((r) => r.group === chosen) ?? null : null;
   const after = cur ? (() => { const c = Math.min(cnt, cur.claimLeft); const d = cur.death + cnt - c; return { c, d, stock: cur.stock - cnt, surv: survOf(cur.net, d) }; })() : null;
   return (
-          <div className="card" style={{ maxWidth: 520 }}>
+          <div className="card" style={{ maxWidth: 560 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
         <h2 className="h2">폐사 입력</h2>
         <span><input ref={pref} type="file" accept="image/*" multiple hidden onChange={(e) => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = ''; }} /><button className="btn" disabled={photos.length >= 3} onClick={() => pref.current?.click()}>사진 등록{photos.length ? ` (${photos.length}/3)` : ''}</button></span>
@@ -138,7 +131,7 @@ function DeathEntry() {
 export function UnregPopup() {
   return (
     <div className="v5" style={{ padding: '12px 12px 32px', minHeight: '100vh', boxSizing: 'border-box' }}>
-      <UnregisteredDeaths popup />
+      <DeathRecords popup />
     </div>
   );
 }
