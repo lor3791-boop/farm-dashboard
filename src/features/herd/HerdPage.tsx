@@ -110,10 +110,10 @@ function HerdTable() {
   const detOrder: string[] = [];
   hFarmSorted.forEach((f) => {
     const g = hRows0.filter((r) => r.farm === f);
-    herdRows.push({ key: 'f:' + f, bg: '#F1EEE6', aria: f + ' 펼치기/접기', onClick: () => set({ exp: { ...s.exp, [f]: !expOf(f) } }), cells: vis.map((c) => aggCell(g, c.k, f)) });
+    herdRows.push({ key: 'f:' + f, bg: '#F1EEE6', tone: g.some((r) => r.bad) ? 'bad' : g.some((r) => r.warn.length) ? 'warn' : undefined, aria: f + ' 펼치기/접기', onClick: () => set({ exp: { ...s.exp, [f]: !expOf(f) } }), cells: vis.map((c) => aggCell(g, c.k, f)) });
     const sorted = sortRows(hs, HC, g);
     sorted.forEach((r) => detOrder.push(r.who));
-    if (expOf(f)) sorted.forEach((r) => herdRows.push({ key: r.who, bg: s.det === r.who ? '#E4ECF3' : '#FFFFFF', aria: r.who + ' 상세 열기', onClick: () => goDet(r.who), cells: vis.map((c) => cellOf(r, c.k)) }));
+    if (expOf(f)) sorted.forEach((r) => herdRows.push({ key: r.who, bg: s.det === r.who ? '#E4ECF3' : '#FFFFFF', tone: r.bad ? 'bad' : r.warn.length ? 'warn' : undefined, aria: r.who + ' 상세 열기', onClick: () => goDet(r.who), cells: vis.map((c) => cellOf(r, c.k)) }));
   });
   const tot = agg(hRows0);
   const reset = () => set({ fSel: null, fStatus: 'all', fQ: '', stage: 'all', warnOnly: false });

@@ -1,5 +1,6 @@
 // 목업 v5 공통 부품 — 세그먼트 버튼, 탭, 정렬되는 표(머리줄·첫 열 고정, 줄 클릭), 칩
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useIsPhone } from '@/lib/useIsPhone';
 
 export function Segs<K extends string>({ opts, value, onPick, label }: { opts: [K, string][]; value: K; onPick: (k: K) => void; label?: string }) {
   return (
@@ -8,7 +9,14 @@ export function Segs<K extends string>({ opts, value, onPick, label }: { opts: [
     </div>
   );
 }
+// 화면을 옆으로 밀면 탭이 넘어가도록 지금 페이지의 탭을 등록 (먼저 그려진 탭이 우선)
+type SwipeTabs = { opts: [string, string][]; value: string; onPick: (k: any) => void };
+const swipeStack: { cur: SwipeTabs }[] = [];
+export const pageTabs = () => swipeStack[0]?.cur ?? null;
 export function Tabs<K extends string>({ opts, value, onPick }: { opts: [K, string][]; value: K; onPick: (k: K) => void }) {
+  const me = useRef<{ cur: SwipeTabs }>({ cur: { opts, value, onPick } });
+  me.current.cur = { opts, value, onPick };
+  useEffect(() => { const m = me.current; swipeStack.push(m); return () => { const i = swipeStack.indexOf(m); if (i >= 0) swipeStack.splice(i, 1); }; }, []);
   return (
     <div className="tabs" role="tablist">
       {opts.map(([k, n]) => <button key={k} role="tab" aria-selected={value === k} className={value === k ? 'tab on' : 'tab'} onClick={() => onPick(k)}>{n}</button>)}
@@ -31,9 +39,29 @@ export function sortRows<T>(sort: Sort, cols: Col<T>[], arr: T[]): T[] {
   const c = cols.find((x) => x.k === sort.k); if (!c) return arr;
   return [...arr].sort((a, b) => { const x = c.sv(a), y = c.sv(b); return (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), 'ko')) * sort.d; });
 }
-export interface GRowView { key: string; bg?: string; cells: ReactNode[]; onClick?: () => void; aria?: string }
+export interface GRowView { key: string; bg?: string; cells: ReactNode[]; onClick?: () => void; aria?: string; tone?: 'bad' | 'warn' }
 
-export function Grid<T>({ cols, sort, onSort, rows, minW, scroll }: { cols: Col<T>[]; sort: Sort; onSort: (k: string) => void; rows: GRowView[]; minW?: string; scroll?: boolean }) {
+export function Grid<T>({ cols, sort, onSort, rows, minW, scroll, noCards }: { cols: Col<T>[]; sort: Sort; onSort: (k: string) => void; rows: GRowView[]; minW?: string; scroll?: boolean; noCards?: boolean }) {
+  const phone = useIsPhone();
+  // 폰: 표 대신 카드 — 첫 칸이 제목, 나머지는 '열 이름 + 값' 3칸 격자
+  if (phone && !noCards) return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0 8px' }}>
+        <span className="muted small">정렬</span>
+        <select aria-label="정렬 기준" value={sort.k ?? ''} onChange={(e) => { if (e.target.value !== (sort.k ?? '')) onSort(e.target.value); }} style={{ minHeight: 36, flex: 1, maxWidth: 200 }}>
+          <option value="">기본</option>{cols.map((c) => <option key={c.k} value={c.k}>{c.l}</option>)}
+        </select>
+        {sort.k && <button className="btn sm ghost" onClick={() => onSort(sort.k!)}>{sort.d > 0 ? '▲ 오름' : '▼ 내림'}</button>}
+      </div>
+      {rows.map((r) => (
+        <div key={r.key} className={'gcard' + (r.tone ? ' tone-' + r.tone : '')} style={{ ['--rowbg' as any]: r.bg ?? '#fff' }}>
+          {r.onClick && <button className="rowhit" onClick={r.onClick} aria-label={r.aria} />}
+          <div style={{ fontWeight: 700 }}>{r.cells[0]}</div>
+          <div className="kv2">{r.cells.slice(1).map((c, i) => <div key={i} style={{ minWidth: 0 }} ref={(el) => { if (el) { const t = (el.textContent ?? '').trim(); el.style.display = t === (cols[i + 1]?.l ?? '') || t === (cols[i + 1]?.l ?? '') + '—' ? 'none' : ''; } }}><small>{cols[i + 1]?.l}</small>{c}</div>)}</div>
+        </div>
+      ))}
+    </div>
+  );
   const grid = cols.map((c) => c.w).join(' ');
   const mw = minW ?? Math.max(560, cols.reduce((a, c) => a + (parseInt(c.w.replace(/minmax\((\d+)px.*/, '$1')) || 60) + 8, 0)) + 'px';
   return (
@@ -49,7 +77,7 @@ export function Grid<T>({ cols, sort, onSort, rows, minW, scroll }: { cols: Col<
           ); })}
         </div>
         {rows.map((r) => (
-          <div key={r.key} className="gr rowx" style={{ gridTemplateColumns: grid, background: r.bg ?? '#fff', ['--rowbg' as any]: r.bg ?? '#fff' }}>
+          <div key={r.key} className={'gr rowx' + (r.tone ? ' tone-' + r.tone : '')} style={{ gridTemplateColumns: grid, background: r.bg ?? '#fff', ['--rowbg' as any]: r.bg ?? '#fff' }}>
             {r.onClick && <button className="rowhit" onClick={r.onClick} aria-label={r.aria} title={r.aria} />}
             {r.cells.map((c, i) => <div key={i} className={i === 0 ? 'stick' : ''} style={{ minWidth: 0 }}>{c}</div>)}
           </div>

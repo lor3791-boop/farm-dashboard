@@ -8,13 +8,16 @@ import { MONTHS } from '@/data/snapshot';
 import { Grid, Lnk, Num, Segs, sortRows, useSorts, type Col } from '@/components/v5';
 import { downloadXlsx } from '@/lib/xlsx';
 
-const monthOpts = MONTHS.map((m) => ({ v: m, l: m.slice(0, 4) + '년 ' + Number(m.slice(5)) + '월' }));
+import { thisMonth } from '@/lib/useIsPhone';
+const mLabel = (m: string) => m.slice(0, 4) + '년 ' + Number(m.slice(5)) + '월';
 
 export function ShipGrade() {
   const { farms, passFarm, ships, shipRows, liveShips } = useHerd();
   const sorts = useSorts();
   const SHIP = shipRows;
-  const [g, setG] = useState({ from: '2026-08', to: '2026-10', view: 'farm' as 'farm' | 'all', farm: '민서', setOpen: false });
+  const ALLM = [...new Set([...MONTHS, thisMonth(), ...SHIP.map((x) => x[0].slice(0, 7))])].sort();
+  const monthOpts = ALLM.map((m) => ({ v: m, l: mLabel(m) }));
+  const [g, setG] = useState({ from: thisMonth(), to: thisMonth(), view: 'farm' as 'farm' | 'all', farm: '민서', setOpen: false });
   // 출하성적
   const shipIn = SHIP.filter((x) => x[0].slice(0, 7) >= g.from && x[0].slice(0, 7) <= g.to && passFarm(x[1]));
   const gTot = shipAgg(shipIn);
@@ -23,7 +26,7 @@ export function ShipGrade() {
   const GC: Col<GA>[] = [{ k: 'name', l: '농장', w: 'minmax(84px,1fr)', sv: (a) => a.name }, { k: 'n', l: '출하두수', w: '76px', num: true, sv: (a) => a.n }, { k: 'avgw', l: '평균체중', w: '76px', num: true, sv: (a) => a.avgw }, { k: 'pay', l: '지급율', w: '68px', num: true, sv: (a) => a.pay }, { k: 'yld', l: '지육율', w: '68px', num: true, sv: (a) => a.yld }, { k: 'g11', l: '1+·1 등급율', w: '88px', num: true, sv: (a) => a.g11 }, { k: 'gp', l: '1+ 등급율', w: '76px', num: true, sv: (a) => a.gp }, { k: 'out', l: '등외', w: '56px', num: true, sv: (a) => a.out }];
   const gCells = (a: GA, sub?: string) => [<Lnk v={a.name} sub={sub} />, <Num v={fmt(a.n)} />, <Num v={a.avgw + 'kg'} />, <Num v={a.pay + '%'} cls="b" />, <Num v={a.yld + '%'} />, <Num v={a.g11 + '%'} />, <Num v={a.gp + '%'} />, <Num v={a.out} />];
   const gFarmAgg: GA[] = [...new Set(shipIn.map((x) => x[1]))].map((f) => ({ ...shipAgg(shipIn.filter((x) => x[1] === f)), name: f }));
-  const gMonths: GA[] = MONTHS.filter((m) => m >= g.from && m <= g.to).map((m) => ({ ...shipAgg(shipIn.filter((x) => x[0].slice(0, 7) === m)), name: Number(m.slice(5)) + '월' })).filter((a) => a.n > 0);
+  const gMonths: GA[] = ALLM.filter((m) => m >= g.from && m <= g.to).map((m) => ({ ...shipAgg(shipIn.filter((x) => x[0].slice(0, 7) === m)), name: Number(m.slice(5)) + '월' })).filter((a) => a.n > 0);
   const gList = shipIn.filter((x) => x[1] === g.farm).sort((a, b) => (a[0] < b[0] ? 1 : -1));
   const gFarmL = shipIn.filter((x) => x[1] === g.farm); const gfa = shipAgg(gFarmL);
   const noShip = farms.filter((f) => passFarm(f) && !shipIn.some((x) => x[1] === f));

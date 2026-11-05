@@ -16,7 +16,7 @@ export function DelayTab({ onOpen }: { onOpen: (who: string) => void }) {
         <div className="card">
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}><h2 className="h2">출하지연 · 경고</h2><button className="btn sm" onClick={() => xl('출하지연경고', ['농장', '그룹', '일령', '출하', '재고', '진행(%)', '사유'], warnRows.map((r) => [r.farm, r.group, r.age, r.sold, r.stock, r.prog, r.warn.join(' · ')]))}>엑셀</button></div>
           <Grid cols={WC} sort={sorts.of('warn')} onSort={(k) => sorts.cycle('warn', k)} rows={sortRows(sorts.of('warn'), WC, warnRows).map((r) => ({
-            key: r.who, aria: r.farm + ' ' + r.group + ' 열기', onClick: () => goDet(r.who),
+            key: r.who, tone: 'warn' as const, aria: r.farm + ' ' + r.group + ' 열기', onClick: () => goDet(r.who),
             cells: [<Lnk v={r.group} sub={r.farm} />, <Num v={r.age} />, <Num v={fmt(r.sold)} />, <Num v={fmt(r.stock)} />, <Num v={r.prog + '%'} />, <span className={r.warnBad ? 'small neg' : 'small warnT'}>{r.warn.join(' · ')}</span>]
           }))} />
           {warnRows.length === 0 && <div className="muted small" style={{ padding: 12 }}>경고 그룹이 없습니다.</div>}

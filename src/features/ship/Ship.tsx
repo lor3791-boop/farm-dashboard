@@ -13,6 +13,8 @@ import { makeResolver } from '@/lib/names';
 import { fmt, md, r1 } from '@/lib/calc/dates';
 import type { ManualShip } from '@/data/types';
 import { ShipManualButton } from './ShipManual';
+import { Sheet } from '@/components/Sheet';
+import { useIsPhone, thisMonth } from '@/lib/useIsPhone';
 
 const WD = ['일', '월', '화', '수', '목', '금', '토'];
 const wd = (d: string) => WD[new Date(d + 'T00:00:00Z').getUTCDay()];
@@ -59,6 +61,7 @@ export function ShipUpload() {
   };
 
   // 폰 '공유'로 받은 엑셀: 등판서면 여기서, 아니면 출하 자료 올리기로 넘김
+  useEffect(() => { const h = (e: Event) => { if ((e as CustomEvent).detail === 'grade') ref.current?.click(); }; addEventListener('ship-open', h); return () => removeEventListener('ship-open', h); }, []);
   useEffect(() => { takeInbox('sheet').then(async (L) => { for (const f of L) { const ok = await onFile(f); if (!ok) { setErr(''); window.dispatchEvent(new CustomEvent('ship-import-file', { detail: f })); } } }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const S = sh ? segRows(sh.rows, segs) : [];
   const n = sh?.rows.length ?? 0, carc = S.reduce((a, x) => a + x.carc, 0), W = Number(weigh);
@@ -161,20 +164,23 @@ export function ShipStatus() {
     });
     return a;
   }, [ships, imports]);
-  const months = useMemo(() => [...new Set(rows.map((r) => r.date.slice(0, 7)))].sort().reverse(), [rows]);
-  const [monSel, setMon] = useState<string | null>(null);
-  const mon = monSel ?? months[0] ?? '';
+  const months = useMemo(() => [...new Set([thisMonth(), ...rows.map((r) => r.date.slice(0, 7))])].sort().reverse(), [rows]);
+  const [mon, setMon] = useState(thisMonth());
+  const phone = useIsPhone();
+  const [open, setOpen] = useState<string | null>(null);
   const [dest, setDest] = useState('');
   const [farm, setFarm] = useState('');
   const [sort, setSort] = useState<'date' | 'n' | 'avgw' | 'yld'>('date');
   const [desc, setDesc] = useState(true);
   const [more, setMore] = useState(false);
-  const L = rows.filter((r) => (!mon || r.date.startsWith(mon)) && (!dest || shortDest(r.dest) === dest) && (!farm || r.farm === farm));
+  const L0 = rows.filter((r) => (!mon || r.date.startsWith(mon)) && (!dest || shortDest(r.dest) === dest));
+  const byFarm: Record<string, number> = {}; L0.forEach((r) => { byFarm[r.farm] = (byFarm[r.farm] ?? 0) + r.n; });
+  const L = L0.filter((r) => !farm || r.farm === farm);
   const val = (r: Row) => (sort === 'date' ? r.date : sort === 'n' ? r.n : sort === 'avgw' ? r.live / r.n : r.carc / r.live);
   L.sort((a, b) => { const x = val(a), y = val(b); return (x < y ? -1 : x > y ? 1 : 0) * (desc ? -1 : 1); });
   const N = L.reduce((a, r) => a + r.n, 0), LV = L.reduce((a, r) => a + r.live, 0), C = L.reduce((a, r) => a + r.carc, 0);
   const P = L.filter((r) => r.pay != null && !r.payEst), PC = P.reduce((a, r) => a + r.carc, 0);
-  const tiles: [string, string][] = [['두수', fmt(N) + '두'], ['총생체중', fmt(Math.round(LV)) + 'kg'], ['출하평체', N ? r1(LV / N) + 'kg' : '—'], ['지급율', PC ? r1(P.reduce((a, r) => a + r.pay! * r.carc, 0) / PC) + '%' : '—'], ['지육율', LV ? r1((C / LV) * 100) + '%' : '—'], ['등급율', N ? r1((L.reduce((a, r) => a + r.g1p + r.g1, 0) / N) * 100) + '%' : '—']];
+  const tiles: [string, string][] = [['두수', fmt(N) + '두'], ['출하 횟수', L.length + '회'], ['출하평체', N ? r1(LV / N) + 'kg' : '—'], ['지급율', PC ? r1(P.reduce((a, r) => a + r.pay! * r.carc, 0) / PC) + '%' : '—'], ['지육율', LV ? r1((C / LV) * 100) + '%' : '—'], ['등급율', N ? r1((L.reduce((a, r) => a + r.g1p + r.g1, 0) / N) * 100) + '%' : '—']];
   const dests = [...new Set(rows.map((r) => shortDest(r.dest)))].sort((a, b) => a.localeCompare(b, 'ko'));
   const g = '96px minmax(110px,1.2fr) 74px 60px 92px 72px 78px 64px 64px 120px';
   const shown = more ? L : L.slice(0, 40);
@@ -193,23 +199,41 @@ export function ShipStatus() {
   return (
     <>
       <div className="card" style={{ marginTop: 16 }}>
-        <h2 className="h2">출하 현황</h2>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-          <select aria-label="월" value={mon} onChange={(e) => setMon(e.target.value)}><option value="">기간 전체</option>{months.map((m) => <option key={m}>{m}</option>)}</select>
-          <select aria-label="거래처" value={dest} onChange={(e) => setDest(e.target.value)}><option value="">거래처 전체</option>{dests.map((d) => <option key={d}>{d}</option>)}</select>
-          <select aria-label="농가" value={farm} onChange={(e) => setFarm(e.target.value)}><option value="">농가 전체</option>{farms.map((f) => <option key={f}>{f}</option>)}</select>
-          <select aria-label="정렬" value={sort} onChange={(e) => setSort(e.target.value as any)}><option value="date">출하일순</option><option value="n">두수순</option><option value="avgw">평체순</option><option value="yld">지육율순</option></select>
-          <button className="btn sm" onClick={() => setDesc(!desc)}>{desc ? '내림차순 ▼' : '오름차순 ▲'}</button>
+        <div className="hscroll" style={{ alignItems: 'center' }}>
+          <select aria-label="월" value={mon} onChange={(e) => setMon(e.target.value)} style={{ minHeight: 38 }}><option value="">기간 전체</option>{months.map((m) => <option key={m} value={m}>{m === thisMonth() ? '이번 달' : m}</option>)}</select>
+          <select aria-label="거래처" value={dest} onChange={(e) => setDest(e.target.value)} style={{ minHeight: 38 }}><option value="">거래처 전체</option>{dests.map((d) => <option key={d}>{d}</option>)}</select>
+          <select aria-label="정렬" value={sort} onChange={(e) => setSort(e.target.value as any)} style={{ minHeight: 38 }}><option value="date">출하일순</option><option value="n">두수순</option><option value="avgw">평체순</option><option value="yld">지육율순</option></select>
+          <button className="btn sm ghost" onClick={() => setDesc(!desc)}>{desc ? '▼' : '▲'}</button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginTop: 12, padding: '14px 16px', background: '#EEF3EF', border: '1px solid #C9D9CF', borderRadius: 10 }}>
-          {tiles.map(([l, v]) => <div key={l}><div style={{ fontSize: 20, fontWeight: 700 }}>{v}</div><div className="muted" style={{ fontSize: 12 }}>{l}</div></div>)}
+        {Object.keys(byFarm).length > 0 && <div className="hscroll" style={{ marginTop: 8 }}>
+          {Object.entries(byFarm).sort((a, b) => b[1] - a[1]).map(([f, n]) => <button key={f} className={farm === f ? 'pill on' : 'pill'} style={{ minHeight: 34, padding: '4px 10px', fontSize: 13 }} onClick={() => setFarm(farm === f ? '' : f)}>{f} {fmt(n)}</button>)}
+        </div>}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(96px, 1fr))', gap: 6, marginTop: 10 }}>
+          {tiles.map(([l, v]) => <div key={l} style={{ background: '#F7F5F0', borderRadius: 10, padding: '8px 10px', minWidth: 0 }}><div className="muted" style={{ fontSize: 12 }}>{l}</div><div style={{ fontSize: 18, fontWeight: 700, whiteSpace: 'nowrap' }}>{v}</div></div>)}
         </div>
-        {L.length === 0 ? <div className="muted" style={{ marginTop: 10 }}>해당하는 출하가 없습니다</div> : (
+        {L.length === 0 ? <div className="muted" style={{ marginTop: 12 }}>해당하는 출하가 없습니다</div> : phone ? (
+          <div style={{ marginTop: 8 }}>
+            {(() => { const m = new Map<string, Row[]>(); shown.forEach((r) => { const k = sort === 'date' ? r.date : ''; if (!m.has(k)) m.set(k, []); m.get(k)!.push(r); }); return [...m]; })().map(([d, G]) => (
+              <div key={d || 'all'}>
+                {d && <div style={{ position: 'sticky', top: 0, zIndex: 1, background: '#fff', display: 'flex', justifyContent: 'space-between', padding: '12px 4px 4px', fontSize: 13, fontWeight: 700, color: wd(d) === '일' ? '#9A3216' : '#6B6A63', borderBottom: '1px solid #E2DDD2' }}><span>{md(d)} ({wd(d)})</span><span>{fmt(G.reduce((a, r) => a + r.n, 0))}두</span></div>}
+                {G.map((r) => (
+                  <button key={r.key} onClick={() => setOpen(r.key)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 4px', background: 'transparent', border: 0, borderBottom: '1px solid #EFEBE3', font: 'inherit', textAlign: 'left', color: 'inherit', cursor: 'pointer', minHeight: 52 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{!d && <span className="muted">{md(r.date)} · </span>}<b>{r.farm}</b> {r.group} <span className="muted small">{shortDest(r.dest)}</span></div>
+                      <div className="muted" style={{ fontSize: 12 }}>평체 {r1(r.live / r.n)}kg · 지육 {r1((r.carc / r.live) * 100)}% · 등급 {r1(((r.g1p + r.g1) / r.n) * 100)}%{r.pay != null ? ` · 지급 ${r.pay}%${r.payEst ? '(예상)' : ''}` : ''}</div>
+                    </div>
+                    <b style={{ fontSize: 17 }}>{fmt(r.n)}<span style={{ fontSize: 12, fontWeight: 400 }}>두</span></b>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        ) : (
           <div className="gt" style={{ marginTop: 12 }}><div style={{ minWidth: 900 }}>
             <div className="gr gh small muted" style={{ gridTemplateColumns: g }}><div>출하일</div><div>농가 · 그룹</div><div>거래처</div><div className="r">두수</div><div className="r">총생체중</div><div className="r">출하평체</div><div className="r">지급율</div><div className="r">지육율</div><div className="r">등급율</div><div className="r">1+/1/2/등외</div></div>
             {shown.map((r) => (
               <div key={r.key} className="gr" style={{ gridTemplateColumns: g }}>
-                <div>{md(r.date)}({wd(r.date)}){r.src !== '종합' && <div><span className="chip warn" style={{ fontSize: 11 }}>{r.src}</span></div>}</div>
+                <div>{md(r.date)}({wd(r.date)})</div>
                 <div><b>{r.farm}</b> {r.group}</div>
                 <div className="small">{shortDest(r.dest)}</div>
                 <div className="r b">{fmt(r.n)}</div>
@@ -223,6 +247,12 @@ export function ShipStatus() {
             ))}
           </div></div>
         )}
+        {(() => { const r = L.find((x) => x.key === open); return r ? (
+          <Sheet title={<>{r.farm} {r.group} <span className="muted" style={{ fontWeight: 400, fontSize: 14 }}>{md(r.date)}({wd(r.date)}) · {fmt(r.n)}두</span></>} onClose={() => setOpen(null)}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, fontSize: 14 }}>
+              {([['거래처', shortDest(r.dest)], ['총생체중', fmt(Math.round(r.live)) + 'kg'], ['출하평체', r1(r.live / r.n) + 'kg'], ['지급율', r.pay == null ? '—' : r.pay + '%' + (r.payEst ? ' (예상)' : '')], ['지육율', r1((r.carc / r.live) * 100) + '%'], ['등급율', r1(((r.g1p + r.g1) / r.n) * 100) + '%'], ['1+', String(r.g1p)], ['1 / 2', r.g1 + ' / ' + r.g2], ['등외', String(r.out)]] as const).map(([l, v]) => <div key={l}><div className="muted small">{l}</div><b>{v}</b></div>)}
+            </div>
+          </Sheet>) : null; })()}
         {!more && L.length > 40 && <button className="btn" style={{ marginTop: 10 }} onClick={() => setMore(true)}>{L.length - 40}건 더 보기</button>}
       </div>
       {checks.length > 0 && (

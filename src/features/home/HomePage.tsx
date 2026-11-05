@@ -49,11 +49,11 @@ export function HomePage() {
 
   return (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))', gap: 12 }}>
-        <button className="kpi" onClick={() => go('/herd', { herdTab: 'herd' })}><div className="muted small">재고 · {farmAgg.length}개 농장</div><div style={{ fontSize: 28, fontWeight: 700 }}>{fmt(totStock)}두</div><div className="muted" style={{ fontSize: 12 }}>{rows.length}개 그룹 · 돈수불 10/9 · 돈군 보기 →</div></button>
-        <button className="kpi" onClick={() => go('/herd', { herdTab: 'herd', fSel: null, fStatus: 'bad', warnOnly: false, stage: 'all', hView: 'table' })}><div className="muted small">문제 농장 (육성률 94% 미만 그룹)</div><div style={{ fontSize: 28, fontWeight: 700, color: '#9A3216' }}>{farmAgg.filter((f) => f.bad).length}개</div><div className="muted" style={{ fontSize: 12 }}>평균 폐사율 {totNet ? r1((totDeath / totNet) * 100) : 0}% · 문제 그룹 보기 →</div></button>
-        <button className="kpi" onClick={() => go('/herd', { herdTab: 'warn' })}><div className="muted small">출하지연 · 경고</div><div style={{ fontSize: 28, fontWeight: 700, color: '#7A4F00' }}>{warnRows.length}개 그룹</div><div className="muted" style={{ fontSize: 12 }}>일령 · 출하 멈춤 · 첫출하 경과 →</div></button>
-        <div className="kpi" style={{ cursor: 'default' }}><div className="muted small">이번 주 작업 ({md(TODAY)}~{md(addIso(TODAY, 6))})</div><div style={{ fontSize: 28, fontWeight: 700 }}>{week.filter((t) => isDone(t.key)).length} / {week.length}건</div><div className="muted" style={{ fontSize: 12 }}>완료 / 전체 · 구제역 · 구충 · 사료변경</div></div>
+      <div className="kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))', gap: 12 }}>
+        <button className="kpi" onClick={() => go('/herd', { herdTab: 'herd' })}><div className="muted small kl-l">재고 · {farmAgg.length}개 농장</div><div className="muted kl-s">재고</div><div className="kv" style={{ fontSize: 28, fontWeight: 700 }}>{fmt(totStock)}</div><div className="muted ks" style={{ fontSize: 12 }}>{rows.length}개 그룹 · 돈수불 10/9 · 돈군 보기 →</div></button>
+        <button className="kpi" onClick={() => go('/herd', { herdTab: 'herd', fSel: null, fStatus: 'bad', warnOnly: false, stage: 'all', hView: 'table' })}><div className="muted small kl-l">문제 농장 (육성률 94% 미만 그룹)</div><div className="muted kl-s">문제농장</div><div className="kv" style={{ fontSize: 28, fontWeight: 700, color: '#9A3216' }}>{farmAgg.filter((f) => f.bad).length}개</div><div className="muted ks" style={{ fontSize: 12 }}>평균 폐사율 {totNet ? r1((totDeath / totNet) * 100) : 0}% · 문제 그룹 보기 →</div></button>
+        <button className="kpi" onClick={() => go('/herd', { herdTab: 'warn' })}><div className="muted small kl-l">출하지연 · 경고</div><div className="muted kl-s">출하지연</div><div className="kv" style={{ fontSize: 28, fontWeight: 700, color: '#7A4F00' }}>{warnRows.length}<span className="kl-l">개 그룹</span></div><div className="muted ks" style={{ fontSize: 12 }}>일령 · 출하 멈춤 · 첫출하 경과 →</div></button>
+        <div className="kpi" style={{ cursor: 'default' }}><div className="muted small kl-l">이번 주 작업 ({md(TODAY)}~{md(addIso(TODAY, 6))})</div><div className="muted kl-s">이번주 작업</div><div className="kv" style={{ fontSize: 28, fontWeight: 700 }}>{week.filter((t) => isDone(t.key)).length}/{week.length}</div><div className="muted ks" style={{ fontSize: 12 }}>완료 / 전체 · 구제역 · 구충 · 사료변경</div></div>
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
@@ -96,7 +96,7 @@ export function HomePage() {
         <div className="card">
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}><h2 className="h2">농장별 현황</h2></div>
           <Grid cols={fCols} sort={sorts.of('farms')} onSort={(k) => sorts.cycle('farms', k)} minW="560px" rows={sortRows(sorts.of('farms'), fCols, farmAgg).map((f) => ({
-            key: f.name, aria: f.name + ' 돈군 보기', onClick: () => go('/herd', { herdTab: 'herd', fSel: [f.name], exp: { ...s.exp, [f.name]: true } }),
+            key: f.name, tone: f.bad ? 'bad' as const : undefined, aria: f.name + ' 돈군 보기', onClick: () => go('/herd', { herdTab: 'herd', fSel: [f.name], exp: { ...s.exp, [f.name]: true } }),
             cells: [<Lnk v={f.name} />, <Num v={fmt(f.stock)} />, <Num v={f.groups} />, <Num v={f.mort + '%'} />, <Num v={f.surv + '%'} />, <span className={f.bad ? 'chip bad' : 'chip ok'}>{f.bad ? '문제' : '정상'}</span>, <span className="small">{f.low.length ? f.low.map((r) => r.group + ' ' + r.surv + '%').join(', ') : '—'}</span>]
           }))} />
         </div>

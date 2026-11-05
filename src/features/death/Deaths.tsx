@@ -7,6 +7,8 @@ import { dongsOf } from '@/lib/calc/herd';
 import { fmt, md } from '@/lib/calc/dates';
 import { todayKST } from '@/lib/util';
 import type { DeathRow } from '@/lib/repo';
+import { Sheet, Stepper, toast } from '@/components/Sheet';
+import { thisMonth } from '@/lib/useIsPhone';
 
 const WD = ['일', '월', '화', '수', '목', '금', '토'];
 const wd = (d: string) => WD[new Date(d + 'T00:00:00Z').getUTCDay()];
@@ -38,15 +40,15 @@ function EditPanel({ r, onDone }: { r: DeathRow; onDone: () => void }) {
   const opts = useDongGroupOpts()(r.farm);
   const [date, setDate] = useState(r.date);
   const [dg, setDg] = useState((r.dong ?? '') + '|' + r.group);
-  const [cnt, setCnt] = useState(String(r.count));
+  const [cnt, setCnt] = useState(r.count);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [del, setDel] = useState(false);
   const has = opts.some((o) => o.v === dg);
-  const dirty = date !== r.date || dg !== (r.dong ?? '') + '|' + r.group || cnt !== String(r.count);
+  const dirty = date !== r.date || dg !== (r.dong ?? '') + '|' + r.group || cnt !== r.count;
   const run = async (f: () => Promise<void>) => { setBusy(true); setErr(''); try { await f(); onDone(); } catch (e) { setErr((e as Error).message || String(e)); } finally { setBusy(false); } };
   const save = () => {
-    const n = Number(cnt);
+    const n = cnt;
     if (!date) return setErr('날짜를 넣으세요');
     if (!(Number.isInteger(n) && n >= 1 && n <= 300)) return setErr('두수는 1~300');
     const [dong, group] = dg.split('|');
@@ -55,12 +57,12 @@ function EditPanel({ r, onDone }: { r: DeathRow; onDone: () => void }) {
   const lab = { fontSize: 13, color: '#6B6A63', display: 'grid', gap: 4 } as const;
   const inp = { width: '100%', minHeight: 44, boxSizing: 'border-box' } as const;
   return (
-    <div style={{ padding: '12px', background: '#F7F5F0', borderRadius: 10, margin: '0 0 8px', display: 'grid', gap: 10 }}>
+    <div style={{ display: 'grid', gap: 14 }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
         <label style={lab}>날짜<input type="date" value={date} max={todayKST()} onChange={(e) => { setDate(e.target.value); setErr(''); }} style={inp} /></label>
         <label style={lab}>동 · 그룹<select value={dg} onChange={(e) => { setDg(e.target.value); setErr(''); }} style={inp}>{!has && <option value={dg}>{dgLabel({ dong: dg.split('|')[0], group: dg.split('|')[1] })}</option>}{opts.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}</select></label>
-        <label style={lab}>두수<input type="number" inputMode="numeric" min={1} max={300} value={cnt} onChange={(e) => { setCnt(e.target.value); setErr(''); }} style={inp} /></label>
       </div>
+      <div style={lab}>두수<Stepper value={cnt} onChange={(n) => { setCnt(n); setErr(''); }} /></div>
       <Photos r={r} />
       {r.checked && dirty && <div className="small" style={{ color: '#7A4F00' }}>고쳐 저장하면 미등록으로 돌아갑니다</div>}
       {err && <div className="small" style={{ color: '#9A3216' }}>{err}</div>}
@@ -69,7 +71,7 @@ function EditPanel({ r, onDone }: { r: DeathRow; onDone: () => void }) {
           ? <><button className="btn" disabled={busy} style={{ background: '#9A3216', borderColor: '#9A3216', color: '#fff' }} onClick={() => run(() => repo!.removeDeath(r))}>삭제 확인</button><button className="btn ghost" onClick={() => setDel(false)}>그대로 두기</button></>
           : <button className="btn ghost" style={{ color: '#9A3216', borderColor: '#E7C3B5' }} onClick={() => setDel(true)}>삭제</button>}
         <div style={{ flex: 1 }} />
-        {!del && <><button className="btn ghost" onClick={onDone}>닫기</button><button className="btn pri" disabled={busy || !dirty} onClick={save}>{busy ? '저장 중…' : '저장'}</button></>}
+        {!del && <button className="btn pri" disabled={busy || !dirty} onClick={save} style={{ minHeight: 48, minWidth: 110 }}>{busy ? '저장 중…' : '저장'}</button>}
       </div>
     </div>
   );
@@ -82,7 +84,7 @@ function Item({ r, open, onOpen, onCheck }: { r: DeathRow; open: boolean; onOpen
   const extra = [nPhotos(r) ? '사진 ' + nPhotos(r) : '', r.heat ? '폭염' : '', x?.claim ? '크레임 ' + x.claim : ''].filter(Boolean).join(' · ');
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderBottom: open ? 0 : '1px solid #EFEBE3', background: open ? '#EEF3EF' : undefined, borderRadius: open ? '10px 10px 0 0' : 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid #EFEBE3', background: open ? '#EEF3EF' : undefined }}>
         <button onClick={onOpen} aria-expanded={open} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', font: 'inherit', background: 'transparent', border: 0, padding: '10px 4px 10px 8px', cursor: 'pointer', minHeight: 52, color: 'inherit' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><b>{r.farm}</b> <span>{dgLabel(r)}</span></div>
@@ -96,7 +98,6 @@ function Item({ r, open, onOpen, onCheck }: { r: DeathRow; open: boolean; onOpen
           {r.checked ? '✓ 완료' : '○ 등록'}
         </button>
       </div>
-      {open && <EditPanel r={r} onDone={onOpen} />}
     </>
   );
 }
@@ -113,21 +114,21 @@ export function DeathRecords({ popup = false }: { popup?: boolean }) {
   const { repo, email } = useAuth();
   const [st, setSt] = useState<St>('no');
   const [farm, setFarm] = useState('');
-  const [mon, setMon] = useState('');
+  const [mon, setMon] = useState(thisMonth());
   const [open, setOpen] = useState<string | null>(null);
   const [allOk, setAllOk] = useState(false);
-  const [undo, setUndo] = useState<DeathRow | null>(null);
   const [more, setMore] = useState(false);
   const base = deaths.filter((r) => popup || passFarm(r.farm));
   const unregN = base.filter((r) => !r.checked).length;
   const inSt = base.filter((r) => st === 'all' || (st === 'ok') === r.checked);
-  const months = useMemo(() => [...new Set(base.map((r) => r.date.slice(0, 7)))].sort().reverse(), [base]);
-  const byFarm = useMemo(() => { const m: Record<string, number> = {}; inSt.filter((r) => !mon || r.date.startsWith(mon)).forEach((r) => { m[r.farm] = (m[r.farm] ?? 0) + r.count; }); return m; }, [inSt, mon]);
-  const rows = inSt.filter((r) => (!farm || r.farm === farm) && (!mon || r.date.startsWith(mon)))
+  const months = useMemo(() => [...new Set([thisMonth(), ...base.map((r) => r.date.slice(0, 7))])].sort().reverse(), [base]);
+  const monF = st === 'no' ? '' : mon;
+  const byFarm = useMemo(() => { const m: Record<string, number> = {}; inSt.filter((r) => !monF || r.date.startsWith(monF)).forEach((r) => { m[r.farm] = (m[r.farm] ?? 0) + r.count; }); return m; }, [inSt, monF]);
+  const rows = inSt.filter((r) => (!farm || r.farm === farm) && (!monF || r.date.startsWith(monF)))
     .sort((a, b) => (st === 'no' ? (a.date < b.date ? -1 : a.date > b.date ? 1 : a.farm.localeCompare(b.farm, 'ko')) : (a.date < b.date ? 1 : a.date > b.date ? -1 : a.at < b.at ? 1 : -1)));
   const lim = st === 'no' || more ? rows : rows.slice(0, 60);
   const days = useMemo(() => { const m = new Map<string, DeathRow[]>(); lim.forEach((r) => { if (!m.has(r.date)) m.set(r.date, []); m.get(r.date)!.push(r); }); return [...m]; }, [lim]);
-  const check = async (r: DeathRow) => { await repo!.updateDeath(r, { checked: !r.checked }, email); if (!r.checked && st === 'no') setUndo(r); };
+  const check = async (r: DeathRow) => { await repo!.updateDeath(r, { checked: !r.checked }, email); if (!r.checked) toast(`${r.farm} ${dgLabel(r)} ${r.count}두 등록완료`, { label: '되돌리기', run: () => { repo!.updateDeath({ ...r, checked: true }, { checked: false }, email); } }); };
   const total = rows.reduce((a, r) => a + r.count, 0);
   const seg = (k: St, l: string) => <button key={k} className={st === k ? 'seg on' : 'seg'} onClick={() => { setSt(k); setOpen(null); setAllOk(false); setMore(false); }}>{l}</button>;
 
@@ -138,7 +139,7 @@ export function DeathRecords({ popup = false }: { popup?: boolean }) {
         <div style={{ flex: 1 }} />
         {!popup && <button className="btn sm ghost" onClick={openUnregWindow}>새 창</button>}
       </div>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', margin: '10px 0 4px' }}>
+      <div className="hscroll" style={{ alignItems: 'center', margin: '10px 0 4px' }}>
         {st !== 'no' && <select aria-label="월" value={mon} onChange={(e) => setMon(e.target.value)} style={{ minHeight: 34 }}><option value="">기간 전체</option>{months.map((m) => <option key={m} value={m}>{m}</option>)}</select>}
         {Object.entries(byFarm).map(([f, n]) => <button key={f} className={farm === f ? 'pill on' : 'pill'} style={{ minHeight: 34, padding: '4px 10px', fontSize: 13 }} onClick={() => setFarm(farm === f ? '' : f)}>{f} {fmt(n)}</button>)}
       </div>
@@ -149,13 +150,6 @@ export function DeathRecords({ popup = false }: { popup?: boolean }) {
           ? <><button className="btn sm ghost" onClick={() => setAllOk(false)}>취소</button><button className="btn sm pri" onClick={async () => { setAllOk(false); for (const r of rows) await repo!.updateDeath(r, { checked: true }, email); }}>{rows.length}건 모두 완료</button></>
           : <button className="btn sm ghost" onClick={() => setAllOk(true)}>모두 등록완료</button>)}
       </div>
-      {undo && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#1D2622', color: '#fff', borderRadius: 10, padding: '6px 6px 6px 12px', margin: '6px 0', fontSize: 14 }}>
-          <span style={{ flex: 1 }}>{undo.farm} {dgLabel(undo)} {undo.count}두 등록완료</span>
-          <button className="btn sm" style={{ background: 'transparent', color: '#BFE3CF', borderColor: 'transparent' }} onClick={async () => { await repo!.updateDeath(undo, { checked: false }, email); setUndo(null); }}>되돌리기</button>
-          <button className="btn sm" aria-label="닫기" style={{ background: 'transparent', color: '#fff', borderColor: 'transparent' }} onClick={() => setUndo(null)}>✕</button>
-        </div>
-      )}
       {rows.length === 0 && <div className="muted" style={{ padding: '16px 4px' }}>{st === 'no' ? '미등록 폐사가 없습니다' : '해당하는 폐사 기록이 없습니다'}</div>}
       {days.map(([d, L]) => (
         <div key={d}>
@@ -165,6 +159,7 @@ export function DeathRecords({ popup = false }: { popup?: boolean }) {
           {L.map((r) => <Item key={r.id} r={r} open={open === r.id} onOpen={() => setOpen(open === r.id ? null : r.id)} onCheck={() => check(r)} />)}
         </div>
       ))}
+      {(() => { const r = rows.find((x) => x.id === open); return r ? <Sheet title={<>{r.farm} <span className="muted" style={{ fontWeight: 400, fontSize: 14 }}>{md(r.date)}({wd(r.date)}) · {dgLabel(r)} · {r.count}두</span></>} onClose={() => setOpen(null)}><EditPanel key={r.id} r={r} onDone={() => setOpen(null)} /></Sheet> : null; })()}
       {st !== 'no' && !more && rows.length > 60 && <button className="btn" style={{ marginTop: 10, width: '100%' }} onClick={() => setMore(true)}>{rows.length - 60}건 더 보기</button>}
     </div>
   );

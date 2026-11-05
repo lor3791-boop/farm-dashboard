@@ -13,6 +13,7 @@ import { useRef } from 'react';
 import { shrinkImage } from '@/lib/image';
 import { pyesaOn, saveToSheet } from '@/lib/pyesa';
 import { takeInbox } from '@/lib/inbox';
+import { Stepper } from '@/components/Sheet';
 import { useEffect } from 'react';
 
 export function DeathPage() {
@@ -87,7 +88,7 @@ function DeathEntry() {
         </div>
       )}
       <div style={{ fontWeight: 700, margin: '14px 0 8px' }}>① 농장</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 6 }}>
+      <div className="hscroll">
         {farms.map((f) => <button key={f} className={pill(s.dFarm === f)} onClick={() => { set({ dFarm: f, dDong: null, dGroup: null }); setCnt(1); setSaved(''); }}>{f}</button>)}
       </div>
       {hasDong && (
@@ -113,13 +114,11 @@ function DeathEntry() {
       )}
       <div style={{ fontWeight: 700, margin: '16px 0 8px' }}>④ 두수 · 날짜</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <button className="pill" onClick={() => { setCnt(Math.max(1, cnt - 1)); setSaved(''); }} aria-label="두수 줄이기">−</button>
-        <span style={{ fontSize: 24, fontWeight: 700, minWidth: 40, textAlign: 'center' }}>{cnt}</span>
-        <button className="pill" onClick={() => { setCnt(cnt + 1); setSaved(''); }} aria-label="두수 늘리기">+</button>
-        <label style={{ fontSize: 14, marginLeft: 8 }}>날짜 <input type="date" value={date} max={todayKST()} onChange={(e) => setDate(e.target.value || todayKST())} /></label>
+        <Stepper value={cnt} onChange={(n) => { setCnt(n); setSaved(''); }} />
+        <label style={{ fontSize: 14 }}>날짜 <input type="date" value={date} max={todayKST()} onChange={(e) => setDate(e.target.value || todayKST())} style={{ minHeight: 44 }} /></label>
       </div>
       <div style={{ marginTop: 18, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button className="btn pri" disabled={busy} onClick={save}>{busy ? "저장 중…" : "저장"}</button>
+        <button className="btn pri" disabled={busy} onClick={save} style={{ minHeight: 48, minWidth: 120, fontSize: 16 }}>{busy ? "저장 중…" : "저장"}</button>
         <button className="btn" onClick={() => { setSaved('한 사진에 여러 동: 이 동을 저장한 뒤 동을 바꿔 한 번 더 저장하세요'); setSavedOk(true); }}>+ 동 추가 (한 사진에 여러 동)</button>
       </div>
       {saved && <div style={{ marginTop: 12 }}><span className={savedOk ? 'chip ok' : 'chip bad'} style={{ whiteSpace: 'normal' }}>{saved}</span></div>}

@@ -1,5 +1,5 @@
 // 앱 데이터 컨텍스트 — 저장소를 구독해 화면에 실시간으로 내려준다. (설정 + 폐사 기록 + 출하 기록)
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AppData, ManualShip } from '@/data/types';
 import type { DeathRow } from './repo';
 import type { ManualGroup } from './calc/herd';
@@ -10,8 +10,8 @@ import { REF } from './calc/herd';
 import { todayKST } from './util';
 import { useAuth } from './auth';
 
-interface DataState { data: AppData | null; error: string; deaths: DeathRow[]; ships: (ManualShip & { id: string })[]; groups: (ManualGroup & { id: string })[]; uploads: (ShipImport & { id: string })[]; imports: ImpRow[]; sheetErr: string }
-const Ctx = createContext<DataState>({ data: null, error: '', deaths: [], ships: [], groups: [], uploads: [], imports: [], sheetErr: '' });
+interface DataState { data: AppData | null; error: string; deaths: DeathRow[]; ships: (ManualShip & { id: string })[]; groups: (ManualGroup & { id: string })[]; uploads: (ShipImport & { id: string })[]; imports: ImpRow[]; sheetErr: string; loading: boolean; refresh: () => Promise<void> }
+const Ctx = createContext<DataState>({ data: null, error: '', deaths: [], ships: [], groups: [], uploads: [], imports: [], sheetErr: '', loading: true, refresh: async () => {} });
 export const useData = () => useContext(Ctx);
 
 export function DataProvider({ children }: { children: ReactNode }) {
@@ -20,6 +20,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [fsDeaths, setDeaths] = useState<DeathRow[]>([]);
   const [sheet, setSheet] = useState<DeathRow[]>([]);
   const [sheetErr, setSheetErr] = useState('');
+  const [sheetReady, setSheetReady] = useState(false);
+  const loadRef = useRef<() => Promise<void>>(async () => {});
   const [ships, setShips] = useState<(ManualShip & { id: string })[]>([]);
   const [groups, setGroups] = useState<(ManualGroup & { id: string })[]>([]);
   const [uploads, setUploads] = useState<(ShipImport & { id: string })[]>([]);
@@ -38,15 +40,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const farmNames = useMemo(() => (st.data?.farms ?? []).map((f) => f.name), [st.data?.farms]);
   useEffect(() => {
     setPyesaKey(key);
-    if (!key) { setSheet([]); return; }
+    if (!key) { setSheet([]); loadRef.current = async () => {}; return; }
     let alive = true;
     const days = Math.max(14, Math.round((Date.parse(todayKST()) - Date.parse(REF)) / 864e5) + 1);
-    const load = () => loadSheet(days, farmNames).then((r) => { if (alive) { setSheet(r); setSheetErr(''); } }).catch((e) => alive && setSheetErr(String(e.message || e)));
+    const load = () => { return loadSheet(days, farmNames).then((r) => { if (alive) { setSheet(r); setSheetErr(''); } }).catch((e) => { if (alive) setSheetErr(String(e.message || e)); }).finally(() => alive && setSheetReady(true)); };
+    loadRef.current = load;
     load();
     const t = setInterval(load, 60000);
     const off = onPyesaChange(load);
     return () => { alive = false; clearInterval(t); off(); };
   }, [key, farmNames]);
   const deaths = useMemo(() => fsDeaths.concat(sheet), [fsDeaths, sheet]);
-  return <Ctx.Provider value={{ ...st, deaths, ships, groups, uploads, imports, sheetErr }}>{children}</Ctx.Provider>;
+  const loading = !st.data || (!!key && !sheetReady);
+  const refresh = useCallback(() => loadRef.current(), []);
+  return <Ctx.Provider value={{ ...st, deaths, ships, groups, uploads, imports, sheetErr, loading, refresh }}>{children}</Ctx.Provider>;
 }

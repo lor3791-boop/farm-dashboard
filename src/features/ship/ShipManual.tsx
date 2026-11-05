@@ -1,5 +1,7 @@
 // 출하 직접 입력 — 등급판정서 없이 출하 한 건을 손으로 넣는다 (팀 대시보드 '출하 기록 직접 입력'과 같은 칸)
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Sheet } from '@/components/Sheet';
+import { useIsPhone, thisMonth } from '@/lib/useIsPhone';
 import { useHerd } from '@/lib/ui';
 import { useAuth } from '@/lib/auth';
 import { useCol } from '@/lib/useCol';
@@ -16,6 +18,8 @@ const blank = (farm: string, group: string, writer: string): F => ({ farm, group
 
 export function ShipManualButton() {
   const [open, setOpen] = useState(false);
+  // + 버튼 › 출하 직접 입력
+  useEffect(() => { const h = (e: Event) => { if ((e as CustomEvent).detail === 'manual') setOpen(true); }; addEventListener('ship-open', h); return () => removeEventListener('ship-open', h); }, []);
   return (
     <>
       <button className="btn pri" onClick={() => setOpen(true)}>+ 직접 입력</button>
@@ -61,16 +65,10 @@ function ShipManualModal({ onClose }: { onClose: () => void }) {
   const row = (label: string, child: React.ReactNode) => (
     <label style={{ display: 'grid', gridTemplateColumns: '110px minmax(0,1fr)', alignItems: 'center', gap: 10, fontSize: 14 }}><span className="muted">{label}</span>{child}</label>
   );
-  const I = (k: keyof F, ph = '', type = 'number') => <input type={type} inputMode={type === 'number' ? 'decimal' : undefined} value={f[k]} placeholder={ph} onChange={(e) => up(k, e.target.value)} style={{ width: '100%' }} />;
+  const I = (k: keyof F, ph = '', type = 'number') => <input type={type} inputMode={type === 'number' ? 'decimal' : undefined} value={f[k]} placeholder={ph} onChange={(e) => up(k, e.target.value)} style={{ width: '100%', minHeight: 44, boxSizing: 'border-box' }} />;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
-      <button aria-label="닫기" onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(20,30,25,.4)', border: 0 }} />
-      <div role="dialog" aria-modal="true" aria-label="출하 기록 직접 입력" className="card" style={{ position: 'relative', width: '100%', maxWidth: 560, maxHeight: '92vh', overflowY: 'auto', padding: '20px 22px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h2 className="h2" style={{ fontSize: 19 }}>출하 기록 직접 입력</h2>
-          <button className="btn sm ghost" onClick={onClose} aria-label="닫기">✕</button>
-        </div>
+    <Sheet title="출하 기록 직접 입력" onClose={onClose}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {row('농장', <select value={f.farm} onChange={(e) => { const g = groupsOf(e.target.value); setF({ ...f, farm: e.target.value, group: g[0] ?? '' }); }}>{farms.map((x) => <option key={x}>{x}</option>)}</select>)}
           {row('그룹', <select value={f.group} onChange={(e) => up('group', e.target.value)}>{groupsOf(f.farm).map((g) => <option key={g}>{g}</option>)}</select>)}
@@ -92,10 +90,9 @@ function ShipManualModal({ onClose }: { onClose: () => void }) {
         {err && <div style={{ marginTop: 10 }}><span className="chip bad" style={{ whiteSpace: 'normal' }}>{err}</span></div>}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 16 }}>
           <button className="btn ghost" onClick={onClose}>취소</button>
-          <button className="btn pri" disabled={busy} onClick={save}>{busy ? '저장 중…' : '저장'}</button>
+          <button className="btn pri" disabled={busy} onClick={save} style={{ minHeight: 48 }}>{busy ? '저장 중…' : '저장'}</button>
         </div>
-      </div>
-    </div>
+    </Sheet>
   );
 }
 
@@ -103,22 +100,48 @@ function ShipManualModal({ onClose }: { onClose: () => void }) {
 export function ShipManualList() {
   const rows = useCol<ManualShip>('shipments');
   const { repo } = useAuth();
+  const phone = useIsPhone();
   const [del, setDel] = useState<string | null>(null);
+  const [mon, setMon] = useState(thisMonth());
+  const [open, setOpen] = useState<string | null>(null);
   if (!rows.length) return null;
-  const sorted = [...rows].sort((a, b) => (a.date < b.date ? 1 : -1));
+  const months = [...new Set([thisMonth(), ...rows.map((x) => x.date.slice(0, 7))])].sort().reverse();
+  const sorted = rows.filter((x) => !mon || x.date.startsWith(mon)).sort((a, b) => (a.date < b.date ? 1 : -1));
   const g = '72px minmax(90px,1fr) 70px 52px 78px 64px 56px 56px 110px 84px';
+  const delBtn = (x: ManualShip & { id: string }) => del === x.id ? <button className="btn sm" style={{ borderColor: '#9A3216', color: '#9A3216' }} onClick={async () => { await repo!.remove('shipments', x.id); setDel(null); setOpen(null); }}>정말 삭제</button> : <button className="btn sm ghost" onClick={() => setDel(x.id)}>삭제</button>;
+  const cur = sorted.find((x) => x.id === open);
   return (
     <div className="card" style={{ marginTop: 16 }}>
-      <h2 className="h2" style={{ marginBottom: 8 }}>등록한 출하 기록 (등판서·직접 입력) · {rows.length}건</h2>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+        <h2 className="h2" style={{ flex: 1 }}>등록한 출하 기록 · {sorted.length}건</h2>
+        <select aria-label="월" value={mon} onChange={(e) => setMon(e.target.value)} style={{ minHeight: 36 }}><option value="">기간 전체</option>{months.map((m) => <option key={m}>{m}</option>)}</select>
+      </div>
+      {sorted.length === 0 && <div className="muted">이 달에 등록한 출하가 없습니다</div>}
+      {phone ? sorted.map((x) => (
+        <button key={x.id} onClick={() => { setOpen(x.id); setDel(null); }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 4px', borderBottom: '1px solid #EFEBE3', background: 'transparent', border: 0, borderBottomStyle: 'solid', font: 'inherit', textAlign: 'left', color: 'inherit', cursor: 'pointer' }}>
+          <span style={{ width: 46, fontWeight: 600 }}>{md(x.date)}</span>
+          <div style={{ flex: 1, minWidth: 0 }}><b>{x.farm}</b> {x.group}<div className="muted small">{shortDest(x.dest)} · 평체 {r1(x.live / x.n)}kg · {x.kind === 'grade' ? '등판서' : '직접 입력'}</div></div>
+          <b>{fmt(x.n)}<span style={{ fontWeight: 400, fontSize: 12 }}>두</span></b>
+        </button>
+      )) : sorted.length > 0 && (
       <div className="gt"><div style={{ minWidth: 820 }}>
         <div className="gr gh small muted" style={{ gridTemplateColumns: g }}><div>출하일</div><div>농장 · 그룹</div><div>거래처</div><div className="r">두수</div><div className="r">평체</div><div className="r">지육율</div><div className="r">지급율</div><div className="r">1+·1</div><div>등록자</div><div /></div>
         {sorted.map((x) => (
           <div key={x.id} className="gr" style={{ gridTemplateColumns: g }}>
             <div>{md(x.date)}</div><div><b>{x.farm}</b> {x.group}</div><div className="small">{shortDest(x.dest)}<div className="sub">{x.kind === 'grade' ? '등판서 ' + (x.range ?? '') : '직접 입력'}</div></div><div className="r b">{fmt(x.n)}</div><div className="r">{r1(x.live / x.n)}kg</div><div className="r">{x.yld}%</div><div className="r">{x.pay ? x.pay + '%' : '—'}</div><div className="r">{x.g1p}·{x.g1}</div><div className="small">{x.writer}{x.kind === 'grade' && x.date > REF ? <div className="sub">재고 차감</div> : null}{x.lowReason ? <div className="sub">저체중: {x.lowReason}</div> : null}</div>
-            <div className="r">{del === x.id ? <button className="btn sm" style={{ borderColor: '#9A3216', color: '#9A3216' }} onClick={async () => { await repo!.remove('shipments', x.id); setDel(null); }}>정말 삭제</button> : <button className="btn sm ghost" onClick={() => setDel(x.id)}>삭제</button>}</div>
+            <div className="r">{delBtn(x)}</div>
           </div>
         ))}
-      </div></div>
+      </div></div>)}
+      {cur && (
+        <Sheet title={<>{cur.farm} {cur.group} <span className="muted" style={{ fontWeight: 400, fontSize: 14 }}>{md(cur.date)} · {fmt(cur.n)}두</span></>} onClose={() => setOpen(null)}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, fontSize: 14 }}>
+            {([['거래처', shortDest(cur.dest)], ['총생체중', fmt(Math.round(cur.live)) + 'kg'], ['평체', r1(cur.live / cur.n) + 'kg'], ['지육율', cur.yld + '%'], ['지급율', cur.pay ? cur.pay + '%' : '—'], ['1+/1/2/등외', `${cur.g1p}/${cur.g1}/${cur.g2}/${cur.out}`], ['입력', cur.kind === 'grade' ? '등판서 ' + (cur.range ?? '') : '직접 입력'], ['등록자', cur.writer || '—']] as const).map(([l, v]) => <div key={l}><div className="muted small">{l}</div><b>{v}</b></div>)}
+          </div>
+          {cur.lowReason && <div className="small" style={{ marginTop: 10 }}>저체중 사유: {cur.lowReason}</div>}
+          <div style={{ marginTop: 16 }}>{delBtn(cur)}</div>
+        </Sheet>
+      )}
     </div>
   );
 }
