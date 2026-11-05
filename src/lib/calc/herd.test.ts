@@ -1,4 +1,4 @@
-// 검산: 목업 v5 원본 계산을 그대로 실행한 결과(__fixtures__/v5-reference.json)와 한 칸도 다르지 않아야 한다.
+// 검산: 정답 파일(__fixtures__/v5-reference.json)과 한 칸도 다르지 않아야 한다. 처음엔 목업 v5 원본 계산 결과, 2026-11-06 피그온 11/5 스냅샷으로 다시 만듦.
 // 기준값을 바꾸면(예: 94% → 95%) 이 테스트는 의도적으로 실패하므로, 그때는 정답 파일도 같이 다시 만든다.
 import { describe, it, expect } from 'vitest';
 import ref from '@/data/__fixtures__/v5-reference.json';
@@ -7,14 +7,14 @@ import { buildGroups, buildTasks, agg } from './herd';
 
 const all = buildGroups(SEED_THRESHOLDS);
 describe('목업 v5 계산과 동일', () => {
-  it('그룹 40개 × 21개 항목', () => {
+  it('그룹별 항목', () => {
     expect(all.length).toBe(ref.groups.length);
     ref.groups.forEach((g: any, i: number) => {
       const a: any = all[i];
       Object.keys(g).forEach((k) => expect([g.who, k, a[k]]).toEqual([g.who, k, g[k]]));
     });
   });
-  it('작업 알림 103건 (날짜·대상·두수)', () => {
+  it('작업 알림 (날짜·대상·두수)', () => {
     const t = buildTasks(all).map(({ d, who, job, heads, sub }) => ({ d, who, job, heads, sub }));
     const key = (x: any) => x.d + x.who + x.job;
     expect([...t].sort((a, b) => key(a).localeCompare(key(b)))).toEqual([...ref.tasks].sort((a: any, b: any) => key(a).localeCompare(key(b))));

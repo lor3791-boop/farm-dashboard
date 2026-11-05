@@ -36,8 +36,10 @@ export const dongsOf = (s: string) => (s === '—' ? [] : s.replace('동', '').s
 export { REF, TODAY };
 
 export function buildGroups(T: Thresholds, firstShipByFarm: Record<string, number> = {}, live?: Live, splitOut?: Record<string, Split>): Group[] {
-  const extra = manualRows(T, (live?.groups ?? []).filter((m) => !G0.some((r) => r[0] === m.farm && r[1] === m.group)));
-  const G = G0.concat(extra.map((x) => x.row));
+  const man = live?.groups ?? [];
+  const extra = manualRows(T, man.filter((m) => !G0.some((r) => r[0] === m.farm && r[1] === m.group)));
+  // 피그온에 들어온 그룹은 피그온 값을 쓰되, 동은 직접 등록 때 넣은 값을 살린다 (피그온엔 동이 없음)
+  const G = G0.map((r) => { if (r[2] !== '—') return r; const m = man.find((x) => x.farm === r[0] && x.group === r[1]); return m?.dongs.length ? ([...r.slice(0, 2), m.dongs.join('·') + '동', ...r.slice(3)] as GRow) : r; }).concat(extra.map((x) => x.row));
   const LOTS: Record<string, Lot[]> = { ...LOTS0 };
   extra.forEach((x) => { LOTS[x.row[0] + ' ' + x.row[1]] = [x.lot]; });
   const base: Record<string, DeathBase & { inDeath: number }> = {};
