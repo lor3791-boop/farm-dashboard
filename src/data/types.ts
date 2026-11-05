@@ -69,7 +69,8 @@ export interface UiSaved {
   firstShipByFarm: Record<string, number>; // 농장별 첫출하 체중 (없으면 기준값)
   shareLinks: Record<string, string>;      // 농장 → 공유 화면 열쇠(무작위 16자). 주소에 농장 이름·대시보드 주소가 드러나지 않음
   settled: Record<string, string>;         // '민서 26-7' → 정산완료 처리한 날 (다시 누르면 해제)
-  sowFarms: string[];                      // 그룹 직접 등록의 자돈농장 선택지에 추가한 이름
+  sowFarms: string[];
+  pyesaKey: string;                        // 폐사입력 서버 접속 키 (설정 › 폐사입력 앱 연결)                      // 그룹 직접 등록의 자돈농장 선택지에 추가한 이름
 }
 
 export interface AppData {

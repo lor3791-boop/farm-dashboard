@@ -1,5 +1,6 @@
 // 출하 — 등급판정서 올리기(그룹 분할·재고 차감) + 출하 현황(필터·합계·건별) + 출하실적종합 대조
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { takeInbox } from '@/lib/inbox';
 import * as XLSX from 'xlsx';
 import { useHerd } from '@/lib/ui';
 import { useAuth } from '@/lib/auth';
@@ -53,9 +54,12 @@ export function ShipUpload() {
       const f = resolveFarm(g.shipper);
       setSh(g); setFarm(f); setDate(g.date); setDest(f ? lastDest(f) : DESTS[0]); setWeigh('');
       setSegs(segsByTrace(g.rows, f ? defGroup(f) : ''));
-    } catch (e) { setErr('등판서를 읽지 못했습니다: ' + (e as Error).message); }
+      return true;
+    } catch (e) { setErr('등판서를 읽지 못했습니다: ' + (e as Error).message); return false; }
   };
 
+  // 폰 '공유'로 받은 엑셀: 등판서면 여기서, 아니면 출하 자료 올리기로 넘김
+  useEffect(() => { takeInbox('sheet').then(async (L) => { for (const f of L) { const ok = await onFile(f); if (!ok) { setErr(''); window.dispatchEvent(new CustomEvent('ship-import-file', { detail: f })); } } }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const S = sh ? segRows(sh.rows, segs) : [];
   const n = sh?.rows.length ?? 0, carc = S.reduce((a, x) => a + x.carc, 0), W = Number(weigh);
   const dup = sh && ships.some((x) => x.kind === 'grade' && x.file === sh.file && x.date === date && x.farm === farm);
@@ -258,6 +262,7 @@ export function ShipImportCard() {
       setMsg({ ok: true, t: `${res.kind === 'pigon' ? '피그온' : '팀 대시보드'} · ${res.rows.length}건 · ${fmt(res.rows.reduce((a, r) => a + r.n, 0))}두 · ${md(ds[0])}~${md(ds[ds.length - 1])}` + (unknown.length ? ` · 이름 확인 필요(설정 › 이름 맞춤표): ${unknown.join(', ')}` : '') });
     } catch (e) { setMsg({ ok: false, t: '읽지 못했습니다: ' + (e as Error).message }); }
   };
+  useEffect(() => { const h = (e: Event) => { onFile((e as CustomEvent<File>).detail); }; window.addEventListener('ship-import-file', h); return () => window.removeEventListener('ship-import-file', h); }); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="card" style={{ marginTop: 16 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'space-between' }}>

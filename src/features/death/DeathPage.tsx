@@ -11,6 +11,9 @@ import { UnregisteredDeaths, DeathList } from './Deaths';
 import { DeathDaily } from './DeathDaily';
 import { useRef } from 'react';
 import { shrinkImage } from '@/lib/image';
+import { pyesaOn, saveToSheet } from '@/lib/pyesa';
+import { takeInbox } from '@/lib/inbox';
+import { useEffect } from 'react';
 
 export function DeathPage() {
   const { s, set } = useHerd();
@@ -39,13 +42,17 @@ function DeathEntry() {
   const [saved, setSaved] = useState('');
   const [savedOk, setSavedOk] = useState(true);
   const [photos, setPhotos] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [forceUntil, setForceUntil] = useState(0);
   const pref = useRef<HTMLInputElement>(null);
   const addPhotos = async (L: FileList) => {
     const room = 3 - photos.length; const out: string[] = [];
-    try { for (const f of [...L].slice(0, room)) out.push(await shrinkImage(f, 220 * 1024, [[1280, 0.7], [1024, 0.6], [800, 0.55]])); setSaved(L.length > room ? '사진은 한 건에 3장까지 붙습니다' : ''); setSavedOk(true); }
+    try { for (const f of [...L].slice(0, room)) out.push(await shrinkImage(f, pyesaOn() ? 1500 * 1024 : 220 * 1024, pyesaOn() ? [[1600, 0.85], [1280, 0.75]] : [[1280, 0.7], [1024, 0.6], [800, 0.55]])); setSaved(L.length > room ? '사진은 한 건에 3장까지 붙습니다' : ''); setSavedOk(true); }
     catch (e) { setSavedOk(false); setSaved((e as Error).message); }
     setPhotos([...photos, ...out]);
   };
+  // 폰 '공유'로 들어온 사진
+  useEffect(() => { takeInbox('image').then((L) => { if (L.length) { const dt = new DataTransfer(); L.forEach((f) => dt.items.add(f)); addPhotos(dt.files); setSavedOk(true); setSaved(`공유받은 사진 ${L.length}장 — 농장·동·두수를 고르고 저장하세요`); } }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   if (!all.length) return null;
   const pill = (on: boolean) => (on ? 'pill on' : 'pill');
   const dRows = all.filter((r) => r.farm === s.dFarm);
@@ -57,10 +64,21 @@ function DeathEntry() {
   const save = async () => {
     if (!chosen) { setSavedOk(false); setSaved('그룹을 먼저 골라야 저장됩니다'); return; }
     const before = cur;
-    await repo!.addDeath({ date, farm: s.dFarm, dong: s.dDong ?? '', group: chosen, count: cnt, ...(photos.length ? { photos } : {}) }, email, ui.shareLinks[s.dFarm] ?? '');
-    setPhotos([]);
-    setSavedOk(true); setSaved(`저장됨: ${s.dFarm} ${chosen} ${cnt}두 · ${md(date)}` + (before && before.claimLeft > 0 ? ` (크레임 ${Math.min(cnt, before.claimLeft)}두 먼저 차감)` : ''));
-    setCnt(1);
+    const rec = { date, farm: s.dFarm, dong: s.dDong ?? '', group: chosen, count: cnt, ...(photos.length ? { photos } : {}) };
+    setBusy(true);
+    try {
+      let spike = false;
+      // 폐사입력 서버 연결 시: 구글시트 기록 + 드라이브 사진 + 카톡 알림. 중복이면 30초 안에 한 번 더 누르면 저장
+      if (pyesaOn()) { const j = await saveToSheet(rec, Date.now() < forceUntil); spike = j.spike; setForceUntil(0); }
+      else await repo!.addDeath(rec, email, ui.shareLinks[s.dFarm] ?? '');
+      setPhotos([]);
+      setSavedOk(true); setSaved(`저장됨: ${s.dFarm} ${chosen} ${cnt}두 · ${md(date)}` + (photos.length ? ` · 사진 ${photos.length}장 드라이브 저장` : '') + (before && before.claimLeft > 0 ? ` (크레임 ${Math.min(cnt, before.claimLeft)}두 먼저 차감)` : '') + (spike ? ' · 폐사 급증 카톡 알림 보냄' : ''));
+      setCnt(1);
+    } catch (e) {
+      const m = (e as Error).message;
+      if (/이미 저장/.test(m)) { setForceUntil(Date.now() + 30000); setSavedOk(false); setSaved(m + ' — 그래도 저장하려면 30초 안에 저장을 한 번 더 누르세요'); }
+      else { setSavedOk(false); setSaved('저장하지 못했습니다: ' + m); }
+    } finally { setBusy(false); }
   };
   const cur = chosen ? dRows.find((r) => r.group === chosen) ?? null : null;
   const after = cur ? (() => { const c = Math.min(cnt, cur.claimLeft); const d = cur.death + cnt - c; return { c, d, stock: cur.stock - cnt, surv: survOf(cur.net, d) }; })() : null;
@@ -108,7 +126,7 @@ function DeathEntry() {
         <label style={{ fontSize: 14, marginLeft: 8 }}>날짜 <input type="date" value={date} max={todayKST()} onChange={(e) => setDate(e.target.value || todayKST())} /></label>
       </div>
       <div style={{ marginTop: 18, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button className="btn pri" onClick={save}>저장</button>
+        <button className="btn pri" disabled={busy} onClick={save}>{busy ? "저장 중…" : "저장"}</button>
         <button className="btn" onClick={() => { setSaved('한 사진에 여러 동: 이 동을 저장한 뒤 동을 바꿔 한 번 더 저장하세요'); setSavedOk(true); }}>+ 동 추가 (한 사진에 여러 동)</button>
       </div>
       {saved && <div style={{ marginTop: 12 }}><span className={savedOk ? 'chip ok' : 'chip bad'} style={{ whiteSpace: 'normal' }}>{saved}</span></div>}

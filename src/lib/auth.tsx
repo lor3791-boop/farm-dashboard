@@ -1,4 +1,5 @@
 // 로그인 — 클라우드 모드에서는 구글 로그인 + 관리자 계정 확인. 미리보기 모드는 로그인 없이 '미리보기'.
+import { withPyesa } from './pyesa';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { firebaseConfig, ADMIN_EMAILS } from './firebaseConfig';
 import { cloudRepo, localRepo, type Repo } from './repo';
@@ -21,7 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!firebaseConfig || import.meta.env.VITE_PREVIEW === '1') {
-      set({ status: 'ready', email: 'preview', name: '', repo: localRepo(), error: '' });
+      set({ status: 'ready', email: 'preview', name: '', repo: withPyesa(localRepo()), error: '' });
       return;
     }
     let unsub = () => {};
@@ -42,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const email = (u.email ?? '').toLowerCase();
         if (!ADMIN_EMAILS.includes(email)) return set({ status: 'denied', email, name: u.displayName ?? '', repo: null, error: '' });
         try {
-          const repo = await cloudRepo(firebaseConfig!);
+          const repo = withPyesa(await cloudRepo(firebaseConfig!));
           set({ status: 'ready', email, name: u.displayName ?? email, repo, error: '' });
         } catch (e) { set({ status: 'signedOut', email, name: '', repo: null, error: String(e) }); }
       });

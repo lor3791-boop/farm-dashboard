@@ -40,7 +40,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
   const nav = useNavigate();
   // 저장 대기 중 화면이 바로 바뀌도록 낙관적 값
   const [opt, setOpt] = useState<Partial<UiSaved>>({});
-  const saved: UiSaved = useMemo(() => ({ planned: {}, done: {}, heatVals: {}, firstShipByFarm: {}, shareLinks: {}, settled: {}, sowFarms: [], ...(data?.ui ?? {}), ...opt }), [data, opt]);
+  const saved: UiSaved = useMemo(() => ({ planned: {}, done: {}, heatVals: {}, firstShipByFarm: {}, shareLinks: {}, settled: {}, sowFarms: [], pyesaKey: '', ...(data?.ui ?? {}), ...opt }), [data, opt]);
   const set = useCallback((p: Partial<UiState>) => setS((o) => ({ ...o, ...p })), []);
   const save = useCallback((p: Partial<UiSaved>) => {
     setOpt((o) => ({ ...o, ...p }));

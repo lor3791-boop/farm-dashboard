@@ -6,6 +6,7 @@ import { Gate } from './Gate';
 import { Layout } from './Layout';
 import { HomePage } from '@/features/home/HomePage';
 import { ShipPage } from '@/features/ship/ShipPage';
+import { ShareIn } from './ShareIn';
 import { DeathPage, UnregPopup } from '@/features/death/DeathPage';
 import { SettlePage } from '@/features/settle/SettlePage';
 import { HerdPage } from '@/features/herd/HerdPage';
@@ -28,6 +29,7 @@ export function App() {
                     <Routes>
                       <Route path="/" element={<HomePage />} />
                       <Route path="/ship" element={<ShipPage />} />
+                      <Route path="/share-in" element={<ShareIn />} />
                       <Route path="/death" element={<DeathPage />} />
                       <Route path="/settle" element={<SettlePage />} />
                       <Route path="/input" element={<Navigate to="/death" />} />

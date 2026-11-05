@@ -29,7 +29,7 @@ export function DeathDaily() {
   const unreg = rows.filter((r) => !r.checked).reduce((a, r) => a + r.count, 0);
   const tone = (v: number) => (v === 0 ? { background: 'transparent', color: '#9A958B' } : v <= 2 ? { background: '#FBE7C6', color: '#5A3A00' } : v <= 5 ? { background: '#F2B27E', color: '#3D1F00' } : { background: '#D9773F', color: '#fff' });
   const grid = `92px repeat(${cols.length}, minmax(64px, 1fr)) 70px`;
-  const xl = () => downloadXlsx('폐사현황', [{ name: '일자별', head: ['날짜', ...cols, '합계'], rows: dates.map((d) => [d, ...cols.map((c) => cell(d, c)), dayTot(d)]) }, { name: '기록', head: ['날짜', '농장', '동', '그룹', '두수', '크레임', '폐사', '입력', '피그온'], rows: [...rows].sort((a, b) => (a.date < b.date ? -1 : 1)).map((r) => [r.date, r.farm, r.dong, r.group, r.count, split[r.id]?.claim ?? 0, split[r.id]?.death ?? r.count, r.src === 'share' ? '농장 앱' : '대시보드', r.checked ? '등록완료' : '미등록']) }]);
+  const xl = () => downloadXlsx('폐사현황', [{ name: '일자별', head: ['날짜', ...cols, '합계'], rows: dates.map((d) => [d, ...cols.map((c) => cell(d, c)), dayTot(d)]) }, { name: '기록', head: ['날짜', '농장', '동', '그룹', '두수', '크레임', '폐사', '입력', '피그온'], rows: [...rows].sort((a, b) => (a.date < b.date ? -1 : 1)).map((r) => [r.date, r.farm, r.dong, r.group, r.count, split[r.id]?.claim ?? 0, split[r.id]?.death ?? r.count, r.src === 'share' ? '농장 앱' : r.src === 'app' ? '폐사입력 앱' : '대시보드', r.checked ? '등록완료' : '미등록']) }]);
 
   return (
     <>
@@ -69,7 +69,7 @@ export function DeathDaily() {
                         <div key={r.id} style={{ display: 'flex', gap: 10, padding: '4px 0', flexWrap: 'wrap' }}>
                           <b style={{ minWidth: 70 }}>{r.farm}</b><span style={{ flex: 1 }}>{r.dong ? r.dong + '동 · ' : ''}{r.group}</span>
                           <b>{r.count}두</b>{split[r.id]?.claim ? <span className="muted small">크레임 {split[r.id].claim}</span> : null}
-                          <span className={r.src === 'share' ? 'chip info' : 'chip'} style={{ fontSize: 12 }}>{r.src === 'share' ? '농장 앱' : '대시보드'}</span>
+                          <span className={r.src === 'share' ? 'chip info' : 'chip'} style={{ fontSize: 12 }}>{r.src === 'share' ? '농장 앱' : r.src === 'app' ? '폐사입력 앱' : '대시보드'}</span>
                           <span className={r.checked ? 'chip ok' : 'chip warn'} style={{ fontSize: 12 }}>{r.checked ? '등록완료' : '미등록'}</span>
                         </div>
                       ))}

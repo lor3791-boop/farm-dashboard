@@ -9,7 +9,7 @@ import type { DeathRow } from '@/lib/repo';
 
 const WD = ['일', '월', '화', '수', '목', '금', '토'];
 const wd = (d: string) => WD[new Date(d + 'T00:00:00Z').getUTCDay()];
-const srcChip = (r: DeathRow) => <span className={r.src === 'share' ? 'chip info' : 'chip'} style={{ fontSize: 12 }}>{r.src === 'share' ? '농장 앱' : '대시보드'}</span>;
+const srcChip = (r: DeathRow) => <span className={r.src === 'share' ? 'chip info' : 'chip'} style={{ fontSize: 12 }}>{r.src === 'share' ? '농장 앱' : r.src === 'app' ? '폐사입력 앱' : '대시보드'}</span>;
 
 // 농장의 동·그룹 선택지 ('3동 · 26-7', 동 없이 관리하면 그룹만)
 export function useDongGroupOpts() {
@@ -61,6 +61,7 @@ function EditRow({ r, onDone }: { r: DeathRow; onDone: () => void }) {
 // 사진 보기 — 썸네일을 누르면 크게
 export function Photos({ r }: { r: DeathRow }) {
   const [big, setBig] = useState<number | null>(null);
+  if (r.photoUrls?.length) return <span style={{ display: 'flex', gap: 8 }}>{r.photoUrls.map((u, i) => <a key={u} href={u} target="_blank" rel="noopener noreferrer" className="small">사진{i + 1}</a>)}</span>;
   if (!r.photos?.length) return null;
   return (
     <div style={{ width: '100%', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -147,7 +148,7 @@ export function DeathList() {
           {shown.map((r) => edit === r.id ? <EditRow key={r.id} r={r} onDone={() => setEdit(null)} /> : (
             <div key={r.id} className="gr" style={{ gridTemplateColumns: g }}>
               <div>{md(r.date)}({wd(r.date)})</div>
-              <div><b>{r.farm}</b> {dgLabel(r)}{r.photos?.length ? <span className="muted small"> · 사진 {r.photos.length}</span> : null}{r.editedAt ? <div className="sub" style={{ fontSize: 12 }}>수정 {md(r.editedAt.slice(0, 10))}</div> : null}</div>
+              <div><b>{r.farm}</b> {dgLabel(r)}{(r.photoUrls?.length || r.photos?.length) ? <span className="muted small"> · 사진 {r.photoUrls?.length || r.photos?.length}</span> : null}{r.heat ? <span className="chip warn" style={{ fontSize: 11, marginLeft: 4 }}>폭염</span> : null}{r.editedAt ? <div className="sub" style={{ fontSize: 12 }}>수정 {md(r.editedAt.slice(0, 10))}</div> : null}</div>
               <div className="r"><b>{r.count}</b><SplitTxt r={r} /></div>
               <div>{srcChip(r)}</div>
               <div><button className={r.checked ? 'chip ok' : 'chip warn'} style={{ border: 0, cursor: 'pointer', font: 'inherit', fontSize: 12 }} onClick={() => repo!.updateDeath(r, { checked: !r.checked }, email)}>{r.checked ? '등록완료' : '미등록'}</button></div>

@@ -11,7 +11,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon-192.png', 'icon-512.png'],
+      includeAssets: ['icon-192.png', 'icon-512.png', 'share-sw.js'],
       manifest: {
         name: '담당농장 대시보드',
         short_name: '농장대시보드',
@@ -19,6 +19,11 @@ export default defineConfig({
         start_url: './',
         scope: './',
         display: 'standalone',
+        // 폰 공유 목록에 '농장대시보드' — 폐사 사진은 폐사 입력, 등판서·출하 엑셀은 출하 올리기로
+        share_target: {
+          action: './share-target', method: 'POST', enctype: 'multipart/form-data',
+          params: { files: [{ name: 'files', accept: ['image/*', '.xls', '.xlsx', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'] }] }
+        } as any,
         background_color: '#F4F2EC',
         theme_color: '#1F4E3D',
         icons: [
@@ -27,7 +32,7 @@ export default defineConfig({
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
         ]
       },
-      workbox: { cleanupOutdatedCaches: true, clientsClaim: true, skipWaiting: true, globPatterns: ['**/*.{js,css,html,png,svg,woff2}'], maximumFileSizeToCacheInBytes: 5 * 1024 * 1024 }
+      workbox: { importScripts: ['share-sw.js'], cleanupOutdatedCaches: true, clientsClaim: true, skipWaiting: true, globPatterns: ['**/*.{js,css,html,png,svg,woff2}'], maximumFileSizeToCacheInBytes: 5 * 1024 * 1024 }
     })
   ],
   test: { environment: 'node' }

@@ -5,16 +5,21 @@ import type { DeathRow } from './repo';
 import type { ManualGroup } from './calc/herd';
 import { mergeImports, type ShipImport, type ImpRow } from './shipImport';
 import { useMemo } from 'react';
+import { setPyesaKey, onPyesaChange, loadSheet } from './pyesa';
+import { REF } from './calc/herd';
+import { todayKST } from './util';
 import { useAuth } from './auth';
 
-interface DataState { data: AppData | null; error: string; deaths: DeathRow[]; ships: (ManualShip & { id: string })[]; groups: (ManualGroup & { id: string })[]; uploads: (ShipImport & { id: string })[]; imports: ImpRow[] }
-const Ctx = createContext<DataState>({ data: null, error: '', deaths: [], ships: [], groups: [], uploads: [], imports: [] });
+interface DataState { data: AppData | null; error: string; deaths: DeathRow[]; ships: (ManualShip & { id: string })[]; groups: (ManualGroup & { id: string })[]; uploads: (ShipImport & { id: string })[]; imports: ImpRow[]; sheetErr: string }
+const Ctx = createContext<DataState>({ data: null, error: '', deaths: [], ships: [], groups: [], uploads: [], imports: [], sheetErr: '' });
 export const useData = () => useContext(Ctx);
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const { repo } = useAuth();
   const [st, set] = useState<{ data: AppData | null; error: string }>({ data: null, error: '' });
-  const [deaths, setDeaths] = useState<DeathRow[]>([]);
+  const [fsDeaths, setDeaths] = useState<DeathRow[]>([]);
+  const [sheet, setSheet] = useState<DeathRow[]>([]);
+  const [sheetErr, setSheetErr] = useState('');
   const [ships, setShips] = useState<(ManualShip & { id: string })[]>([]);
   const [groups, setGroups] = useState<(ManualGroup & { id: string })[]>([]);
   const [uploads, setUploads] = useState<(ShipImport & { id: string })[]>([]);
@@ -28,5 +33,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const u5 = repo.watch<ShipImport>('shipImport', setUploads);
     return () => { u1(); u2(); u3(); u4(); u5(); };
   }, [repo]);
-  return <Ctx.Provider value={{ ...st, deaths, ships, groups, uploads, imports }}>{children}</Ctx.Provider>;
+  // 폐사입력 앱(구글시트) 기록: 기준일 이후를 1분마다, 저장·수정 직후에 다시 읽는다
+  const key = (st.data?.ui as any)?.pyesaKey ?? '';
+  const farmNames = useMemo(() => (st.data?.farms ?? []).map((f) => f.name), [st.data?.farms]);
+  useEffect(() => {
+    setPyesaKey(key);
+    if (!key) { setSheet([]); return; }
+    let alive = true;
+    const days = Math.max(14, Math.round((Date.parse(todayKST()) - Date.parse(REF)) / 864e5) + 1);
+    const load = () => loadSheet(days, farmNames).then((r) => { if (alive) { setSheet(r); setSheetErr(''); } }).catch((e) => alive && setSheetErr(String(e.message || e)));
+    load();
+    const t = setInterval(load, 60000);
+    const off = onPyesaChange(load);
+    return () => { alive = false; clearInterval(t); off(); };
+  }, [key, farmNames]);
+  const deaths = useMemo(() => fsDeaths.concat(sheet), [fsDeaths, sheet]);
+  return <Ctx.Provider value={{ ...st, deaths, ships, groups, uploads, imports, sheetErr }}>{children}</Ctx.Provider>;
 }

@@ -55,6 +55,7 @@ export function SettingsPage() {
             <tbody>{data.nameMap.map((r) => <tr key={r.id}><td>{r.source} ({r.sourceFile})</td><td>{r.excluded ? '담당 아님' + (r.memo ? ' · ' + r.memo.replace('골드피그와 같은 사장님의 다른 농장', '골드피그와 다른 농장') : '') : r.target}</td></tr>)}</tbody>
           </table></div>
         </div>
+        <PyesaLink />
         <div className="card">
           <h2 className="h2" style={{ marginBottom: 10 }}>농장 공유 링크</h2>
           <div className="tblbox"><table>
@@ -100,5 +101,32 @@ export function SettingsPage() {
         </Tabs>
       </div>
     </>
+  );
+}
+
+// 폐사입력 앱 연결 — 기존 폐사입력 앱의 설정 링크(…#k=…)나 접속 키를 붙여 넣으면 구글시트 폐사 기록과 연동
+function PyesaLink() {
+  const { saved, save, deaths } = useHerd();
+  const { sheetErr } = useData();
+  const [v, setV] = useState('');
+  const on = !!saved.pyesaKey;
+  const n = deaths.filter((d) => d.src === 'app').length;
+  const apply = () => { const k = (v.match(/k=([\w-]+)/) || [])[1] || v.trim(); if (/^[\w-]{8,}$/.test(k)) { save({ pyesaKey: k }); setV(''); } };
+  return (
+    <div className="card">
+      <h2 className="h2" style={{ marginBottom: 10 }}>폐사입력 앱 연결</h2>
+      {on ? (
+        <>
+          <div style={{ fontSize: 14 }}>{sheetErr ? <span className="chip bad">연결 오류: {sheetErr}</span> : <span className="chip ok">연결됨 · 구글시트 기록 {n}건</span>}</div>
+          <div className="small muted" style={{ marginTop: 8 }}>폐사 저장 → 폐사 기록 시트 + 드라이브 폐사사진/농장/날짜 폴더 + 카톡 알림</div>
+          <button className="btn sm ghost" style={{ marginTop: 10 }} onClick={() => save({ pyesaKey: '' })}>연결 끊기</button>
+        </>
+      ) : (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input value={v} onChange={(e) => setV(e.target.value)} placeholder="폐사입력 앱 설정 링크 또는 접속 키" style={{ flex: 1, minWidth: 0 }} />
+          <button className="btn pri" onClick={apply}>연결</button>
+        </div>
+      )}
+    </div>
   );
 }

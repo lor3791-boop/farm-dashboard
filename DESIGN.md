@@ -38,7 +38,8 @@
 - 검산 샘플은 `*.test.ts`. 배포 전에 자동 실행된다.
 
 ## Firestore 경로
-`farms/{farmId}`, `config/thresholds`, `config/nameMap`, `config/ui`(정산예정·작업완료·폭염·첫출하·공유 열쇠), `deaths`(대시보드 입력, 열쇠 없는 농장), `share/{열쇠}/deaths`(농장 앱 입력 + 열쇠 있는 농장의 대시보드 입력 — 대시보드는 컬렉션 그룹 'deaths'로 함께 읽음), `shipments`(출하 직접 입력 + 등판서 kind:'grade'), `share/{열쇠}`(공개 읽기), `shareDeaths`(예전 농장 앱 입력, 읽기·수정만), `groups`(그룹 직접 등록), `feed`(피그온 그룹 사료 업로드, 한 줄 = 탭으로 이은 문자열), `feedMid`(정산월 중간투입), `vaccine`(구제역 백신비 + 첨부 data URL, 700KB 이하), `shipImport`(피그온 출하·팀 대시보드 출하기록 업로드, `src/lib/shipImport.ts`), `logs` — 모든 기록에 `updatedAt`, `updatedBy`.
+`farms/{farmId}`, `config/thresholds`, `config/nameMap`, `config/ui`(정산예정·작업완료·폭염·첫출하·공유 열쇠), `deaths`(대시보드 입력, 열쇠 없는 농장), `share/{열쇠}/deaths`(농장 앱 입력 + 열쇠 있는 농장의 대시보드 입력 — 대시보드는 컬렉션 그룹 'deaths'로 함께 읽음), `shipments`(출하 직접 입력 + 등판서 kind:'grade'), `share/{열쇠}`(공개 읽기), `shareDeaths`(예전 농장 앱 입력, 읽기·수정만), `groups`(그룹 직접 등록), `feed`(피그온 그룹 사료 업로드, 한 줄 = 탭으로 이은 문자열), `feedMid`(정산월 중간투입), `vaccine`(구제역 백신비 + 첨부 data URL, 700KB 이하), `shipImport`(피그온 출하·팀 대시보드 출하기록 업로드, `src/lib/shipImport.ts`), `logs`
+- 폐사 원본: '폐사 기록' 구글시트 (폐사입력 서버 = Apps Script '농장별 사진분류', `src/lib/pyesa.ts`). config/ui.pyesaKey가 있으면 대시보드 폐사 입력·수정·삭제·등록완료가 모두 시트로 가고, 사진은 드라이브 폐사사진/<농장>/<날짜>. 카톡 알림은 시트 기준. Firestore deaths는 연결 전 입력분과 농장 앱(share) 입력분만. — 모든 기록에 `updatedAt`, `updatedBy`.
 묶음 2부터: `groups`, `lots`, `placements`(동 배치), `deaths`, `shipments`, `shipSummary`, `heat`, `feed`, `tasks`, `vaccineCost`, `uploads`.
 
 ## 데이터 원천 (계산은 이것을 그대로 따른다)
