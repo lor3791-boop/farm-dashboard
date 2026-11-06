@@ -42,7 +42,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setPyesaKey(key);
     if (!key) { setSheet([]); loadRef.current = async () => {}; return; }
     let alive = true;
-    // 폐사입력 앱 기록은 120일치를 읽는다 (폐사현황·목록용, 재고 차감은 기준일 이후만)
+    // 폐사입력 앱 기록은 120일치를 읽는다 (폐사현황·목록용. 재고 차감은 기준일 이후 + 미등록 전부)
     const days = Math.max(120, Math.round((Date.parse(todayKST()) - Date.parse(REF)) / 864e5) + 1);
     const load = () => { return loadSheet(days, farmNames).then((r) => { if (alive) { setSheet(r); setSheetErr(''); } }).catch((e) => { if (alive) setSheetErr(String(e.message || e)); }).finally(() => alive && setSheetReady(true)); };
     loadRef.current = load;
