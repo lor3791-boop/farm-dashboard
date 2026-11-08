@@ -1,5 +1,6 @@
 // 돈군 — 표(농장 소계 + 그룹) / 주차 히트맵 / 오른쪽 그룹 상세 (목업 v5)
 import { useState, type ReactNode } from 'react';
+import { todayKST } from '@/lib/util';
 import { useHerd, useUi } from '@/lib/ui';
 import { agg, dongsOf, heat, type Group } from '@/lib/calc/herd';
 import { addIso, fmt, md } from '@/lib/calc/dates';
@@ -25,7 +26,10 @@ export function HerdPage() {
 
 function HerdTable() {
   const H = useHerd();
-  const { rows, s, set, isPlanned, togglePlan, T } = H;
+  const { rows, s, set, isPlanned, togglePlan, T, saved, save } = H;
+  // 정산완료 처리한 그룹은 '정산완료' 단계에서만 보인다 (거기서 해제)
+  const settled = (r: Group) => saved.settled[r.who];
+  const toggleSettled = (r: Group) => { const m = { ...saved.settled }; if (m[r.who]) delete m[r.who]; else m[r.who] = todayKST(); save({ settled: m }); };
   const { go } = useUi();
   const sorts = useSorts();
   const [colOpen, setColOpen] = useState(false);
@@ -49,7 +53,7 @@ function HerdTable() {
     { k: 'first', l: '첫출하', w: '96px', sv: (r) => r.first },
     { k: 'end', l: '출하종료', w: '64px', sv: (r) => r.first },
     { k: 'next', l: '다음 전입', w: '64px', sv: (r) => r.first },
-    { k: 'plan', l: '정산예정', w: '84px', sv: (r) => (isPlanned(r) ? 0 : 1) },
+    { k: 'plan', l: '정산', w: '132px', sv: (r) => (isPlanned(r) ? 0 : 1) },
     { k: 'warn', l: '경고', w: 'minmax(130px,1.4fr)', sv: (r) => r.warn.length }
   ];
   const vis = HC.filter((c) => c.fixed || !s.hidden[c.k]);
@@ -74,12 +78,14 @@ function HerdTable() {
       case 'first': return r.sold > 0 ? <Chip t="info">출하 중</Chip> : r.firstOver > 0 ? <Txt v={md(r.first)} sub={r.firstOver + '일 경과'} cls="neg" /> : md(r.first);
       case 'end': return md(addIso(r.first, T.shipPeriodDays));
       case 'next': return md(addIso(r.first, T.shipPeriodDays + T.emptyDays));
-      case 'plan': return <label className="chk fg"><input type="checkbox" checked={isPlanned(r)} onChange={togglePlan(r)} /> 정산</label>;
+      case 'plan': return settled(r)
+        ? <button className="btn sm fg" title="누르면 정산완료 해제" onClick={() => toggleSettled(r)}>완료 {md(settled(r))} · 해제</button>
+        : <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}><label className="chk fg"><input type="checkbox" checked={isPlanned(r)} onChange={togglePlan(r)} /> 정산</label>{r.sold > 0 && <button className="btn sm ghost fg" title="정산완료 처리하면 이 목록에서 빠집니다" onClick={() => toggleSettled(r)}>완료</button>}</span>;
       case 'warn': return <span className={r.warn.length ? (r.warnBad ? 'small neg' : 'small warnT') : 'small muted'}>{r.warn.length ? r.warn.join(' · ') : '—'}</span>;
     }
     return '';
   };
-  const hRows0 = rows.filter((r) => (s.stage === 'all' || (s.stage === 'ship' ? r.sold > 0 : r.sold === 0)) && (!s.warnOnly || r.warn.length || r.bad));
+  const hRows0 = rows.filter((r) => (s.stage === 'done' ? !!settled(r) : !settled(r) && (s.stage === 'all' || (s.stage === 'ship' ? r.sold > 0 : r.sold === 0))) && (!s.warnOnly || r.warn.length || r.bad));
   const hFarms = [...new Set(hRows0.map((r) => r.farm))];
   const defaultExp = hFarms.length <= 3;
   const expOf = (f: string) => (s.exp[f] === undefined ? defaultExp : s.exp[f]);
@@ -123,7 +129,7 @@ function HerdTable() {
       <div style={{ flex: '999 1 620px', minWidth: 0 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginBottom: 12 }}>
           <Segs label="보기" opts={[['table', '표'], ['heat', '주차 히트맵']]} value={s.hView} onPick={(k) => set({ hView: k })} />
-          <Segs label="출하 단계" opts={[['all', '전체'], ['pre', '출하 전'], ['ship', '출하 중']]} value={s.stage} onPick={(k) => set({ stage: k })} />
+          <Segs label="출하 단계" opts={[['all', '전체'], ['pre', '출하 전'], ['ship', '출하 중'], ['done', `정산완료 ${rows.filter((r) => settled(r)).length}`]]} value={s.stage} onPick={(k) => set({ stage: k })} />
           <div className="segs"><button className={s.warnOnly ? 'seg on' : 'seg'} onClick={() => set({ warnOnly: !s.warnOnly })}>문제·경고 그룹만</button></div>
           <div style={{ flex: 1 }} />
           <button className="btn sm ghost" onClick={() => { const e: Record<string, boolean> = {}; hFarms.forEach((f) => { e[f] = true; }); set({ exp: e }); }}>모두 펼치기</button>

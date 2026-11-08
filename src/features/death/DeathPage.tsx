@@ -52,7 +52,9 @@ function DeathEntry() {
   const dRows = all.filter((r) => r.farm === s.dFarm);
   const hasDong = dRows.some((r) => r.dong !== '—');
   const dongs = [...new Set(dRows.flatMap((r) => dongsOf(r.dong)))].sort();
-  const cover = hasDong ? dRows.filter((r) => s.dDong !== null && dongsOf(r.dong).includes(s.dDong)) : dRows;
+  // 동으로 관리하는 그룹과 동 없이 관리하는 그룹이 섞인 농장: '동 없음'(dDong === '')을 따로 고른다
+  const noDong = dRows.filter((r) => !dongsOf(r.dong).length);
+  const cover = hasDong ? (s.dDong === '' ? noDong : dRows.filter((r) => s.dDong !== null && dongsOf(r.dong).includes(s.dDong))) : dRows;
   const auto = hasDong && cover.length === 1;
   const chosen = auto ? cover[0].group : s.dGroup;
   const save = async () => {
@@ -94,10 +96,10 @@ function DeathEntry() {
       {hasDong && (
         <>
           <div style={{ fontWeight: 700, margin: '16px 0 8px' }}>② 동</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{dongs.map((x) => <button key={x} className={pill(s.dDong === x)} onClick={() => { set({ dDong: x, dGroup: null }); setSaved(''); }}>{x}동</button>)}</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{dongs.map((x) => <button key={x} className={pill(s.dDong === x)} onClick={() => { set({ dDong: x, dGroup: null }); setSaved(''); }}>{x}동</button>)}{noDong.length > 0 && <button className={pill(s.dDong === '')} onClick={() => { set({ dDong: '', dGroup: null }); setSaved(''); }}>동 없음 ({noDong.map((r) => r.group).join('·')})</button>}</div>
         </>
       )}
-      {(!hasDong || (!!s.dDong && cover.length > 1)) && (
+      {(!hasDong || (s.dDong !== null && cover.length > 1)) && (
         <>
           <div style={{ fontWeight: 700, margin: '16px 0 8px' }}>{hasDong ? '③ 이 동에 그룹이 여럿 — 어느 그룹인가요?' : '② 그룹 (명임은 동 없이 관리)'}</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{cover.map((r) => <button key={r.group} className={pill(s.dGroup === r.group)} onClick={() => { set({ dGroup: r.group }); setSaved(''); }}>{r.group} · 재고 {fmt(r.stock)} · {r.surv}%</button>)}</div>

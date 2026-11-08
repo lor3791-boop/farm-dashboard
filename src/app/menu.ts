@@ -7,5 +7,6 @@ export const MENU: MenuItem[] = [
   { path: '/death', label: '폐사관리', filter: false },
   { path: '/analysis', label: '성적분석', filter: true },
   { path: '/settle', label: '정산자료', filter: false },
+  { path: '/bonds', label: '농장채권', filter: false },
   { path: '/settings', label: '설정', filter: false }
 ];

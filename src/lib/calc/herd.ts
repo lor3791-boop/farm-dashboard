@@ -1,7 +1,7 @@
 // 그룹 계산 — 목업 v5의 rec()/agg()를 그대로 옮기고, 숫자 기준은 설정(thresholds)에서 읽는다.
 // 화면은 계산식을 직접 쓰지 않고 이 파일의 결과만 쓴다.
 import type { Thresholds } from '@/data/types';
-import { G as G0, LOTS as LOTS0, LAST_SHIP, WEEKLY, REF, TODAY, FARM_SURV, type Lot, type GRow } from '@/data/snapshot';
+import { G as G0, LOTS as LOTS0, LAST_SHIP, WEEKLY, REF, TODAY as SNAP_TODAY, FARM_SURV, type Lot, type GRow } from '@/data/snapshot';
 import { iso, days, addIso, r1 } from './dates';
 import { applyDeaths, type DeathLike, type Split, type DeathBase } from '@/share/applyDeaths';
 
@@ -33,7 +33,9 @@ export interface Group {
 }
 
 export const dongsOf = (s: string) => (s === '—' ? [] : s.replace('동', '').split('·'));
-export { REF, TODAY };
+// 오늘: 화면에서는 실제 오늘(한국시간), 검산 테스트에서는 스냅샷 날짜로 고정
+export const TODAY = import.meta.env.MODE === 'test' ? SNAP_TODAY : new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+export { REF };
 
 export function buildGroups(T: Thresholds, firstShipByFarm: Record<string, number> = {}, live?: Live, splitOut?: Record<string, Split>): Group[] {
   const man = live?.groups ?? [];

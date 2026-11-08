@@ -1,4 +1,5 @@
 // 출하관리 — 출하현황(이번 달) / 출하입력(등판서·직접 입력·자료 올리기·등록 기록) / 농장별 출하성적
+import { ShipTotalCard } from './ShipTotal';
 import { useHerd } from '@/lib/ui';
 import { Tabs } from '@/components/v5';
 import { ShipUpload, ShipStatus, ShipImportCard } from './Ship';
@@ -11,7 +12,7 @@ export function ShipPage() {
     <>
       <Tabs opts={[['status', '출하현황'], ['input', '출하입력'], ['grade', '농장별 출하성적']]} value={s.shipTab} onPick={(k) => set({ shipTab: k })} />
       {s.shipTab === 'status' && <ShipStatus />}
-      {s.shipTab === 'input' && (<><ShipUpload /><ShipImportCard /><ShipManualList /></>)}
+      {s.shipTab === 'input' && (<><ShipUpload /><ShipTotalCard /><ShipImportCard /><ShipManualList /></>)}
       {s.shipTab === 'grade' && (<><ShipImportCard /><div style={{ height: 16 }} /><ShipGrade /></>)}
     </>
   );

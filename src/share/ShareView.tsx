@@ -55,7 +55,9 @@ export function ShareView({ p, deaths = [], onSaveDeath, onEditDeath }: { p: Sha
   });
   const noDong = G.every((r) => r.dong === '—');
   const dongs = [...new Set(G.flatMap((r) => dongsOf(r.dong)))].sort();
-  const cover = noDong ? G : G.filter((r) => dong !== null && dongsOf(r.dong).includes(dong));
+  // 동 있는 그룹과 동 없는 그룹이 섞이면 '동 없음'(dong === '')을 따로 보여준다
+  const plain = G.filter((r) => !dongsOf(r.dong).length);
+  const cover = noDong ? G : dong === '' ? plain : G.filter((r) => dong !== null && dongsOf(r.dong).includes(dong));
   const chosen = !noDong && cover.length === 1 ? cover[0].group : grp;
   const today = p.today, todayMd = today.slice(5), weekEnd = addIso(today, 6).slice(5), weekAgo = addIso(today, -7).slice(5);
 
@@ -219,16 +221,16 @@ export function ShareView({ p, deaths = [], onSaveDeath, onEditDeath }: { p: Sha
             {!noDong && (
               <>
                 <div style={{ fontWeight: 700, marginTop: 16 }}>{t.dong}</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginTop: 8 }}>{dongs.map((d) => <button key={d} className={dong === d ? 'pill on' : 'pill'} style={{ fontSize: 16, minHeight: 48, borderRadius: 12 }} onClick={() => { setDong(d); setGrp(null); setSaved(null); }}>{d}동</button>)}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginTop: 8 }}>{dongs.map((d) => <button key={d} className={dong === d ? 'pill on' : 'pill'} style={{ fontSize: 16, minHeight: 48, borderRadius: 12 }} onClick={() => { setDong(d); setGrp(null); setSaved(null); }}>{d}동</button>)}{plain.length > 0 && <button className={dong === '' ? 'pill on' : 'pill'} style={{ fontSize: 16, minHeight: 48, borderRadius: 12 }} onClick={() => { setDong(''); setGrp(null); setSaved(null); }}>{plain.map((r) => r.group).join('·')}</button>}</div>
               </>
             )}
-            {(noDong || (dong && cover.length > 1)) && (
+            {(noDong || (dong !== null && cover.length > 1)) && (
               <>
                 <div style={{ fontWeight: 700, marginTop: 16 }}>{t.group}</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>{cover.map((r) => <button key={r.group} className={grp === r.group ? 'pill on' : 'pill'} style={{ fontSize: 16, minHeight: 48, borderRadius: 12 }} onClick={() => { setGrp(r.group); setSaved(null); }}>{r.group}</button>)}</div>
               </>
             )}
-            {!noDong && cover.length === 1 && <div style={{ marginTop: 8 }}><span className="chip ok">{t.auto}: {cover[0].group} ({dong}동)</span></div>}
+            {!noDong && cover.length === 1 && <div style={{ marginTop: 8 }}><span className="chip ok">{t.auto}: {cover[0].group}{dong ? ` (${dong}동)` : ''}</span></div>}
             {cur && (() => { const c = Math.min(cnt, cur.claimLeft ?? 0), d2 = cur.death + cnt - c, s2 = survOf(cur.net, d2); return (
               <div style={{ marginTop: 12, padding: '10px 12px', background: '#F4F2EC', borderRadius: 10, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 6, fontSize: 13 }}>
                 <div><div className="muted">{t.stock}</div><b style={{ fontSize: 18 }}>{cur.stock.toLocaleString()}</b><div className="muted">→ {(cur.stock - cnt).toLocaleString()}</div></div>

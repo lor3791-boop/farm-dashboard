@@ -19,6 +19,9 @@ const TABS: [string, string, string][] = [
   ['/death', '폐사', 'M4 5h16v14H4zM4 10h16M9 5v14']
 ];
 // 화면 아래 끝이 옆으로 밀리는 표·칩 줄 안에서 시작한 밀기는 탭 넘기기로 보지 않는다
+// 오늘 날짜 '11월 9일 (월)' — 재고는 피그온 기준일 값에 이후 입력을 반영한 오늘 값
+const todayLabel = () => { const d = new Date(Date.now() + 9 * 3600e3); return `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일 (${'일월화수목금토'[d.getUTCDay()]})`; };
+const refLabel = `${Number(REF.slice(5, 7))}/${Number(REF.slice(8))}`;
 const inHScroll = (el: EventTarget | null) => { for (let n = el as HTMLElement | null; n && n !== document.body; n = n.parentElement) { if (n.scrollWidth > n.clientWidth + 4 && /(auto|scroll)/.test(getComputedStyle(n).overflowX)) return true; if (n.closest('input,select,textarea,.sheet')) return true; } return false; };
 
 function Fab() {
@@ -69,7 +72,8 @@ export function Layout({ children }: { children: ReactNode }) {
   const nav = (
     <nav style={{ background: '#1F4E3D', padding: '22px 14px', boxSizing: 'border-box', height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ color: '#fff', fontSize: 18, fontWeight: 700, padding: '0 8px' }}>담당농장 대시보드</div>
-      <div style={{ color: '#A9C6B8', fontSize: 12, padding: '4px 8px 14px' }}>피그온 {Number(REF.slice(5, 7))}/{Number(REF.slice(8))} 기준</div>
+      <div style={{ color: '#E3EEE8', fontSize: 14, padding: '6px 8px 0' }}>{todayLabel()}</div>
+      <div style={{ color: '#A9C6B8', fontSize: 12, padding: '0 8px 14px' }}>(피그온 {refLabel} 업데이트)</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {MENU.map((m) => (
           <NavLink key={m.path} to={m.path} end={m.path === '/'} onClick={() => setOpen(false)} className={({ isActive }) => (isActive ? 'nav on' : 'nav')}>{m.label}</NavLink>
@@ -104,7 +108,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <button className="flex items-center justify-center lg:hidden" aria-label="메뉴 열기" onClick={() => setOpen(true)} style={{ width: 44, height: 44, borderRadius: 8, fontSize: 22 }}>☰</button>
             <h1 style={{ margin: 0, fontSize: 24 }}>{cur.label}</h1>
           </div>
-          <span className="chip warn" title="피그온 재고 기준일. 이후 폐사·출하 입력은 재고에서 뺌">{Number(REF.slice(5, 7))}/{Number(REF.slice(8))} 기준</span>
+          <span className="chip" title="피그온 재고 기준일. 이후 폐사·출하 입력과 미등록 폐사는 재고에서 뺌" style={{ textAlign: 'right', lineHeight: 1.25 }}>{todayLabel()}<br /><span className="muted" style={{ fontSize: 11 }}>(피그온 {refLabel} 업데이트)</span></span>
         </div>
         {repo?.mode === 'local' && <div className="chip info" style={{ display: 'block', whiteSpace: 'normal', marginBottom: 12 }}>미리보기 모드 — 체크·입력은 이 브라우저에만 저장됩니다. Firebase 연결 후 구글 로그인하면 모든 기기에서 같은 자료를 봅니다.</div>}
         {error && <div className="chip bad" style={{ display: 'block', whiteSpace: 'normal', marginBottom: 12 }}>서버 연결 오류: {error} — Firestore 규칙 게시 여부를 확인하세요</div>}

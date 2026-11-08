@@ -9,6 +9,7 @@ import { ShipPage } from '@/features/ship/ShipPage';
 import { ShareIn } from './ShareIn';
 import { DeathPage, UnregPopup } from '@/features/death/DeathPage';
 import { SettlePage } from '@/features/settle/SettlePage';
+import { BondsPage } from '@/features/bonds/BondsPage';
 import { HerdPage } from '@/features/herd/HerdPage';
 import { AnalysisPage } from '@/features/analysis/AnalysisPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
@@ -32,6 +33,7 @@ export function App() {
                       <Route path="/share-in" element={<ShareIn />} />
                       <Route path="/death" element={<DeathPage />} />
                       <Route path="/settle" element={<SettlePage />} />
+                      <Route path="/bonds" element={<BondsPage />} />
                       <Route path="/input" element={<Navigate to="/death" />} />
                       <Route path="/report" element={<Navigate to="/analysis" />} />
                       <Route path="/herd" element={<HerdPage />} />

@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { useData } from '@/lib/data';
 import { parseGradeSheet, segRows, segsByTrace, type GradeSheet, type Seg } from '@/lib/gradeSheet';
 import { SHIP } from '@/data/snapshot';
-import { shortDest, shipKey, SHIP_KEYS, estPay, pendingImports } from '@/lib/calc/ship';
+import { shortDest, estPay, pendingImports, shipBase, baseHas, shipKey } from '@/lib/calc/ship';
 import { parseShipImport, type ShipImport } from '@/lib/shipImport';
 import { makeResolver } from '@/lib/names';
 import { fmt, md, r1 } from '@/lib/calc/dates';
@@ -155,10 +155,10 @@ interface Row { key: string; date: string; farm: string; group: string; dest: st
 export function ShipStatus() {
   const { ships, farms, imports } = useHerd();
   const rows = useMemo<Row[]>(() => {
-    const a: Row[] = SHIP.map((x, i) => ({ key: 's' + i, date: x[0], farm: x[1], group: '', dest: x[2], n: x[3], live: x[4], carc: x[5], pay: x[6] > 0 ? r1(x[6] * 100) : null, payEst: false, g1p: x[7], g1: x[8], g2: x[9], out: x[10], src: '종합' }));
+    const a: Row[] = shipBase().map((x, i) => ({ key: 's' + i, date: x[0], farm: x[1], group: '', dest: x[2], n: x[3], live: x[4], carc: x[5], pay: x[6] > 0 ? r1(x[6] * 100) : null, payEst: false, g1p: x[7], g1: x[8], g2: x[9], out: x[10], src: '종합' }));
     const P = pendingImports(imports), ik = new Set(P.map((r) => shipKey(r.date, r.farm)));
     P.forEach((r, i) => { const pay = r.pay ?? estPay(r.dest, r.date); a.push({ key: 'i' + i, date: r.date, farm: r.farm, group: r.group, dest: r.dest, n: r.n, live: r.live, carc: r.carc > 0 ? r.carc : r.live * 0.77, pay, payEst: r.pay == null && pay != null, g1p: r.g1p, g1: r.g1, g2: r.g2, out: r.out, src: r.src === 'pigon' ? '피그온' : '팀 대시보드' }); });
-    ships.filter((m) => !SHIP_KEYS.has(shipKey(m.date, m.farm)) && !ik.has(shipKey(m.date, m.farm))).forEach((m) => {
+    ships.filter((m) => !baseHas(m.date, m.farm) && !ik.has(shipKey(m.date, m.farm))).forEach((m) => {
       const pay = m.pay ?? estPay(m.dest, m.date);
       a.push({ key: m.id, date: m.date, farm: m.farm, group: m.group, dest: m.dest, n: m.n, live: m.live, carc: m.carc ?? r1((m.live * m.yld) / 100), pay, payEst: m.pay == null && pay != null, g1p: m.g1p, g1: m.g1, g2: m.g2, out: m.out, src: m.kind === 'grade' ? '등판서' : '직접 입력' });
     });
@@ -190,7 +190,7 @@ export function ShipStatus() {
     const m: Record<string, { date: string; farm: string; n: number; live: number; file: string }> = {};
     ships.filter((x) => x.kind === 'grade').forEach((x) => { const k = shipKey(x.date, x.farm) + '|' + (x.batch ?? x.id); (m[k] ||= { date: x.date, farm: x.farm, n: 0, live: 0, file: x.file ?? '' }); m[k].n += x.n; m[k].live += x.live; });
     return Object.values(m).sort((a, b) => (a.date < b.date ? 1 : -1)).map((b) => {
-      const S = SHIP.filter((x) => x[0] === b.date && x[1] === b.farm);
+      const S = shipBase().filter((x) => x[0] === b.date && x[1] === b.farm);
       const sn = S.reduce((a, x) => a + x[3], 0), sl = S.reduce((a, x) => a + x[4], 0);
       return { ...b, sn, sl, parts: S.map((x) => fmt(x[4])).join('+'), res: !S.length ? '종합 대기' : sn === b.n && Math.abs(sl - b.live) < 1 ? '일치' : '차이' };
     });

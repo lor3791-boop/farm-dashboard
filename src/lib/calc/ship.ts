@@ -3,6 +3,7 @@ import { r1 } from './dates';
 import { SHIP, type ShipRow } from '@/data/snapshot';
 import type { ManualShip } from '@/data/types';
 import type { ImpRow } from '@/lib/shipImport';
+import { totToRow, type TotRow } from '@/lib/shipTotal';
 export interface ShipAgg { n: number; trucks: number; avgw: number; yld: number; pay: number; g11: number; gp: number; out: number }
 const sum = (L: ShipRow[], i: number) => L.reduce((a, x) => a + (x[i] as number), 0);
 export function shipAgg(L: ShipRow[]): ShipAgg {
@@ -16,14 +17,23 @@ export const shortDest = (d: string) => (d.includes('일호') ? '일호' : d.inc
 export const manualToRow = (m: ManualShip): ShipRow => [m.date, m.farm, m.dest + (m.kind === 'grade' ? ' (등판서)' : ' (직접 입력)'), m.n, m.live, m.carc ?? Math.round(m.live * m.yld * 10) / 1000, m.pay ? m.pay / 100 : 0, m.g1p, m.g1, m.g2, m.out];
 // 같은 날·같은 농장에 출하실적종합이 있으면 종합 값을 쓰고, 없을 때만 등판서·직접 입력을 쓴다 (두 번 세지 않음)
 export const shipKey = (date: string, farm: string) => date + '|' + farm;
-export const SHIP_KEYS = new Set(SHIP.map((x) => shipKey(x[0], x[1])));
-export const pendingManual = <T extends ManualShip>(manual: T[]) => manual.filter((m) => !SHIP_KEYS.has(shipKey(m.date, m.farm)));
+// 출하실적종합 기본값 = 스냅샷 SHIP. 출하실적종합(新) 파일을 올리면 그 파일 기간(첫 출하일~마지막 출하일)은 올린 값으로 바꾼다.
+let BASE: ShipRow[] = SHIP;
+let KEYS = new Set(SHIP.map((x) => shipKey(x[0], x[1])));
+export const shipBase = () => BASE;
+export const baseHas = (date: string, farm: string) => KEYS.has(shipKey(date, farm));
+export function setShipBase(tot: TotRow[]) {
+  if (!tot.length) BASE = SHIP;
+  else { const from = tot[0].date, to = tot[tot.length - 1].date; BASE = SHIP.filter((x) => x[0] < from || x[0] > to).concat(tot.map(totToRow)).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)); }
+  KEYS = new Set(BASE.map((x) => shipKey(x[0], x[1])));
+}
+export const pendingManual = <T extends ManualShip>(manual: T[]) => manual.filter((m) => !baseHas(m.date, m.farm));
 export const impToRow = (r: ImpRow): ShipRow => [r.date, r.farm, r.dest + (r.src === 'pigon' ? ' (피그온)' : ' (팀 대시보드)'), r.n, r.live, r.carc > 0 ? r.carc : 0, r.pay ? r.pay / 100 : 0, r.g1p, r.g1, r.g2, r.out];
 // 우선순위: 출하실적종합 > 올린 출하 자료(피그온·팀 대시보드) > 등판서·직접 입력 — 같은 날·같은 농장 기준
-export const pendingImports = (imp: ImpRow[]) => imp.filter((r) => !SHIP_KEYS.has(shipKey(r.date, r.farm)));
+export const pendingImports = (imp: ImpRow[]) => imp.filter((r) => !baseHas(r.date, r.farm));
 export const allShips = (manual: ManualShip[], imp: ImpRow[] = []): ShipRow[] => {
   const ik = new Set(imp.map((r) => shipKey(r.date, r.farm)));
-  return SHIP.concat(pendingImports(imp).map(impToRow), pendingManual(manual).filter((m) => !ik.has(shipKey(m.date, m.farm))).map(manualToRow));
+  return BASE.concat(pendingImports(imp).map(impToRow), pendingManual(manual).filter((m) => !ik.has(shipKey(m.date, m.farm))).map(manualToRow));
 };
 // 재고 차감용 출하(기준일 이후): 그룹이 있는 피그온 자료가 있으면 그 날·농장은 피그온, 아니면 등판서·직접 입력
 export const liveShipsOf = (manual: ManualShip[], imp: ImpRow[]) => {
@@ -34,8 +44,8 @@ export const liveShipsOf = (manual: ManualShip[], imp: ImpRow[]) => {
 // 종합이 아직 없는 출하의 예상 지급율: 같은 출하처의 최근 60일 종합 지급율(지육중량 가중)
 export function estPay(dest: string, date: string): number | null {
   const sd = shortDest(dest), from = new Date(Date.parse(date) - 60 * 864e5).toISOString().slice(0, 10);
-  let L = SHIP.filter((x) => shortDest(x[2]) === sd && x[0] >= from && x[0] <= date && x[6] > 0);
-  if (!L.length) L = SHIP.filter((x) => shortDest(x[2]) === sd && x[6] > 0);
+  let L = BASE.filter((x) => shortDest(x[2]) === sd && x[0] >= from && x[0] <= date && x[6] > 0);
+  if (!L.length) L = BASE.filter((x) => shortDest(x[2]) === sd && x[6] > 0);
   const c = L.reduce((a, x) => a + x[5], 0);
   return c ? r1((L.reduce((a, x) => a + x[6] * x[5], 0) / c) * 100) : null;
 }
