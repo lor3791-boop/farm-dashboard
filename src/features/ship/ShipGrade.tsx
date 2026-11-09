@@ -9,6 +9,7 @@ import { Grid, Lnk, Num, Segs, sortRows, useSorts, type Col } from '@/components
 import { downloadXlsx } from '@/lib/xlsx';
 
 import { thisMonth } from '@/lib/useIsPhone';
+import { mergeOutWhy } from '@/lib/gradeSheet';
 const mLabel = (m: string) => m.slice(0, 4) + '년 ' + Number(m.slice(5)) + '월';
 
 export function ShipGrade() {
@@ -23,9 +24,13 @@ export function ShipGrade() {
   const gTot = shipAgg(shipIn);
   const gCards: [string, string, string][] = [['출하두수', fmt(gTot.n) + '두', gTot.trucks + '회 출하'], ['평균체중', gTot.avgw + 'kg', '생체 합 ÷ 두수'], ['지급율', gTot.pay + '%', '지육중량 가중평균'], ['지육율', gTot.yld + '%', '지육 합 ÷ 생체 합'], ['등급율 (1+·1)', gTot.g11 + '%', '1+ 등급 ' + gTot.gp + '%'], ['등외', fmt(gTot.out) + '두', gTot.n ? r1((gTot.out / gTot.n) * 100) + '%' : '']];
   type GA = ShipAgg & { name: string };
-  const GC: Col<GA>[] = [{ k: 'name', l: '농장', w: 'minmax(84px,1fr)', sv: (a) => a.name }, { k: 'n', l: '출하두수', w: '76px', num: true, sv: (a) => a.n }, { k: 'avgw', l: '평균체중', w: '76px', num: true, sv: (a) => a.avgw }, { k: 'pay', l: '지급율', w: '68px', num: true, sv: (a) => a.pay }, { k: 'yld', l: '지육율', w: '68px', num: true, sv: (a) => a.yld }, { k: 'g11', l: '1+·1 등급율', w: '88px', num: true, sv: (a) => a.g11 }, { k: 'gp', l: '1+ 등급율', w: '76px', num: true, sv: (a) => a.gp }, { k: 'out', l: '등외', w: '56px', num: true, sv: (a) => a.out }];
-  const gCells = (a: GA, sub?: string) => [<Lnk v={a.name} sub={sub} />, <Num v={fmt(a.n)} />, <Num v={a.avgw + 'kg'} />, <Num v={a.pay + '%'} cls="b" />, <Num v={a.yld + '%'} />, <Num v={a.g11 + '%'} />, <Num v={a.gp + '%'} />, <Num v={a.out} />];
-  const gFarmAgg: GA[] = [...new Set(shipIn.map((x) => x[1]))].map((f) => ({ ...shipAgg(shipIn.filter((x) => x[1] === f)), name: f }));
+  const GC: Col<GA>[] = [{ k: 'name', l: '농장', w: 'minmax(84px,1fr)', sv: (a) => a.name }, { k: 'n', l: '출하두수', w: '76px', num: true, sv: (a) => a.n }, { k: 'avgw', l: '평균체중', w: '76px', num: true, sv: (a) => a.avgw }, { k: 'pay', l: '지급율', w: '68px', num: true, sv: (a) => a.pay }, { k: 'yld', l: '지육율', w: '68px', num: true, sv: (a) => a.yld }, { k: 'g11', l: '1+·1 등급율', w: '88px', num: true, sv: (a) => a.g11 }, { k: 'gp', l: '1+ 등급율', w: '76px', num: true, sv: (a) => a.gp }, { k: 'out', l: '등외', w: '56px', num: true, sv: (a) => a.out }, { k: 'why', l: '등외 비고', w: 'minmax(110px,1.2fr)', sv: (a) => (a as GA & { why?: string }).why ?? '' }];
+  const gCells = (a: GA, sub?: string) => [<Lnk v={a.name} sub={sub} />, <Num v={fmt(a.n)} />, <Num v={a.avgw + 'kg'} />, <Num v={a.pay + '%'} cls="b" />, <Num v={a.yld + '%'} />, <Num v={a.g11 + '%'} />, <Num v={a.gp + '%'} />, <Num v={a.out} />, <span className="small" style={{ color: '#7A4F00' }}>{(a as GA & { why?: string }).why ?? ''}</span>];
+  // 등외 사유: 같은 농장·출하일 등판서 기록의 사유 요약 (등판서가 없으면 '사유 모름')
+  const whyOf = (date: string, farm: string) => mergeOutWhy(ships.filter((m) => m.kind === 'grade' && m.farm === farm && m.date === date).map((m) => m.outWhy ?? ''));
+  const whyRow = (x: (typeof shipIn)[number]) => (x[10] > 0 ? whyOf(x[0], x[1]) || '사유 모름' : '');
+  const whyAgg = (L: typeof shipIn) => { const w = mergeOutWhy(L.filter((x) => x[10] > 0).map(whyRow).filter((t) => t !== '사유 모름')); const unk = L.filter((x) => x[10] > 0 && whyRow(x) === '사유 모름').reduce((a, x) => a + x[10], 0); return [w, unk ? `사유 모름 ${unk}` : ''].filter(Boolean).join('·'); };
+  const gFarmAgg: (GA & { why: string })[] = [...new Set(shipIn.map((x) => x[1]))].map((f) => ({ ...shipAgg(shipIn.filter((x) => x[1] === f)), name: f, why: whyAgg(shipIn.filter((x) => x[1] === f)) }));
   const gMonths: GA[] = ALLM.filter((m) => m >= g.from && m <= g.to).map((m) => ({ ...shipAgg(shipIn.filter((x) => x[0].slice(0, 7) === m)), name: Number(m.slice(5)) + '월' })).filter((a) => a.n > 0);
   const gList = shipIn.filter((x) => x[1] === g.farm).sort((a, b) => (a[0] < b[0] ? 1 : -1));
   const gFarmL = shipIn.filter((x) => x[1] === g.farm); const gfa = shipAgg(gFarmL);
@@ -42,9 +47,9 @@ export function ShipGrade() {
               <div style={{ flex: 1 }} />
               <button className="btn sm ghost" onClick={() => setG({ ...g, setOpen: !g.setOpen })}>{g.setOpen ? '첫출하 체중 기준 닫기' : '첫출하 체중 기준 설정'}</button>
               <button className="btn sm" onClick={() => downloadXlsx('출하성적', [
-                { name: '농장별', head: ['농장', '출하두수', '평균체중', '지급율(%)', '지육율(%)', '1+·1 등급율(%)', '1+ 등급율(%)', '등외'], rows: gFarmAgg.map((a) => [a.name, a.n, a.avgw, a.pay, a.yld, a.g11, a.gp, a.out]) },
+                { name: '농장별', head: ['농장', '출하두수', '평균체중', '지급율(%)', '지육율(%)', '1+·1 등급율(%)', '1+ 등급율(%)', '등외', '등외 비고'], rows: gFarmAgg.map((a) => [a.name, a.n, a.avgw, a.pay, a.yld, a.g11, a.gp, a.out, a.why]) },
                 { name: '월별', head: ['월', '출하두수', '평균체중', '지급율(%)', '지육율(%)', '1+·1 등급율(%)', '1+ 등급율(%)', '등외'], rows: gMonths.map((a) => [a.name, a.n, a.avgw, a.pay, a.yld, a.g11, a.gp, a.out]) },
-                { name: '출하내역', head: ['출하일', '농장', '출하처', '두수', '생체kg', '지육kg', '지급율', '1+', '1', '2', '등외'], rows: shipIn.map((x) => [...x]) }
+                { name: '출하내역', head: ['출하일', '농장', '출하처', '두수', '생체kg', '지육kg', '지급율', '1+', '1', '2', '등외', '등외 비고'], rows: shipIn.map((x) => [...x, whyRow(x)]) }
               ])}>엑셀</button>
             </div>
             {g.setOpen && <FirstShipSetting />}
@@ -64,10 +69,10 @@ export function ShipGrade() {
                 <div className="card" style={{ marginTop: 14 }}>
                   <h2 className="h2">{g.farm} 출하 내역</h2>
                   <div className="muted small" style={{ margin: '4px 0 10px' }}>{g.farm} 평균: {fmt(gfa.n)}두 · {gfa.avgw}kg · 지급율 {gfa.pay}% · 지육율 {gfa.yld}% · 1+·1 {gfa.g11}% · 등외 {gfa.out}두</div>
-                  <div className="gt"><div style={{ minWidth: 720 }}>
-                    <div className="gr gh small muted" style={{ gridTemplateColumns: '56px 80px 56px 70px 64px 64px 44px 44px 44px 44px' }}><div>출하일</div><div>출하처</div><div className="r">두수</div><div className="r">평체</div><div className="r">지육율</div><div className="r">지급율</div><div className="r">1+</div><div className="r">1</div><div className="r">2</div><div className="r">등외</div></div>
+                  <div className="gt"><div style={{ minWidth: 840 }}>
+                    <div className="gr gh small muted" style={{ gridTemplateColumns: '56px 80px 56px 70px 64px 64px 44px 44px 44px 44px minmax(110px,1fr)' }}><div>출하일</div><div>출하처</div><div className="r">두수</div><div className="r">평체</div><div className="r">지육율</div><div className="r">지급율</div><div className="r">1+</div><div className="r">1</div><div className="r">2</div><div className="r">등외</div><div title="등판서 사유·비고 칸, 없으면 도체중·등지방으로 추정">등외 비고</div></div>
                     {gList.map((x, i) => (
-                      <div key={i} className="gr" style={{ gridTemplateColumns: '56px 80px 56px 70px 64px 64px 44px 44px 44px 44px' }}><div>{md(x[0])}</div><div className="small">{shortDest(x[2])}</div><div className="r b">{x[3]}</div><div className="r">{x[3] ? r1(x[4] / x[3]) + 'kg' : '—'}</div><div className="r">{x[4] ? r1((x[5] / x[4]) * 100) + '%' : '—'}</div><div className="r">{x[6] > 0 ? r1(x[6] * 100) + '%' : '—'}</div><div className="r">{x[7]}</div><div className="r">{x[8]}</div><div className="r">{x[9]}</div><div className="r">{x[10]}</div></div>
+                      <div key={i} className="gr" style={{ gridTemplateColumns: '56px 80px 56px 70px 64px 64px 44px 44px 44px 44px minmax(110px,1fr)' }}><div>{md(x[0])}</div><div className="small">{shortDest(x[2])}</div><div className="r b">{x[3]}</div><div className="r">{x[3] ? r1(x[4] / x[3]) + 'kg' : '—'}</div><div className="r">{x[4] ? r1((x[5] / x[4]) * 100) + '%' : '—'}</div><div className="r">{x[6] > 0 ? r1(x[6] * 100) + '%' : '—'}</div><div className="r">{x[7]}</div><div className="r">{x[8]}</div><div className="r">{x[9]}</div><div className="r">{x[10]}</div><div className="small" style={{ color: '#7A4F00' }}>{whyRow(x)}</div></div>
                     ))}
                   </div></div>
                 </div>

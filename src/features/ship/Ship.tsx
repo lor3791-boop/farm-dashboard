@@ -66,6 +66,15 @@ export function ShipUpload() {
   const S = sh ? segRows(sh.rows, segs) : [];
   const n = sh?.rows.length ?? 0, carc = S.reduce((a, x) => a + x.carc, 0), W = Number(weigh);
   const dup = sh && ships.some((x) => x.kind === 'grade' && x.file === sh.file && x.date === date && x.farm === farm);
+  // 같은 농장·출하일에 직접 입력해 둔 출하 → 등판서로 바꿔 저장 (계근중량·그룹을 거기서 가져옴)
+  const match = sh && farm && date ? ships.filter((x) => x.kind !== 'grade' && x.farm === farm && x.date === date) : [];
+  const matchKey = match.map((x) => x.id).join(',');
+  useEffect(() => {
+    if (!match.length) return;
+    setWeigh(String(r1(match.reduce((a, x) => a + x.live, 0))));
+    const g = [...match].sort((a, b) => b.n - a.n)[0].group;
+    if (g) setSegs((L) => L.map((x) => ({ ...x, group: g })));
+  }, [matchKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const summ = (k: 'g1p' | 'g1' | 'g2' | 'out') => S.reduce((a, x) => a + x[k], 0);
 
   const addCut = () => {
@@ -89,10 +98,11 @@ export function ShipUpload() {
       const batch = Math.random().toString(36).slice(2, 10);
       for (const x of S) {
         const live = r1((W * x.carc) / carc);
-        const rec: Omit<ManualShip, 'id'> = { kind: 'grade', batch, file: sh.file, plant: sh.plant, range: x.from + '~' + x.to, farm, group: x.group, date, dest, n: x.n, live, carc: x.carc, yld: r1((x.carc / live) * 100), pay: null, price: null, g1p: x.g1p, g1: x.g1, g2: x.g2, out: x.out, lowReason: '', writer: name || email };
+        const rec: Omit<ManualShip, 'id'> = { kind: 'grade', batch, file: sh.file, plant: sh.plant, range: x.from + '~' + x.to, farm, group: x.group, date, dest, n: x.n, live, carc: x.carc, yld: r1((x.carc / live) * 100), pay: null, price: null, g1p: x.g1p, g1: x.g1, g2: x.g2, out: x.out, ...(x.outWhy ? { outWhy: x.outWhy } : {}), lowReason: '', writer: name || email };
         await repo!.add('shipments', rec as any, email);
       }
-      setMsg(`저장됨: ${farm} ${md(date)} ${n}두 — ${S.map((x) => x.group + ' ' + x.n + '두').join(', ')}`);
+      for (const m of match) await repo!.remove('shipments', m.id);
+      setMsg(`저장됨: ${farm} ${md(date)} ${n}두 — ${S.map((x) => x.group + ' ' + x.n + '두').join(', ')}${match.length ? ` · 직접 입력 ${match.reduce((a, x) => a + x.n, 0)}두를 등판서로 바꿈` : ''}`);
       setSh(null); setSegs([]);
     } catch (e) { setErr('저장하지 못했습니다: ' + String(e)); } finally { setBusy(false); }
   };
@@ -115,11 +125,12 @@ export function ShipUpload() {
             <b>{sh.file}</b> · {sh.kind} 양식<br />
             출하자 {sh.shipper || '—'} → <b>{farm || '농장 확인 필요'}</b> · 작업장 {sh.plant || '—'} · {n}두 · 도체중 합계 {fmt(r1(carc))}kg · 이력번호 {new Set(sh.rows.map((r) => r.trace)).size}개
             {dup && <><br /><span className="chip warn">같은 파일을 이미 저장했습니다</span></>}
+            {match.length > 0 && <><br /><span className="chip info" style={{ whiteSpace: 'normal' }}>직접 입력한 {md(date)} 출하 {match.map((x) => `${x.group} ${x.n}두·${fmt(x.live)}kg`).join(', ')}와 맞춤 — 저장하면 등판서 성적으로 바뀝니다</span></>}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'end', marginTop: 16 }}>
             <label style={{ fontSize: 14 }}>농장<br /><select value={farm} onChange={(e) => { setFarm(e.target.value); setDest(lastDest(e.target.value)); setSegs(segs.map((s) => ({ ...s, group: defGroup(e.target.value) }))); }}><option value="">고르세요</option>{farms.map((f) => <option key={f}>{f}</option>)}</select></label>
             <label style={{ fontSize: 14 }}>출하일<br /><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
-            <label style={{ fontSize: 14 }}>계근중량 (생체, kg)<br /><input type="number" inputMode="decimal" value={weigh} onChange={(e) => { setWeigh(e.target.value); setErr(''); }} style={{ width: 150 }} /></label>
+            <label style={{ fontSize: 14 }}>계근중량 (생체, kg)<br /><input inputMode="decimal" value={weigh} onChange={(e) => { setWeigh(e.target.value.replace(/[^\d.]/g, '')); setErr(''); }} style={{ width: 150 }} /></label>
             <label style={{ fontSize: 14 }}>출하처<br /><select value={dest} onChange={(e) => setDest(e.target.value)}>{DESTS.map((d) => <option key={d} value={d}>{shortDest(d)} · {d}</option>)}</select></label>
             <div style={{ fontSize: 14 }}>평체 <b>{W > 0 ? r1(W / n) + 'kg' : '—'}</b> · 지육률 <b>{W > 0 ? r1((carc / W) * 100) + '%' : '—'}</b> · 등급율 <b>{n ? r1(((summ('g1p') + summ('g1')) / n) * 100) + '%' : '—'}</b></div>
           </div>

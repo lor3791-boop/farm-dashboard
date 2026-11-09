@@ -8,7 +8,7 @@ export interface FcSettings {
   monthIndex: number[]; weightAdj: number[]; holidays: string[]; farmRates: Record<string, number>;
 }
 // key = 피그온 농장명(농장계수 조회), farm = 양식 농장명
-export interface FcGroup { mgr: string; farm: string; key: string; group: string; indate: string; n: number; w0: number; stock: number; shipped: number; firstShip: string | null }
+export interface FcGroup { mgr: string; farm: string; key: string; group: string; indate: string; n: number; w0: number; stock: number; shipped: number; firstShip: string | null; rate?: number; rateWhy?: string } // rate: 출하실적으로 역산한 증체계수(있으면 우선)
 export interface FcSeg { y?: number; month: number; k: number; start: string; end: string; days: number; label: string }
 export interface FcRow extends FcGroup { rate: number; sigma: number; t1: string; status: '출하중' | '대기' | '지연'; startAt: string; endAt: string; total: number; heads: number[] }
 
@@ -92,7 +92,7 @@ export function forecast(groups: FcGroup[], S: FcSettings, asof: string, startMo
   segs.forEach((s) => { prev = s ? s.end : prev; ends.push(prev); });
   const off = S.w1 - S.w2 + S.delta;
   const rows: FcRow[] = groups.map((g) => {
-    const rate = S.farmRates[g.key] ?? S.teamRate;
+    const rate = g.rate ?? S.farmRates[g.key] ?? S.teamRate;
     const sg = sigmaOf(g.n, S);
     const started = !!g.firstShip;
     const t1 = g.firstShip ?? firstShip(g, rate, S, cum);
@@ -135,3 +135,12 @@ export function monthsToCover(rows: FcRow[], startMonth: string) {
   return Math.max(1, (y1 - y0) * 12 + (m1 - m0) + 1);
 }
 export const ymOf = (d: string) => d.slice(0, 7);
+
+/** 출하실적 역산 증체계수: 출하일 평체가 (전입평체 + 계수 × 전입~출하 누적 계절지수)라 보고 두수 가중 평균.
+ *  ships = 그 그룹 출하 [출하일, 두수, 총생체중]. 첫출하 체중 보정(weightAdj)은 쓰지 않는다(실제 체중이므로). 0.5~1.3 밖이면 버림 */
+export function backRate(g: { indate: string; w0: number }, ships: { date: string; n: number; live: number }[], S: FcSettings, cum = makeCum(S)): number | null {
+  let wn = 0, wr = 0;
+  const base = cum(addIso(g.indate, -1));
+  ships.forEach((x) => { if (!(x.n > 0 && x.live > 0) || x.date <= g.indate) return; const dc = cum(x.date) - base; if (dc <= 0) return; const r = (x.live / x.n - g.w0) / dc; if (r > 0.5 && r < 1.3) { wn += x.n; wr += r * x.n; } });
+  return wn ? Math.round((wr / wn) * 1000) / 1000 : null;
+}

@@ -68,7 +68,9 @@ export function assignGroups(rows: TotRow[], groups: GroupCap[], over: Record<st
   for (const r of rows) {
     const o = over[r.key];
     if (o) { res[r.key] = { group: o === '-' ? '' : o, how: 'manual' }; if (o !== '-') used[r.farm + ' ' + o] = (used[r.farm + ' ' + o] ?? 0) + r.n; continue; }
-    const p = pig.find((x) => x.farm === r.farm && x.date === r.date && x.n === r.n && x.group);
+    // 같은 농장·출하일 기록(피그온 출하, 직접 입력·등판서 — 그룹 있음): 두수가 같으면 그 그룹, 아니면 그날 두수가 가장 많은 그룹
+    const same = pig.filter((x) => x.farm === r.farm && x.date === r.date && x.group);
+    const p = same.find((x) => x.n === r.n) ?? (() => { const m: Record<string, number> = {}; same.forEach((x) => (m[x.group] = (m[x.group] ?? 0) + x.n)); const g = Object.entries(m).sort((a, b) => b[1] - a[1])[0]; return g ? { group: g[0] } : undefined; })();
     if (p) { res[r.key] = { group: p.group, how: 'pigon' }; used[r.farm + ' ' + p.group] = (used[r.farm + ' ' + p.group] ?? 0) + r.n; continue; }
     // 선입선출: 출하일에 140일령 이상이고 전입 뒤인 그룹 중, 피그온 출하 누계(기준일 이후면 재고까지)를 아직 다 못 채운 가장 오래된 그룹
     const cand = byFarm(r.farm).filter((g) => r.date > g.date && g.ageRef + (Date.parse(r.date) - Date.parse(ref)) / 864e5 >= 140);

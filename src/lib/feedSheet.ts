@@ -21,23 +21,28 @@ export function normMonth(v: unknown, year = new Date().getFullYear()): string {
   m = s.match(/^(\d{1,2})\s*월$/); if (m) return `${year}-${m[1].padStart(2, '0')}`;
   return '';
 }
-export const normGroup = (v: unknown) => { const m = S(v).match(/(\d{2})\s*-\s*(\d{1,2})/); return m ? `${m[1]}-${Number(m[2])}` : S(v); };
+// 그룹: '가경-가경-2026-001' / '2026-001(2)' → 26-1, '26-7' → 26-7
+export const normGroup = (v: unknown) => { const s = S(v); let m = s.match(/(20\d{2})\s*-\s*0*(\d+)(?:\s*\(\d+\))?\s*$/); if (m) return `${m[1].slice(2)}-${Number(m[2])}`; m = s.match(/(\d{2})\s*-\s*0*(\d{1,3})(?:\s*\(\d+\))?\s*(?:차|그룹|군)?\s*$/); return m ? `${m[1]}-${Number(m[2])}` : s; };
 
 export function parseFeedSheet(aoa: unknown[][], resolveFarm: (name: string) => string, year = new Date().getFullYear()): FeedRow[] {
   const grid = aoa.map((r) => (r ?? []).map(S));
   for (let h = 0; h < Math.min(grid.length, 40); h++) {
-    const r = grid[h];
+    // 두 줄 머리(피그온 '그룹 사료 사용': 위 '품목'·'사용', 아래 '품목코드·품목명'·'수량·중량')는 위아래를 이어서 본다
+    const nx = grid[h + 1] ?? [];
+    const sub = nx.some((c) => c) && !nx.some((c) => /^-?\d[\d,.]*$/.test(c) || resolveFarm(c));
+    const r = grid[h].map((c, j) => (sub ? c + ' ' + (nx[j] ?? '') : c).trim());
     const cF = find(r, /농장|농가|사육장|위탁처/), cG = find(r, /그룹|차수|돈군|로트/);
     if (cF < 0 || cG < 0) continue;
-    const cI = find(r, /사료명|품목|제품|사료$|사료 ?코드명/);
-    const cM = find(r, /년월|월$|일자|기간|사용월/);
-    const cK = find(r, /kg|사용량|수량|중량|급여량/i);
+    const cI = (() => { const a = find(r, /품목명|사료명|제품명/); return a >= 0 ? a : find(r, /품목|제품|사료$|사료 ?코드명/); })();
+    const cM = find(r, /년월|기준월|사용월|월$|일자|기간/);
+    const cK = (() => { const a = find(r, /중량|kg/i); return a >= 0 ? a : find(r, /사용량|수량|급여량/); })();
     const out: FeedRow[] = [];
     const monthCols = r.map((c, j) => ({ j, m: normMonth(c, year) })).filter((x) => x.m && x.j !== cF && x.j !== cG);
     let lastF = '', lastG = '';
     for (let i = h + 1; i < grid.length; i++) {
       const x = grid[i]; if (!x.some((c) => c)) continue;
       if (/합계|소계|총계/.test(x.join(''))) continue;
+      if (i === h + 1 && sub) continue; // 아래 머리줄
       const fRaw = x[cF] || lastF, gRaw = x[cG] || lastG; lastF = fRaw; lastG = gRaw;
       const farm = resolveFarm(fRaw); if (!farm) continue;
       const group = normGroup(gRaw), item = cI >= 0 ? x[cI] : '';

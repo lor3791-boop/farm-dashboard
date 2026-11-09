@@ -1,8 +1,14 @@
 // 돈군 — 표(농장 소계 + 그룹) / 주차 히트맵 / 오른쪽 그룹 상세 (목업 v5)
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { todayKST } from '@/lib/util';
+import { useData } from '@/lib/data';
+import { useSettle } from '@/lib/useSettle';
+import { useCol } from '@/lib/useCol';
+import { mergeFeed, type FeedUpload } from '@/lib/feedSheet';
+import { groupFcr } from '@/lib/calc/fcr';
+
 import { useHerd, useUi } from '@/lib/ui';
-import { agg, dongsOf, heat, type Group } from '@/lib/calc/herd';
+import { agg, dongsOf, heat, TODAY, type Group } from '@/lib/calc/herd';
 import { addIso, fmt, md } from '@/lib/calc/dates';
 import { Chip, Grid, Lnk, Num, Segs, Tabs, Txt, sortRows, useSorts, type Col, type GRowView } from '@/components/v5';
 import { EntryTab } from './EntryTab';
@@ -251,7 +257,12 @@ function Heatmap({ farms, rows, mode, setMode, det, onOpen }: { farms: string[];
 }
 
 function Detail({ who, order, onDeath }: { who: string; order: string[]; onDeath: (g: Group) => void }) {
-  const { all, set, isPlanned, togglePlan, T } = useHerd();
+  const { all, set, isPlanned, togglePlan, T, saved, save, ships, imports } = useHerd();
+  const { data } = useData();
+  const st = useSettle();
+  const ups = useCol<FeedUpload>('feed');
+  const feed = useMemo(() => mergeFeed(ups), [ups]);
+  const [dongEdit, setDongEdit] = useState<string[] | null>(null);
   const d = all.find((r) => r.who === who);
   if (!d || !T) return null;
   const idx = order.indexOf(d.who);
@@ -263,6 +274,15 @@ function Detail({ who, order, onDeath }: { who: string; order: string[]; onDeath
   const sched: [string, string][] = [['첫출하예정', d.sold > 0 ? '출하 중' : md(d.first) + (d.firstOver > 0 ? ' (' + d.firstOver + '일 경과)' : '')], ['출하종료', md(addIso(d.first, T.shipPeriodDays))], ['다음 전입', md(addIso(d.first, T.shipPeriodDays + T.emptyDays))], ['마지막 출하', d.last ? md(d.last) + ' (' + d.since + '일 전)' : '없음'], ['예상 출하두수', fmt(d.exp) + '두']];
   const on = isPlanned(d);
   const lg = '36px 46px 52px 44px 40px 44px 46px 46px';
+  // 동 매칭: 농장 설정의 동 목록(없으면 1~8동)에서 고른다
+  const farmDongs = (() => { const f = data?.farms.find((x) => x.name === d.farm); const L = f?.dongs?.length ? f.dongs.map(String) : ['1', '2', '3', '4', '5', '6', '7', '8']; return L.map((x) => x.replace(/동$/, '')); })();
+  const curDongs = dongsOf(d.dong);
+  const saveDong = (L: string[]) => { const m = { ...(saved.groupDong ?? {}) }; m[d.who] = L.length ? [...L].sort((a, b) => a.localeCompare(b, 'ko', { numeric: true })).join('·') + '동' : '—'; save({ groupDong: m }); setDongEdit(null); };
+  // FCR: 출하 생체 = 출하실적종합(그룹 배정) + 이후 등판서·직접 입력·피그온 출하
+  const totL = st.rowsOf(d), lastT = totL.reduce((a, r) => (r.date > a ? r.date : a), '');
+  const shipLive = totL.reduce((a, r) => a + r.live, 0) + [...ships, ...imports].filter((r) => r.farm === d.farm && r.group === d.group && r.date > lastT).reduce((a, r) => a + (r.live || 0), 0);
+  const fc = groupFcr(d, feed, shipLive, { adg: T.defaultAdgKg, target: T.firstShipWeightKg, today: TODAY });
+  const ftone = (v: number | null) => (v === null ? {} : v < 2.4 ? { background: '#E3EFE7', color: '#1F4E3D' } : v < 2.7 ? { background: '#FBEFD5', color: '#7A4F00' } : { background: '#F8E1D8', color: '#9A3216' });
   return (
     <aside className="card" style={{ flex: '1 1 340px', maxWidth: 460, minWidth: 0, boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 8 }}>
@@ -282,6 +302,27 @@ function Detail({ who, order, onDeath }: { who: string; order: string[]; onDeath
         {kpis.map(([l, v, x]) => <div key={l} style={{ background: '#F7F5F0', borderRadius: 8, padding: '10px 12px' }}><div className="muted" style={{ fontSize: 12 }}>{l}</div><div style={{ fontSize: 18, fontWeight: 700 }}>{v}</div><div className="sub">{x}</div></div>)}
       </div>
       {d.warn.length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>{d.warn.map((w) => <span key={w} className="chip warn">{w}</span>)}</div>}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '16px 0 6px' }}><b style={{ flex: 1 }}>동 매칭</b>{dongEdit === null && <button className="btn sm ghost" onClick={() => setDongEdit(curDongs)}>바꾸기</button>}</div>
+      {dongEdit === null ? (
+        <div style={{ fontSize: 14 }}>{curDongs.length ? curDongs.map((x) => <span key={x} className="chip info" style={{ marginRight: 4 }}>{x}동</span>) : <span className="muted">동 없이 관리 (그룹으로만)</span>}{saved.groupDong?.[d.who] && <span className="muted small"> · 직접 정함</span>}</div>
+      ) : (
+        <div style={{ background: '#F7F5F0', borderRadius: 8, padding: 10 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{farmDongs.map((x) => { const on2 = dongEdit.includes(x); return <button key={x} className={on2 ? 'pill on' : 'pill'} style={{ minHeight: 40, padding: '6px 12px' }} onClick={() => setDongEdit(on2 ? dongEdit.filter((y) => y !== x) : [...dongEdit, x])}>{x}동</button>; })}</div>
+          <div className="muted small" style={{ margin: '6px 0' }}>고른 동이 없으면 '동 없이 관리'로 저장 — 폐사 입력에서 '동 없음'으로 나옵니다</div>
+          <div style={{ display: 'flex', gap: 6 }}><button className="btn sm pri" onClick={() => saveDong(dongEdit)}>저장</button><button className="btn sm ghost" onClick={() => setDongEdit(null)}>취소</button>{saved.groupDong?.[d.who] && <button className="btn sm ghost" onClick={() => { const m = { ...(saved.groupDong ?? {}) }; delete m[d.who]; save({ groupDong: m }); setDongEdit(null); }}>원래대로</button>}</div>
+        </div>
+      )}
+      <div className="b" style={{ margin: '16px 0 6px' }}>FCR 추이</div>
+      {fc ? (
+        <div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div style={{ ...ftone(fc.now), borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 12 }}>현재 FCR</div><b style={{ fontSize: 20 }}>{fc.now ?? '—'}</b><div style={{ fontSize: 11 }}>누적 사료 {fmt(Math.round(fc.feed))}kg · 추정 {fc.wNow}kg</div></div>
+            <div style={{ ...ftone(fc.exp), borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 12 }}>정산 예상 FCR</div><b style={{ fontSize: 20 }}>{fc.exp ?? '—'}</b><div style={{ fontSize: 11 }}>{T.firstShipWeightKg}kg까지 키운다고 보고</div></div>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>{fc.months.map((x) => <span key={x.m} style={{ ...ftone(x.fcr), borderRadius: 6, padding: '2px 6px', fontSize: 12 }}>{Number(x.m.slice(5))}월 {x.fcr ?? '·'}</span>)}</div>
+          <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>피그온 그룹 사료 기준 · 일당증체 {T.defaultAdgKg}kg 가정 추정치</div>
+        </div>
+      ) : <div className="muted small">피그온 그룹 사료 자료가 없습니다 (정산자료 › 사료 사용에서 올리기)</div>}
       <div className="b" style={{ margin: '16px 0 6px' }}>주차별 폐사</div>
       {months.map((m) => (
         <div key={m.label} style={{ display: 'grid', gridTemplateColumns: '58px repeat(4, minmax(0, 1fr))', gap: 5, alignItems: 'stretch', marginBottom: 5 }}>

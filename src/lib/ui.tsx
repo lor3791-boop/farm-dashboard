@@ -40,7 +40,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
   const nav = useNavigate();
   // 저장 대기 중 화면이 바로 바뀌도록 낙관적 값
   const [opt, setOpt] = useState<Partial<UiSaved>>({});
-  const saved: UiSaved = useMemo(() => ({ planned: {}, done: {}, heatVals: {}, firstShipByFarm: {}, shareLinks: {}, settled: {}, shipGroup: {}, bondPlan: {}, sowFarms: [], pyesaKey: '', ...(data?.ui ?? {}), ...opt }), [data, opt]);
+  const saved: UiSaved = useMemo(() => ({ planned: {}, done: {}, heatVals: {}, firstShipByFarm: {}, shareLinks: {}, settled: {}, shipGroup: {}, bondPlan: {}, groupDong: {}, sowFarms: [], pyesaKey: '', ...(data?.ui ?? {}), ...opt }), [data, opt]);
   const set = useCallback((p: Partial<UiState>) => setS((o) => ({ ...o, ...p })), []);
   const save = useCallback((p: Partial<UiSaved>) => {
     setOpt((o) => ({ ...o, ...p }));
@@ -57,9 +57,9 @@ export function useHerd() {
   // 기준일 이후 폐사·출하를 반영한 그룹 + 폐사 기록별 나눔(크레임/폐사)
   const { all, split } = useMemo(() => {
     const sp: Record<string, Split> = {};
-    const g: Group[] = data ? buildGroups(data.thresholds, saved.firstShipByFarm, { deaths, groups, ships: liveShipsOf(ships, imports) }, sp) : [];
+    const g: Group[] = data ? buildGroups(data.thresholds, saved.firstShipByFarm, { deaths, groups, ships: liveShipsOf(ships, imports), dongs: saved.groupDong }, sp) : [];
     return { all: g, split: sp };
-  }, [data, saved.firstShipByFarm, deaths, ships, groups, imports]);
+  }, [data, saved.firstShipByFarm, saved.groupDong, deaths, ships, groups, imports]);
   const shipRows = useMemo(() => allShips(ships, imports), [ships, imports, up.total.rows]); // eslint-disable-line react-hooks/exhaustive-deps
   const liveShips = useMemo(() => liveShipsOf(ships, imports), [ships, imports]);
   const farms = useMemo(() => [...new Set(all.map((r) => r.farm))], [all]);

@@ -1,7 +1,7 @@
 // 등급판정서(등판서) 읽기 — 도축장 양식·축평원 양식 모두 '두당 1행' 표를 찾아 읽는다.
 // 머리줄(도체번호·등급이 함께 있는 줄)을 찾고, 그 위쪽에서 출하자·판정일·작업장을 찾는다. 없으면 파일 이름에서 보충.
 export type Grade = '1+' | '1' | '2' | '등외';
-export interface GradeRow { no: string; trace: string; carc: number; grade: Grade }
+export interface GradeRow { no: string; trace: string; carc: number; grade: Grade; bf?: number; why?: string } // bf: 등지방두께(mm), why: 등판서의 등외 사유·비고
 export interface GradeSheet { file: string; kind: '도축장' | '축평원'; shipper: string; date: string; plant: string; rows: GradeRow[] }
 
 const S = (v: unknown) => (v === null || v === undefined ? '' : String(v)).replace(/\s+/g, ' ').trim();
@@ -43,6 +43,8 @@ export function parseGradeSheet(aoa: unknown[][], file: string, year = new Date(
   const cCarc = (() => { const a = find(hr, /도체중|도체 중|도체중량/); return a >= 0 ? a : find(hr, /중량|kg/i); })();
   const cGrade = (() => { const ex = hr.findIndex((c) => /^(최종)?등급$|^육질등급$|^등급판정$/.test(c.replace(/\s/g, ''))); return ex >= 0 ? ex : hr.findIndex((c, j) => /등급/.test(c) && !/육량/.test(c) && j !== cNo); })();
   if (cCarc < 0) throw new Error('도체중 칸을 찾지 못했습니다');
+  const cBf = find(hr, /등지방/);
+  const cWhy = find(hr, /등외사유|판정사유|결함|사유|비고/);
   const rows: GradeRow[] = [];
   for (let i = h + 1; i < grid.length; i++) {
     const r = grid[i];
@@ -50,7 +52,8 @@ export function parseGradeSheet(aoa: unknown[][], file: string, year = new Date(
     if (!no || /합계|소계|평균|계$/.test(no) || /합계|소계/.test(r.join(''))) { if (rows.length && !no) continue; if (/합계|소계|평균/.test(r.join(''))) break; continue; }
     const carc = num(r[cCarc]); const g = normGrade(r[cGrade]);
     if (!(carc > 0) || !g) continue;
-    rows.push({ no, trace: cTrace >= 0 ? (r[cTrace] ?? '').replace(/\s/g, '') : '', carc, grade: g });
+    const bf = cBf >= 0 ? num(r[cBf]) : NaN;
+    rows.push({ no, trace: cTrace >= 0 ? (r[cTrace] ?? '').replace(/\s/g, '') : '', carc, grade: g, ...(bf > 0 ? { bf } : {}), ...(cWhy >= 0 && r[cWhy] ? { why: r[cWhy] } : {}) });
   }
   if (!rows.length) throw new Error('판정 행이 없습니다');
   // 머리줄 위쪽 정보: '라벨: 값' 또는 라벨 오른쪽 칸
@@ -78,8 +81,34 @@ export function segRows(rows: GradeRow[], segs: Seg[]) {
   return st.map((s, i) => {
     const R = rows.slice(s.start, i + 1 < st.length ? st[i + 1].start : rows.length);
     const c = (g: Grade) => R.filter((x) => x.grade === g).length;
-    return { ...s, rows: R, n: R.length, carc: Math.round(R.reduce((a, x) => a + x.carc, 0) * 10) / 10, from: R[0]?.no ?? '', to: R[R.length - 1]?.no ?? '', g1p: c('1+'), g1: c('1'), g2: c('2'), out: c('등외') };
+    return { ...s, rows: R, n: R.length, carc: Math.round(R.reduce((a, x) => a + x.carc, 0) * 10) / 10, from: R[0]?.no ?? '', to: R[R.length - 1]?.no ?? '', g1p: c('1+'), g1: c('1'), g2: c('2'), out: c('등외'), outWhy: outSummary(R) };
   });
 }
 // 이력번호가 바뀌는 곳마다 나눈다
 export const segsByTrace = (rows: GradeRow[], group = ''): Seg[] => rows.reduce<Seg[]>((a, r, i) => (i === 0 || r.trace !== rows[i - 1].trace ? [...a, { start: i, group }] : a), []);
+
+// 등외 사유 — 등판서 사유·비고 칸이 있으면 그 말을 줄여 쓰고, 없으면 도체중·등지방으로 추정.
+// 추정 기준(도체중 70kg 미만 저체중, 110kg 초과 고체중, 등지방 10mm 미만 얇음, 33mm 초과 두꺼움)은 [최신 기준 확인 필요]
+export const OUT_RULE = { lowKg: 70, highKg: 110, thinMm: 10, thickMm: 33 };
+export function outReason(r: GradeRow): string {
+  const w = (r.why ?? '').replace(/\s/g, '');
+  if (w) {
+    if (/체중|중량/.test(w)) return /미달|미만|저|경/.test(w) ? '저체중' : /초과|과|고|중/.test(w) ? '고체중' : '체중';
+    if (/지방/.test(w)) return /얇|미달|부족|미만/.test(w) ? '등지방얇음' : /두껍|두꺼|과|초과/.test(w) ? '등지방두꺼움' : '등지방';
+    if (/PSE|DFD|이상|물퇘|수퇘|웅취/.test(w)) return '이상육';
+    if (/결함|외관|방혈|출혈|농양|골절|상처/.test(w)) return '결함';
+    return w.slice(0, 6);
+  }
+  if (r.carc < OUT_RULE.lowKg) return '저체중';
+  if (r.carc > OUT_RULE.highKg) return '고체중';
+  if (r.bf !== undefined && r.bf < OUT_RULE.thinMm) return '등지방얇음';
+  if (r.bf !== undefined && r.bf > OUT_RULE.thickMm) return '등지방두꺼움';
+  return r.bf === undefined ? '사유 칸 없음' : '기타';
+}
+/** '저체중 2·등지방얇음 1' */
+export function outSummary(R: GradeRow[]): string {
+  const m: Record<string, number> = {};
+  R.filter((x) => x.grade === '등외').forEach((x) => { const k = outReason(x); m[k] = (m[k] ?? 0) + 1; });
+  return Object.entries(m).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join('·');
+}
+export const mergeOutWhy = (L: string[]) => { const m: Record<string, number> = {}; L.filter(Boolean).forEach((s) => s.split('·').forEach((t) => { const i = t.lastIndexOf(' '); const k = t.slice(0, i), n = Number(t.slice(i + 1)); if (k && n) m[k] = (m[k] ?? 0) + n; })); return Object.entries(m).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join('·'); };

@@ -12,3 +12,6 @@ export const firebaseConfig: Record<string, string> | null = {
 
 // 관리자(지역부장) 구글 계정. firestore.rules 의 isAdmin() 과 같은 값이어야 한다.
 export const ADMIN_EMAILS = ['lor3791@gmail.com'];
+
+// 대시보드 운영자(지역부장) 이름 — 화면 표시·등록자 기록에 쓴다 (구글 계정 이름 대신)
+export const OPERATOR_NAME = '이오름';

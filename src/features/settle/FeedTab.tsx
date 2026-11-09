@@ -29,7 +29,8 @@ export function FeedTab() {
   const onFile = async (file: File) => {
     setMsg(null);
     try {
-      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      // raw: 피그온 '엑셀'(실제로는 HTML 표)의 '명임-2026-002' 같은 글자를 날짜로 바꾸지 않게
+      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', raw: true });
       const rf = makeResolver(farms, data?.nameMap);
       let got: ReturnType<typeof parseFeedSheet> = [], last = '';
       for (const n of wb.SheetNames) { try { got = got.concat(parseFeedSheet(XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: '', raw: true }) as unknown[][], rf)); } catch (e) { last = (e as Error).message; } }

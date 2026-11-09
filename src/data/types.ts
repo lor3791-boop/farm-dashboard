@@ -70,7 +70,8 @@ export interface UiSaved {
   shareLinks: Record<string, string>;      // 농장 → 공유 화면 열쇠(무작위 16자). 주소에 농장 이름·대시보드 주소가 드러나지 않음
   settled: Record<string, string>;
   shipGroup?: Record<string, string>;     // 출하실적종합 줄(key) → 직접 고른 그룹 ('-' = 그룹 아님)
-  bondPlan?: Record<string, number>;      // 선급금(key) → 이번 회전 상계 예정액(직접 고친 값)         // '민서 26-7' → 정산완료 처리한 날 (다시 누르면 해제)
+  bondPlan?: Record<string, number>;
+  groupDong?: Record<string, string>;     // 그룹별 동 매칭('민서 26-7' → '1·2동', 동 없음은 '—')      // 선급금(key) → 이번 회전 상계 예정액(직접 고친 값)         // '민서 26-7' → 정산완료 처리한 날 (다시 누르면 해제)
   sowFarms: string[];
   pyesaKey: string;                        // 폐사입력 서버 접속 키 (설정 › 폐사입력 앱 연결)                      // 그룹 직접 등록의 자돈농장 선택지에 추가한 이름
 }
@@ -89,4 +90,5 @@ export interface ManualShip {
   g1p: number; g1: number; g2: number; out: number; lowReason: string; writer: string; by?: string; at?: string;
   // 등판서 업로드분: kind 'grade', 도체중 합(carc), 같은 파일 묶음(batch), 도체번호 구간(range)
   kind?: 'manual' | 'grade'; carc?: number; batch?: string; file?: string; range?: string; plant?: string;
+  outWhy?: string; // 등외 사유 요약 '저체중 2·등지방얇음 1' (등판서)
 }

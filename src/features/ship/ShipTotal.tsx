@@ -15,7 +15,7 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { nowIso } from '@/lib/util';
 
 const won = (n: number) => (n >= 1e8 ? (n / 1e8).toFixed(2) + '억' : n >= 1e4 ? fmt(Math.round(n / 1e4)) + '만' : fmt(n));
-const HOW: Record<string, string> = { manual: '직접', pigon: '피그온', auto: '자동', '': '' };
+const HOW: Record<string, string> = { manual: '직접 고름', pigon: '입력 기록', auto: '자동', '': '' };
 
 export function ShipTotalCard() {
   const { repo } = useAuth();

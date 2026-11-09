@@ -9,7 +9,7 @@ import { applyDeaths, type DeathLike, type Split, type DeathBase } from '@/share
 export interface LiveShip { farm: string; group: string; date: string; n: number }
 // 직접 등록한 그룹 (피그온 전입현황 업로드 전) — dongs: ['1','2'] (동 없이 관리면 빈 배열)
 export interface ManualGroup { id?: string; farm: string; group: string; dongs: string[]; date: string; inn: number; claim: number; avgw: number; age: number; totalKg?: number; source?: string; memo?: string }
-export interface Live { deaths: DeathLike[]; ships: LiveShip[]; groups?: ManualGroup[] }
+export interface Live { deaths: DeathLike[]; ships: LiveShip[]; groups?: ManualGroup[]; dongs?: Record<string, string> } // dongs: 사육현황에서 고친 그룹별 동 ('민서 26-7' → '1·2동' 또는 '—')
 const mmdd = (d: string) => d.slice(5);
 // 직접 등록 그룹 → 스냅샷과 같은 모양(GRow + 로트)
 export function manualRows(T: Thresholds, L: ManualGroup[]): { row: GRow; lot: Lot }[] {
@@ -41,7 +41,7 @@ export function buildGroups(T: Thresholds, firstShipByFarm: Record<string, numbe
   const man = live?.groups ?? [];
   const extra = manualRows(T, man.filter((m) => !G0.some((r) => r[0] === m.farm && r[1] === m.group)));
   // 피그온에 들어온 그룹은 피그온 값을 쓰되, 동은 직접 등록 때 넣은 값을 살린다 (피그온엔 동이 없음)
-  const G = G0.map((r) => { if (r[2] !== '—') return r; const m = man.find((x) => x.farm === r[0] && x.group === r[1]); return m?.dongs.length ? ([...r.slice(0, 2), m.dongs.join('·') + '동', ...r.slice(3)] as GRow) : r; }).concat(extra.map((x) => x.row));
+  const G = G0.map((r) => { const ov = live?.dongs?.[r[0] + ' ' + r[1]]; if (ov) return [...r.slice(0, 2), ov, ...r.slice(3)] as GRow; if (r[2] !== '—') return r; const m = man.find((x) => x.farm === r[0] && x.group === r[1]); return m?.dongs.length ? ([...r.slice(0, 2), m.dongs.join('·') + '동', ...r.slice(3)] as GRow) : r; }).concat(extra.map((x) => x.row));
   const LOTS: Record<string, Lot[]> = { ...LOTS0 };
   extra.forEach((x) => { LOTS[x.row[0] + ' ' + x.row[1]] = [x.lot]; });
   const base: Record<string, DeathBase & { inDeath: number }> = {};

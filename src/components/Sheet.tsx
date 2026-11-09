@@ -1,16 +1,17 @@
 // 아래에서 올라오는 창(손잡이를 끌어내리면 닫힘) + 화면 아래 알림(되돌리기)
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
-export function Sheet({ title, onClose, children }: { title: ReactNode; onClose: () => void; children: ReactNode }) {
+export function Sheet({ title, onClose, children, locked = false }: { title: ReactNode; onClose: () => void; children: ReactNode; locked?: boolean }) {
+  // locked: 입력 창 — 바깥을 누르거나 끌어내려도 닫히지 않음 (✕·취소로만 닫음)
   const [dy, setDy] = useState(0);
   const y0 = useRef<number | null>(null);
-  useEffect(() => { const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose(); addEventListener('keydown', k); const o = document.body.style.overflow; document.body.style.overflow = 'hidden'; return () => { removeEventListener('keydown', k); document.body.style.overflow = o; }; }, [onClose]);
+  useEffect(() => { const k = (e: KeyboardEvent) => e.key === 'Escape' && !locked && onClose(); addEventListener('keydown', k); const o = document.body.style.overflow; document.body.style.overflow = 'hidden'; return () => { removeEventListener('keydown', k); document.body.style.overflow = o; }; }, [onClose, locked]);
   const start = (e: React.TouchEvent) => { y0.current = e.touches[0].clientY; };
-  const move = (e: React.TouchEvent) => { if (y0.current != null) setDy(Math.max(0, e.touches[0].clientY - y0.current)); };
+  const move = (e: React.TouchEvent) => { if (!locked && y0.current != null) setDy(Math.max(0, e.touches[0].clientY - y0.current)); };
   const end = () => { if (dy > 90) onClose(); setDy(0); y0.current = null; };
   return (
     <div className="sheet-wrap" role="dialog" aria-modal="true">
-      <button className="sheet-bg" aria-label="닫기" onClick={onClose} />
+      <div className="sheet-bg" aria-hidden="true" onClick={locked ? undefined : onClose} />
       <div className="sheet" style={{ transform: dy ? `translateY(${dy}px)` : undefined, transition: dy ? 'none' : undefined }}>
         <div className="sheet-head" onTouchStart={start} onTouchMove={move} onTouchEnd={end}>
           <div className="sheet-grab" />
@@ -49,7 +50,7 @@ export function Stepper({ value, onChange, min = 1, max = 300 }: { value: number
   return (
     <div className="stepper">
       <button type="button" aria-label="줄이기" onClick={() => set(value - 1)} disabled={value <= min}>−</button>
-      <input aria-label="두수" type="number" inputMode="numeric" value={value} onFocus={(e) => e.target.select()} onChange={(e) => { const n = parseInt(e.target.value, 10); if (!isNaN(n)) set(n); }} />
+      <input aria-label="두수" inputMode="numeric" value={value} onFocus={(e) => e.target.select()} onChange={(e) => { const n = parseInt(e.target.value.replace(/[^\d]/g, ""), 10); if (!isNaN(n)) set(n); }} />
       <button type="button" aria-label="늘리기" onClick={() => set(value + 1)} disabled={value >= max}>+</button>
     </div>
   );

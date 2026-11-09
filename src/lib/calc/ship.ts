@@ -7,14 +7,16 @@ import { totToRow, type TotRow } from '@/lib/shipTotal';
 export interface ShipAgg { n: number; trucks: number; avgw: number; yld: number; pay: number; g11: number; gp: number; out: number }
 const sum = (L: ShipRow[], i: number) => L.reduce((a, x) => a + (x[i] as number), 0);
 export function shipAgg(L: ShipRow[]): ShipAgg {
-  const n = sum(L, 3), live = sum(L, 4), carc = sum(L, 5);
-  const pr = L.filter((x) => x[6] > 0 && x[5] > 0); const pc = sum(pr, 5);
-  return { n, trucks: L.length, avgw: n ? r1(live / n) : 0, yld: live ? r1((carc / live) * 100) : 0, pay: pc ? r1((pr.reduce((a, x) => a + x[6] * x[5], 0) / pc) * 100) : 0, g11: n ? r1(((sum(L, 7) + sum(L, 8)) / n) * 100) : 0, gp: n ? r1((sum(L, 7) / n) * 100) : 0, out: sum(L, 10) };
+  // 두수·평체는 모든 줄, 지육율·등급은 도체 값이 있는 줄만 (직접 입력은 두수·생체중뿐이라 빠짐)
+  const n = sum(L, 3), live = sum(L, 4);
+  const G = L.filter((x) => x[5] > 0), gn = sum(G, 3), glive = sum(G, 4), carc = sum(G, 5);
+  const pr = G.filter((x) => x[6] > 0); const pc = sum(pr, 5);
+  return { n, trucks: L.length, avgw: n ? r1(live / n) : 0, yld: glive ? r1((carc / glive) * 100) : 0, pay: pc ? r1((pr.reduce((a, x) => a + x[6] * x[5], 0) / pc) * 100) : 0, g11: gn ? r1(((sum(G, 7) + sum(G, 8)) / gn) * 100) : 0, gp: gn ? r1((sum(G, 7) / gn) * 100) : 0, out: sum(G, 10) };
 }
 export const shortDest = (d: string) => (d.includes('일호') ? '일호' : d.includes('참푸른') ? '참푸른' : d.includes('음성신선') ? '신선' : d.includes('중앙축산') ? '중앙축산' : d.includes('논산') ? '논산축협' : d.includes('도도') ? '도도농장' : d.slice(0, 6));
 
 // 출하실적종합 + 직접 입력을 합친 출하 목록 (직접 입력은 지육 = 생체 × 지육율, 지급율 없으면 0 → 지급율 평균에서 제외)
-export const manualToRow = (m: ManualShip): ShipRow => [m.date, m.farm, m.dest + (m.kind === 'grade' ? ' (등판서)' : ' (직접 입력)'), m.n, m.live, m.carc ?? Math.round(m.live * m.yld * 10) / 1000, m.pay ? m.pay / 100 : 0, m.g1p, m.g1, m.g2, m.out];
+export const manualToRow = (m: ManualShip): ShipRow => [m.date, m.farm, m.dest + (m.kind === 'grade' ? ' (등판서)' : ' (직접 입력)'), m.n, m.live, m.carc ?? Math.round(m.live * (m.yld || 0) * 10) / 1000, m.pay ? m.pay / 100 : 0, m.g1p, m.g1, m.g2, m.out];
 // 같은 날·같은 농장에 출하실적종합이 있으면 종합 값을 쓰고, 없을 때만 등판서·직접 입력을 쓴다 (두 번 세지 않음)
 export const shipKey = (date: string, farm: string) => date + '|' + farm;
 // 출하실적종합 기본값 = 스냅샷 SHIP. 출하실적종합(新) 파일을 올리면 그 파일 기간(첫 출하일~마지막 출하일)은 올린 값으로 바꾼다.

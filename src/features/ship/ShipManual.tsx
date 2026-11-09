@@ -12,9 +12,10 @@ import { REF } from '@/lib/calc/herd';
 import { shortDest } from '@/lib/calc/ship';
 
 const DESTS = ['일호', '참푸른', '신선', '중앙축산', '논산축협', '도도농장'];
-const LOW_KG = 110;
-type F = { farm: string; group: string; date: string; dest: string; n: string; live: string; yld: string; pay: string; price: string; g1p: string; g1: string; g2: string; out: string; lowReason: string; writer: string };
-const blank = (farm: string, group: string, writer: string): F => ({ farm, group, date: todayKST(), dest: '', n: '', live: '', yld: '', pay: '', price: '', g1p: '0', g1: '0', g2: '0', out: '0', lowReason: '', writer });
+type F = { farm: string; group: string; date: string; dest: string; n: string; live: string };
+const blank = (farm: string, group: string): F => ({ farm, group, date: todayKST(), dest: '', n: '', live: '' });
+// 숫자 칸: 글자 입력칸으로 받아 화면을 스크롤해도 값이 바뀌지 않게 (type=number는 휠·스크롤에 값이 바뀜)
+const digits = (v: string, dec = false) => v.replace(dec ? /[^\d.]/g : /[^\d]/g, '');
 
 export function ShipManualButton() {
   const [open, setOpen] = useState(false);
@@ -28,70 +29,55 @@ export function ShipManualButton() {
   );
 }
 
+// 직접 입력은 두수·총생체중만. 등판서가 나오면 '등급판정서 올리기'로 올리면 같은 날·농장 직접 입력 건에 붙어 성적이 채워지고,
+// 출하실적종합(新)을 올리면 그 값이 최종 실적이 된다 (이 그룹 정보로 그룹별로 나뉨).
 function ShipManualModal({ onClose }: { onClose: () => void }) {
   const { all, farms } = useHerd();
   const { repo, email, name } = useAuth();
   const first = farms[0] ?? '';
   const groupsOf = (f: string) => all.filter((r) => r.farm === f && r.stock > 0).map((r) => r.group);
-  const [f, setF] = useState<F>(blank(first, groupsOf(first)[0] ?? '', name && name !== '미리보기' ? name : ''));
+  const [f, setF] = useState<F>(blank(first, groupsOf(first)[0] ?? ''));
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const up = (k: keyof F, v: string) => { setF({ ...f, [k]: v }); setErr(''); };
-  const num = (v: string) => (v.trim() === '' ? NaN : Number(v));
-  const n = num(f.n), live = num(f.live), yld = num(f.yld);
+  const n = Number(f.n), live = Number(f.live);
   const avgw = n > 0 && live > 0 ? r1(live / n) : null;
-  const grades = [f.g1p, f.g1, f.g2, f.out].reduce((a, x) => a + (Number(x) || 0), 0);
-  const low = avgw !== null && avgw <= LOW_KG;
 
   const save = async () => {
     if (!f.farm || !f.group) return setErr('농장과 그룹을 고르세요');
     if (!f.date) return setErr('출하일을 넣으세요');
-    if (!f.dest.trim()) return setErr('거래처를 넣으세요');
+    if (!f.dest.trim()) return setErr('거래처를 고르세요');
     if (!(n > 0) || !Number.isInteger(n)) return setErr('두수를 넣으세요');
     if (!(live > 0)) return setErr('총생체중을 넣으세요');
-    if (!(yld > 50 && yld < 90)) return setErr('지육율(%)을 50~90 사이로 넣으세요');
-    if (f.pay.trim() !== '' && !(num(f.pay) > 30 && num(f.pay) < 100)) return setErr('지급율(%)을 확인하세요');
-    if (grades > n) return setErr(`등급 두수 합(${grades})이 출하 두수(${n})보다 많습니다`);
-    if (low && !f.lowReason.trim()) return setErr(`출하평체 ${LOW_KG}kg 이하 — 저체중 사유를 넣으세요`);
-    if (!f.writer.trim()) return setErr('등록자 이름을 넣으세요');
+    if (avgw !== null && (avgw < 60 || avgw > 180)) return setErr(`평체 ${avgw}kg — 두수·총생체중을 확인하세요`);
     setBusy(true);
     try {
-      const rec: Omit<ManualShip, 'id'> = { farm: f.farm, group: f.group, date: f.date, dest: f.dest.trim(), n, live, yld, pay: f.pay.trim() === '' ? null : num(f.pay), price: f.price.trim() === '' ? null : num(f.price), g1p: Number(f.g1p) || 0, g1: Number(f.g1) || 0, g2: Number(f.g2) || 0, out: Number(f.out) || 0, lowReason: f.lowReason.trim(), writer: f.writer.trim() };
+      const rec: Omit<ManualShip, 'id'> = { kind: 'manual', farm: f.farm, group: f.group, date: f.date, dest: f.dest.trim(), n, live, yld: 0, pay: null, price: null, g1p: 0, g1: 0, g2: 0, out: 0, lowReason: '', writer: name || email };
       await repo!.add('shipments', rec as any, email);
       onClose();
     } catch (e) { setErr('저장하지 못했습니다: ' + String(e)); } finally { setBusy(false); }
   };
 
-  const row = (label: string, child: React.ReactNode) => (
-    <label style={{ display: 'grid', gridTemplateColumns: '110px minmax(0,1fr)', alignItems: 'center', gap: 10, fontSize: 14 }}><span className="muted">{label}</span>{child}</label>
-  );
-  const I = (k: keyof F, ph = '', type = 'number') => <input type={type} inputMode={type === 'number' ? 'decimal' : undefined} value={f[k]} placeholder={ph} onChange={(e) => up(k, e.target.value)} style={{ width: '100%', minHeight: 44, boxSizing: 'border-box' }} />;
-
+  const lab = { display: 'grid', gap: 4, fontSize: 13, color: '#6B6A63', minWidth: 0 } as const;
+  const inp = { width: '100%', minHeight: 44, boxSizing: 'border-box', fontSize: 16 } as const;
   return (
-    <Sheet title="출하 기록 직접 입력" onClose={onClose}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {row('농장', <select value={f.farm} onChange={(e) => { const g = groupsOf(e.target.value); setF({ ...f, farm: e.target.value, group: g[0] ?? '' }); }}>{farms.map((x) => <option key={x}>{x}</option>)}</select>)}
-          {row('그룹', <select value={f.group} onChange={(e) => up('group', e.target.value)}>{groupsOf(f.farm).map((g) => <option key={g}>{g}</option>)}</select>)}
-          {row('출하일', I('date', '', 'date'))}
-          {row('거래처', <><input list="ship-dests" value={f.dest} placeholder="참푸른 / 일호 등" onChange={(e) => up('dest', e.target.value)} style={{ width: '100%' }} /><datalist id="ship-dests">{DESTS.map((d) => <option key={d} value={d} />)}</datalist></>)}
-          {row('두수', I('n'))}
-          {row('총생체중(kg)', I('live'))}
-          {row('출하평체', <b>{avgw === null ? '—' : avgw + 'kg'}</b>)}
-          {row('지육율(%)', I('yld'))}
-          {row('지급율(직접,%)', I('pay', '비워두면 출하실적종합 값 사용'))}
-          {row('기준단가', I('price'))}
-          {row('1+ 두수', I('g1p'))}
-          {row('1등급 두수', I('g1'))}
-          {row('2등급 두수', I('g2'))}
-          {row('등외 두수', I('out'))}
-          {row('저체중 사유', I('lowReason', low ? '필수 입력' : `출하평체 ${LOW_KG}kg 이하일 때 필수`, 'text'))}
-          {row('등록자', I('writer', '이름을 입력하세요', 'text'))}
+    <Sheet title="출하 직접 입력" onClose={onClose} locked>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <label style={lab}>농장<select value={f.farm} style={inp} onChange={(e) => { const g = groupsOf(e.target.value); setF({ ...f, farm: e.target.value, group: g[0] ?? '' }); }}>{farms.map((x) => <option key={x}>{x}</option>)}</select></label>
+        <label style={lab}>그룹<select value={f.group} style={inp} onChange={(e) => up('group', e.target.value)}>{groupsOf(f.farm).map((g) => <option key={g}>{g}</option>)}</select></label>
+        <label style={{ ...lab, gridColumn: '1 / -1' }}>출하일<input type="date" value={f.date} max={todayKST()} style={inp} onChange={(e) => up('date', e.target.value)} /></label>
+        <div style={{ ...lab, gridColumn: '1 / -1' }}>거래처
+          <div className="hscroll">{DESTS.map((d) => <button key={d} type="button" className={f.dest === d ? 'pill on' : 'pill'} style={{ minHeight: 40, padding: '6px 12px', fontSize: 14 }} onClick={() => up('dest', d)}>{d}</button>)}</div>
         </div>
-        {err && <div style={{ marginTop: 10 }}><span className="chip bad" style={{ whiteSpace: 'normal' }}>{err}</span></div>}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 16 }}>
-          <button className="btn ghost" onClick={onClose}>취소</button>
-          <button className="btn pri" disabled={busy} onClick={save} style={{ minHeight: 48 }}>{busy ? '저장 중…' : '저장'}</button>
-        </div>
+        <label style={lab}>두수<input inputMode="numeric" value={f.n} placeholder="예: 40" style={inp} onChange={(e) => up('n', digits(e.target.value))} /></label>
+        <label style={lab}>총생체중(kg)<input inputMode="decimal" value={f.live} placeholder="예: 4,600" style={inp} onChange={(e) => up('live', digits(e.target.value, true))} /></label>
+      </div>
+      <div style={{ marginTop: 10, fontSize: 14 }}>출하평체 <b>{avgw === null ? '—' : avgw + 'kg'}</b><span className="muted small"> · 지육율·등급은 등판서를 올리면 채워집니다</span></div>
+      {err && <div style={{ marginTop: 10 }}><span className="chip bad" style={{ whiteSpace: 'normal' }}>{err}</span></div>}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 14 }}>
+        <button className="btn ghost" onClick={onClose}>취소</button>
+        <button className="btn pri" disabled={busy} onClick={save} style={{ minHeight: 48 }}>{busy ? '저장 중…' : '저장'}</button>
+      </div>
     </Sheet>
   );
 }
