@@ -21,7 +21,7 @@ const HOW: Record<string, string> = { manual: '직접 고름', pigon: '입력 �
 export function ShipTotalCard() {
   const { repo } = useAuth();
   const { data, up } = useData();
-  const { all, saved, save, farms } = useHerd();
+  const { all, full, saved, save, farms } = useHerd();
   const { tot, asg, rowsOf } = useSettle();
   const phone = useIsPhone();
   const ref = useRef<HTMLInputElement>(null);
@@ -82,7 +82,7 @@ export function ShipTotalCard() {
       {open && (
         <Sheet title={open === '미배정' ? '그룹 못 정한 출하' : open + ' 출하'} onClose={() => setOpen(null)}>
           {cur.length === 0 && <div className="muted">없습니다</div>}
-          {cur.map((r) => { const a = asg[r.key]; const opts = all.filter((g) => g.farm === r.farm); return (
+          {cur.map((r) => { const a = asg[r.key]; const opts = full.filter((g) => g.farm === r.farm && (!saved.settled[g.who] || a?.group === g.group)); return (
             <div key={r.key} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #EFEBE3', flexWrap: 'wrap' }}>
               <div style={{ flex: '1 1 180px', minWidth: 0 }}><b>{md(r.date)}</b> {r.farm} · {shortDest(r.dest)} · <b>{r.n}두</b><div className="muted" style={{ fontSize: 12 }}>평체 {Math.round((r.live / r.n) * 10) / 10}kg · 지급 {Math.round(r.pay * 1000) / 10}% · {fmt(r.amount)}원{a?.how ? ' · ' + HOW[a.how] : ''}</div></div>
               <select aria-label="그룹" value={saved.shipGroup?.[r.key] ?? a?.group ?? ''} onChange={(e) => setGroup(r, e.target.value || '-')} style={{ minHeight: 40 }}>

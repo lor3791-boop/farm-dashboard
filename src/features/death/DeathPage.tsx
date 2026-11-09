@@ -39,6 +39,8 @@ function DeathEntry() {
   const [photos, setPhotos] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [forceUntil, setForceUntil] = useState(0);
+  // '+ 동 추가'로 담아 둔 줄 — 저장 한 번에 지금 고른 것과 함께 모두 저장 (사진은 첫 줄에만 붙음)
+  const [queue, setQueue] = useState<{ dong: string; group: string; count: number }[]>([]);
   const pref = useRef<HTMLInputElement>(null);
   const addPhotos = async (L: FileList) => {
     const room = 3 - photos.length; const out: string[] = [];
@@ -50,7 +52,8 @@ function DeathEntry() {
   useEffect(() => { takeInbox('image').then((L) => { if (L.length) { const dt = new DataTransfer(); L.forEach((f) => dt.items.add(f)); addPhotos(dt.files); setSavedOk(true); setSaved(`공유받은 사진 ${L.length}장 — 농장·동·두수를 고르고 저장하세요`); } }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   if (!all.length) return null;
   const pill = (on: boolean) => (on ? 'pill on' : 'pill');
-  const dRows = all.filter((r) => r.farm === s.dFarm);
+  // 재고 없는 그룹(출하 끝)·정산완료 그룹은 고를 수 없게
+  const dRows = all.filter((r) => r.farm === s.dFarm && r.stock > 0);
   const hasDong = dRows.some((r) => r.dong !== '—');
   const dongs = [...new Set(dRows.flatMap((r) => dongsOf(r.dong)))].sort();
   // 동으로 관리하는 그룹과 동 없이 관리하는 그룹이 섞인 농장: '동 없음'(dDong === '')을 따로 고른다
@@ -58,23 +61,36 @@ function DeathEntry() {
   const cover = hasDong ? (s.dDong === '' ? noDong : dRows.filter((r) => s.dDong !== null && dongsOf(r.dong).includes(s.dDong))) : dRows;
   const auto = hasDong && cover.length === 1;
   const chosen = auto ? cover[0].group : s.dGroup;
+  const addLine = () => {
+    if (!chosen) { setSavedOk(false); setSaved('동·그룹을 고른 뒤 추가하세요'); return; }
+    setQueue([...queue, { dong: s.dDong ?? '', group: chosen, count: cnt }]);
+    set({ dDong: null, dGroup: null }); setCnt(1); setSavedOk(true); setSaved('');
+  };
   const save = async () => {
-    if (!chosen) { setSavedOk(false); setSaved('그룹을 먼저 골라야 저장됩니다'); return; }
-    const before = cur;
-    const rec = { date, farm: s.dFarm, dong: s.dDong ?? '', group: chosen, count: cnt, ...(photos.length ? { photos } : {}) };
+    const lines = [...queue, ...(chosen ? [{ dong: s.dDong ?? '', group: chosen, count: cnt }] : [])];
+    if (!lines.length) { setSavedOk(false); setSaved('그룹을 먼저 골라야 저장됩니다'); return; }
     setBusy(true);
+    const done: string[] = []; let spike = false;
     try {
-      let spike = false;
-      // 폐사입력 서버 연결 시: 구글시트 기록 + 드라이브 사진 + 카톡 알림. 중복이면 30초 안에 한 번 더 누르면 저장
-      if (pyesaOn()) { const j = await saveToSheet(rec, Date.now() < forceUntil); spike = j.spike; setForceUntil(0); }
-      else await repo!.addDeath(rec, email, ui.shareLinks[s.dFarm] ?? '');
-      setPhotos([]);
-      setSavedOk(true); setSaved(`저장됨: ${s.dFarm} ${chosen} ${cnt}두 · ${md(date)}` + (photos.length ? ` · 사진 ${photos.length}장 드라이브 저장` : '') + (before && before.claimLeft > 0 ? ` (크레임 ${Math.min(cnt, before.claimLeft)}두 먼저 차감)` : '') + (spike ? ' · 폐사 급증 카톡 알림 보냄' : ''));
+      for (let i = 0; i < lines.length; i++) {
+        const L = lines[i];
+        const rec = { date, farm: s.dFarm, dong: L.dong, group: L.group, count: L.count, ...(i === 0 && photos.length ? { photos } : {}) };
+        // 폐사입력 서버 연결 시: 구글시트 기록 + 드라이브 사진 + 카톡 알림. 중복이면 30초 안에 한 번 더 누르면 저장
+        if (pyesaOn()) { const j = await saveToSheet(rec, Date.now() < forceUntil); spike = spike || j.spike; }
+        else await repo!.addDeath(rec, email, ui.shareLinks[s.dFarm] ?? '');
+        done.push(`${L.dong ? L.dong + '동 ' : ''}${L.group} ${L.count}두`);
+        if (i === 0) setPhotos([]);
+      }
+      setForceUntil(0); setQueue([]);
+      setSavedOk(true); setSaved(`저장됨: ${s.dFarm} ${done.join(', ')} · ${md(date)}` + (photos.length ? ` · 사진 ${photos.length}장 드라이브 저장` : '') + (spike ? ' · 폐사 급증 카톡 알림 보냄' : ''));
       setCnt(1);
     } catch (e) {
       const m = (e as Error).message;
-      if (/이미 저장/.test(m)) { setForceUntil(Date.now() + 30000); setSavedOk(false); setSaved(m + ' — 그래도 저장하려면 30초 안에 저장을 한 번 더 누르세요'); }
-      else { setSavedOk(false); setSaved('저장하지 못했습니다: ' + m); }
+      setQueue(lines.slice(done.length));
+      if (done.length) set({ dDong: null, dGroup: null });
+      const pre = done.length ? `저장됨: ${done.join(', ')} / 남은 줄 ` : '';
+      if (/이미 저장/.test(m)) { setForceUntil(Date.now() + 30000); setSavedOk(false); setSaved(pre + m + ' — 그래도 저장하려면 30초 안에 저장을 한 번 더 누르세요'); }
+      else { setSavedOk(false); setSaved(pre + '저장하지 못했습니다: ' + m); }
     } finally { setBusy(false); }
   };
   const cur = chosen ? dRows.find((r) => r.group === chosen) ?? null : null;
@@ -92,7 +108,7 @@ function DeathEntry() {
       )}
       <div style={{ fontWeight: 700, margin: '14px 0 8px' }}>① 농장</div>
       <div className="hscroll">
-        {farms.map((f) => <button key={f} className={pill(s.dFarm === f)} onClick={() => { set({ dFarm: f, dDong: null, dGroup: null }); setCnt(1); setSaved(''); }}>{f}</button>)}
+        {farms.map((f) => <button key={f} className={pill(s.dFarm === f)} onClick={() => { set({ dFarm: f, dDong: null, dGroup: null }); setCnt(1); setQueue([]); setSaved(''); }}>{f}</button>)}
       </div>
       {hasDong && (
         <>
@@ -120,9 +136,14 @@ function DeathEntry() {
         <Stepper value={cnt} onChange={(n) => { setCnt(n); setSaved(''); }} />
         <label style={{ fontSize: 14 }}>날짜 <input type="date" value={date} max={todayKST()} onChange={(e) => setDate(e.target.value || todayKST())} style={{ minHeight: 44 }} /></label>
       </div>
+      {queue.length > 0 && (
+        <div style={{ marginTop: 14, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {queue.map((q, i) => <span key={i} className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{q.dong ? q.dong + '동 · ' : ''}{q.group} · {q.count}두<button aria-label="줄 빼기" onClick={() => setQueue(queue.filter((_, j) => j !== i))} style={{ border: 0, background: 'none', cursor: 'pointer', padding: 0 }}>✕</button></span>)}
+        </div>
+      )}
       <div style={{ marginTop: 18, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button className="btn pri" disabled={busy} onClick={save} style={{ minHeight: 48, minWidth: 120, fontSize: 16 }}>{busy ? "저장 중…" : "저장"}</button>
-        <button className="btn" onClick={() => { setSaved('한 사진에 여러 동: 이 동을 저장한 뒤 동을 바꿔 한 번 더 저장하세요'); setSavedOk(true); }}>+ 동 추가 (한 사진에 여러 동)</button>
+        <button className="btn pri" disabled={busy} onClick={save} style={{ minHeight: 48, minWidth: 120, fontSize: 16 }}>{busy ? '저장 중…' : queue.length ? `저장 (${queue.length + (chosen ? 1 : 0)}줄)` : '저장'}</button>
+        <button className="btn" disabled={!chosen} onClick={addLine}>+ 동 추가</button>
       </div>
       {saved && <div style={{ marginTop: 12 }}><span className={savedOk ? 'chip ok' : 'chip bad'} style={{ whiteSpace: 'normal' }}>{saved}</span></div>}
     </DropCard>

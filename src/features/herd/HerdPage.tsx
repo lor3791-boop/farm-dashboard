@@ -4,7 +4,7 @@ import { todayKST } from '@/lib/util';
 import { useData } from '@/lib/data';
 import { useSettle } from '@/lib/useSettle';
 import { useCol } from '@/lib/useCol';
-import { mergeFeed, type FeedUpload } from '@/lib/feedSheet';
+import { mergeFeed, type FeedMid, type FeedUpload } from '@/lib/feedSheet';
 import { groupFcr } from '@/lib/calc/fcr';
 
 import { useHerd, useUi } from '@/lib/ui';
@@ -32,7 +32,7 @@ export function HerdPage() {
 
 function HerdTable() {
   const H = useHerd();
-  const { rows, s, set, isPlanned, togglePlan, T, saved, save } = H;
+  const { rowsFull: rows, s, set, isPlanned, togglePlan, T, saved, save } = H;
   // 정산완료 처리한 그룹은 '정산완료' 단계에서만 보인다 (거기서 해제)
   const settled = (r: Group) => saved.settled[r.who];
   const toggleSettled = (r: Group) => { const m = { ...saved.settled }; if (m[r.who]) delete m[r.who]; else m[r.who] = todayKST(); save({ settled: m }); };
@@ -257,11 +257,12 @@ function Heatmap({ farms, rows, mode, setMode, det, onOpen }: { farms: string[];
 }
 
 function Detail({ who, order, onDeath }: { who: string; order: string[]; onDeath: (g: Group) => void }) {
-  const { all, set, isPlanned, togglePlan, T, saved, save, ships, imports } = useHerd();
+  const { full: all, set, isPlanned, togglePlan, T, saved, save, ships, imports } = useHerd();
   const { data } = useData();
   const st = useSettle();
   const ups = useCol<FeedUpload>('feed');
   const feed = useMemo(() => mergeFeed(ups), [ups]);
+  const mids = useCol<FeedMid>('feedMid');
   const [dongEdit, setDongEdit] = useState<string[] | null>(null);
   const d = all.find((r) => r.who === who);
   if (!d || !T) return null;
@@ -279,7 +280,8 @@ function Detail({ who, order, onDeath }: { who: string; order: string[]; onDeath
   const curDongs = dongsOf(d.dong);
   const saveDong = (L: string[]) => { const m = { ...(saved.groupDong ?? {}) }; m[d.who] = L.length ? [...L].sort((a, b) => a.localeCompare(b, 'ko', { numeric: true })).join('·') + '동' : '—'; save({ groupDong: m }); setDongEdit(null); };
   // FCR: 출하 생체 = 출하실적종합(그룹 배정) + 이후 등판서·직접 입력·피그온 출하
-  const fc = groupFcr(d, feed, st.shipLiveOf(d), { endKg: T.fcrEndKg, today: TODAY });
+  const midKg = mids.filter((m) => m.farm === d.farm && m.group === d.group).reduce((a, m) => a + m.kg, 0);
+  const fc = groupFcr(d, feed, st.shipLiveOf(d), { endKg: T.fcrEndKg, today: TODAY, settled: saved.settled[d.who] ? { ...st.settledShipOf(d), mid: midKg } : undefined });
   const ftone = (v: number | null) => (v === null ? {} : v < 2.4 ? { background: '#E3EFE7', color: '#1F4E3D' } : v < 2.7 ? { background: '#FBEFD5', color: '#7A4F00' } : { background: '#F8E1D8', color: '#9A3216' });
   return (
     <aside className="card" style={{ flex: '1 1 340px', maxWidth: 460, minWidth: 0, boxSizing: 'border-box' }}>
@@ -313,12 +315,16 @@ function Detail({ who, order, onDeath }: { who: string; order: string[]; onDeath
       <div className="b" style={{ margin: '16px 0 6px' }}>FCR 추이</div>
       {fc ? (
         <div>
+          {fc.settled ? (
+            <div style={{ ...ftone(fc.now), borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 12 }}>정산 FCR</div><b style={{ fontSize: 20 }}>{fc.now ?? '—'}</b><div style={{ fontSize: 11 }}>사료 {fmt(Math.round(fc.settled.feed))}kg · 출하 {fmt(fc.settled.heads)}두 · 출하평체 {fc.settled.wOut}kg · 전입평체 {d.avgw}kg</div></div>
+          ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <div style={{ ...ftone(fc.now), borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 12 }}>현재 FCR</div><b style={{ fontSize: 20 }}>{fc.now ?? '—'}</b><div style={{ fontSize: 11 }}>누적 사료 {fmt(Math.round(fc.feed))}kg · 추정 {fc.wNow}kg</div></div>
             <div style={{ ...ftone(fc.exp), borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 12 }}>종료예상 FCR</div><b style={{ fontSize: 20 }}>{fc.exp ?? '—'}</b><div style={{ fontSize: 11 }}>{T.fcrEndKg}kg 출하종료 · 조견표 대비 {fc.k}배</div></div>
           </div>
+          )}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>{fc.months.map((x) => <span key={x.m} style={{ ...ftone(x.fcr), borderRadius: 6, padding: '2px 6px', fontSize: 12 }}>{Number(x.m.slice(5))}월 {x.fcr ?? '·'}</span>)}</div>
-          <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>피그온 그룹 사료 기준 · 일당증체 {T.defaultAdgKg}kg 가정 추정치</div>
+          <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>{fc.settled ? '정산서 식 · 월별은 조견표 추정' : '피그온 그룹 사료 · 정밀성장조견표 추정'}</div>
         </div>
       ) : <div className="muted small">피그온 그룹 사료 자료가 없습니다 (정산자료 › 사료 사용에서 올리기)</div>}
       <div className="b" style={{ margin: '16px 0 6px' }}>주차별 폐사</div>

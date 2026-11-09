@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useHerd } from '@/lib/ui';
 import { useCol } from '@/lib/useCol';
 import { useSettle } from '@/lib/useSettle';
-import { mergeFeed, type FeedUpload } from '@/lib/feedSheet';
+import { mergeFeed, type FeedMid, type FeedUpload } from '@/lib/feedSheet';
 import { groupFcr } from '@/lib/calc/fcr';
 import { TODAY } from '@/lib/calc/herd';
 import { fmt, md, r1 } from '@/lib/calc/dates';
@@ -14,16 +14,18 @@ const Fv = ({ v, big }: { v: number | null; big?: boolean }) => <span style={{ .
 const span = (c: number, n: number, r = 1, rn = 1): React.CSSProperties => ({ gridColumn: `${c} / span ${n}`, gridRow: `${r} / span ${rn}` });
 
 export function FcrTab({ onOpen }: { onOpen: (who: string) => void }) {
-  const { all, farms, T } = useHerd();
+  const { full: all, farms, T, saved } = useHerd();
   const st = useSettle();
   const ups = useCol<FeedUpload>('feed');
   const feed = useMemo(() => mergeFeed(ups), [ups]);
+  const mids = useCol<FeedMid>('feedMid');
+  const midOf = (g: { farm: string; group: string }) => mids.filter((m) => m.farm === g.farm && m.group === g.group).reduce((a, m) => a + m.kg, 0);
   const withFeed = farms.filter((f) => feed.some((r) => r[0] === f));
   const [farm, setFarm] = useState('');
   const F = farm || withFeed[0] || '';
   if (!T) return null;
   const endKg = T.fcrEndKg;
-  const G = all.filter((g) => g.farm === F).map((g) => ({ g, fc: groupFcr(g, feed, st.shipLiveOf(g), { endKg, today: TODAY }) })).filter((x) => x.fc && x.fc.feed > 0) as { g: (typeof all)[number]; fc: NonNullable<ReturnType<typeof groupFcr>> }[];
+  const G = all.filter((g) => g.farm === F).map((g) => ({ g, fc: groupFcr(g, feed, st.shipLiveOf(g), { endKg, today: TODAY, settled: saved.settled[g.who] ? { ...st.settledShipOf(g), mid: midOf(g) } : undefined }) })).filter((x) => x.fc && x.fc.feed > 0) as { g: (typeof all)[number]; fc: NonNullable<ReturnType<typeof groupFcr>> }[];
   const months = [...new Set(G.flatMap((x) => x.fc.months.map((b) => b.m)))].sort();
   const grid = 'minmax(90px,1fr) 64px 92px 84px 84px 66px 70px ' + months.map(() => '58px').join(' ');
   const mC = 8; // 월 열 시작
@@ -34,7 +36,7 @@ export function FcrTab({ onOpen }: { onOpen: (who: string) => void }) {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {farms.map((f) => <button key={f} className={F === f ? 'pill on' : 'pill'} disabled={!withFeed.includes(f)} onClick={() => setFarm(f)}>{f}</button>)}
         </div>
-        <div className="muted small" style={{ marginTop: 10 }}>피그온 그룹 사료 · 리더 정밀성장조견표 기준 증체 · 종료예상 = 지금 추세로 {endKg}kg 출하종료 · 2.4 미만 / 2.4~2.7 / 2.7 이상</div>
+        <div className="muted small" style={{ marginTop: 10 }}>피그온 그룹 사료 · 리더 정밀성장조견표 기준 증체 · 종료예상 = 지금 추세로 {endKg}kg 출하종료 · 정산 표시 그룹은 정산서 식(실제 출하평체) · 2.4 미만 / 2.4~2.7 / 2.7 이상</div>
       </div>
       {!withFeed.length && <div className="card" style={{ marginTop: 16 }}><div className="muted">피그온 그룹 사료 자료가 없습니다. 정산자료 › 사료 사용에서 파일을 올리면 여기 나옵니다.</div></div>}
       {G.length > 0 && (
@@ -52,8 +54,8 @@ export function FcrTab({ onOpen }: { onOpen: (who: string) => void }) {
               {months.map((m, i) => <div key={m} className="r" style={span(mC + i, 1, 2)}>{Number(m.slice(5))}월</div>)}
             </div>
             {G.map(({ g, fc }) => (
-              <button key={g.who} className="gr" onClick={() => onOpen(g.who)} style={{ gridTemplateColumns: grid, width: '100%', textAlign: 'left', font: 'inherit', border: 0, cursor: 'pointer' }} title={`추정체중 ${fc.wNow}kg · 조견표 대비 사료 ${fc.k}배`}>
-                <div className="b">{g.group}<div className="sub">{g.age}일령 · {fc.wNow}kg</div></div><div>{md(g.date)}</div>
+              <button key={g.who} className="gr" onClick={() => onOpen(g.who)} style={{ gridTemplateColumns: grid, width: '100%', textAlign: 'left', font: 'inherit', border: 0, cursor: 'pointer' }} title={fc.settled ? '정산서 식: 사료 ÷ 출하두수 ÷ (출하평체 − 전입평체)' : `추정체중 ${fc.wNow}kg · 조견표 대비 사료 ${fc.k}배`}>
+                <div className="b">{g.group}{fc.settled && <span className="chip ok" style={{ marginLeft: 6, fontSize: 11 }}>정산</span>}<div className="sub">{fc.settled ? `출하 ${fc.settled.heads}두 · 평체 ${fc.settled.wOut}kg` : `${g.age}일령 · ${fc.wNow}kg`}</div></div><div>{md(g.date)}</div>
                 <div className="r">{fmt(Math.round(fc.feed))}kg</div><div className="r">{r1(fc.perHead)}kg</div><div className="r">{fc.daily.toFixed(2)}kg</div>
                 <div className="r"><Fv v={fc.now} big /></div><div className="r"><Fv v={fc.exp} big /></div>
                 {months.map((m) => <div key={m} className="r"><Fv v={fc.months.find((y) => y.m === m)?.fcr ?? null} /></div>)}

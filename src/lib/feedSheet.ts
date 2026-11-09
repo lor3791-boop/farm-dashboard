@@ -1,10 +1,10 @@
 // 피그온 '그룹 사료 사용' 엑셀 읽기 — 세로형(월·품목·kg 칸) / 가로형(월이 열 제목) 모두 지원.
-// 결과 한 줄 = [농장, 그룹, 월 YYYY-MM, 사료 품목, kg]
-export type FeedRow = [string, string, string, string, number];
+// 결과 한 줄 = [농장, 그룹, 월 YYYY-MM, 사료 품목, kg, 투입구분('중간'=중간정산 직접투입, ''=마감)]
+export type FeedRow = [string, string, string, string, number, string?];
 // Firestore는 배열 안 배열을 못 담아서 한 줄을 탭으로 이은 문자열로 저장한다
 export interface FeedUpload { file: string; at?: string; rows: string[] }
-export const encodeFeed = (r: FeedRow) => r.join('\t');
-export const decodeFeed = (s: string): FeedRow => { const [a, b, c, d, e] = s.split('\t'); return [a, b, c, d, Number(e)]; };
+export const encodeFeed = (r: FeedRow) => (r[5] ? r : r.slice(0, 5)).join('\t');
+export const decodeFeed = (s: string): FeedRow => { const [a, b, c, d, e, f] = s.split('\t'); return f ? [a, b, c, d, Number(e), f] : [a, b, c, d, Number(e)]; };
 // 정산월 중간투입 (정산 때 직접 넣는 양)
 export interface FeedMid { farm: string; group: string; month: string; item: string; kg: number; memo?: string; at?: string }
 // 구제역 백신비 — 첨부(영수증 사진·PDF)는 줄여서 함께 저장
@@ -35,6 +35,7 @@ export function parseFeedSheet(aoa: unknown[][], resolveFarm: (name: string) => 
     if (cF < 0 || cG < 0) continue;
     const cI = (() => { const a = find(r, /품목명|사료명|제품명/); return a >= 0 ? a : find(r, /품목|제품|사료$|사료 ?코드명/); })();
     const cM = find(r, /년월|기준월|사용월|월$|일자|기간/);
+    const cT = find(r, /투입구분/);
     const cK = (() => { const a = find(r, /중량|kg/i); return a >= 0 ? a : find(r, /사용량|수량|급여량/); })();
     const out: FeedRow[] = [];
     const monthCols = r.map((c, j) => ({ j, m: normMonth(c, year) })).filter((x) => x.m && x.j !== cF && x.j !== cG);
@@ -46,16 +47,20 @@ export function parseFeedSheet(aoa: unknown[][], resolveFarm: (name: string) => 
       const fRaw = x[cF] || lastF, gRaw = x[cG] || lastG; lastF = fRaw; lastG = gRaw;
       const farm = resolveFarm(fRaw); if (!farm) continue;
       const group = normGroup(gRaw), item = cI >= 0 ? x[cI] : '';
-      if (cM >= 0 && cK >= 0) { const m = normMonth(x[cM], year), kg = num(x[cK]); if (m && kg > 0) out.push([farm, group, m, item, kg]); }
+      if (cM >= 0 && cK >= 0) { const m = normMonth(x[cM], year), kg = num(x[cK]); if (m && kg > 0) out.push(cT >= 0 && /중간/.test(x[cT]) ? [farm, group, m, item, kg, '중간'] : [farm, group, m, item, kg]); }
       else if (monthCols.length) monthCols.forEach(({ j, m }) => { const kg = num(x[j]); if (kg > 0) out.push([farm, group, m, item, kg]); });
     }
     if (out.length) return out;
   }
   throw new Error('농장·그룹·월·사료량 칸을 찾지 못했습니다');
 }
-// 여러 번 올린 자료를 합친다 — 같은 농장·그룹·월·품목이면 나중에 올린 값
+// 여러 번 올린 자료를 합친다 — 같은 농장·그룹·월은 나중에 올린 파일의 줄로 통째로 바꾼다(마감·중간정산 구분 포함)
 export function mergeFeed(ups: FeedUpload[]): FeedRow[] {
-  const m = new Map<string, FeedRow>();
-  [...ups].sort((a, b) => ((a.at ?? '') < (b.at ?? '') ? -1 : 1)).forEach((u) => u.rows.map(decodeFeed).forEach((r) => m.set(r.slice(0, 4).join('|'), r)));
-  return [...m.values()];
+  const m = new Map<string, FeedRow[]>();
+  [...ups].sort((a, b) => ((a.at ?? '') < (b.at ?? '') ? -1 : 1)).forEach((u) => {
+    const by = new Map<string, FeedRow[]>();
+    u.rows.map(decodeFeed).forEach((r) => { const k = r.slice(0, 3).join('|'); by.set(k, [...(by.get(k) ?? []), r]); });
+    by.forEach((L, k) => m.set(k, L));
+  });
+  return [...m.values()].flat();
 }

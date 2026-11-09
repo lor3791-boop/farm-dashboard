@@ -55,20 +55,23 @@ export function useHerd() {
   const { data, deaths, ships, groups, imports, up } = useData();
   const { s, set, saved, save } = useUi();
   // 기준일 이후 폐사·출하를 반영한 그룹 + 폐사 기록별 나눔(크레임/폐사)
-  const { all, split } = useMemo(() => {
+  // full = 정산완료 포함 전체, all = 정산완료 처리한 그룹을 뺀 목록(화면 대부분은 all만 씀)
+  const { full, split } = useMemo(() => {
     const sp: Record<string, Split> = {};
     const g: Group[] = data ? buildGroups(data.thresholds, saved.firstShipByFarm, { deaths, groups, ships: liveShipsOf(ships, imports), dongs: saved.groupDong }, sp) : [];
-    return { all: g, split: sp };
+    return { full: g, split: sp };
   }, [data, saved.firstShipByFarm, saved.groupDong, deaths, ships, groups, imports]);
+  const all = useMemo(() => full.filter((r) => !saved.settled[r.who]), [full, saved.settled]);
   const shipRows = useMemo(() => allShips(ships, imports), [ships, imports, up.total.rows]); // eslint-disable-line react-hooks/exhaustive-deps
   const liveShips = useMemo(() => liveShipsOf(ships, imports), [ships, imports]);
-  const farms = useMemo(() => [...new Set(all.map((r) => r.farm))], [all]);
+  const farms = useMemo(() => [...new Set(full.map((r) => r.farm))], [full]);
   const farmBad = useMemo(() => { const m: Record<string, boolean> = {}; farms.forEach((f) => { m[f] = all.some((r) => r.farm === f && r.bad); }); return m; }, [all, farms]);
   const selSet = s.fSel === null ? farms : s.fSel;
   const passFarm = (f: string) => selSet.includes(f) && (s.fStatus === 'all' || (s.fStatus === 'bad' ? farmBad[f] : !farmBad[f]));
   const rows = all.filter((r) => passFarm(r.farm));
+  const rowsFull = full.filter((r) => passFarm(r.farm));
   const isPlanned = (r: Group) => (saved.planned[r.who] === undefined ? r.rec : saved.planned[r.who]);
   const setPlanned = (r: Group, v: boolean) => save({ planned: { ...saved.planned, [r.who]: v } });
   const togglePlan = (r: Group) => () => setPlanned(r, !isPlanned(r));
-  return { all, split, deaths, ships, groups, imports, shipRows, liveShips, farms, farmBad, selSet, passFarm, rows, isPlanned, setPlanned, togglePlan, s, set, saved, save, T: data?.thresholds };
+  return { all, full, rowsFull, split, deaths, ships, groups, imports, shipRows, liveShips, farms, farmBad, selSet, passFarm, rows, isPlanned, setPlanned, togglePlan, s, set, saved, save, T: data?.thresholds };
 }
