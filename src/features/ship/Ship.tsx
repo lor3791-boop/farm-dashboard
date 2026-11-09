@@ -1,4 +1,5 @@
 // 출하 — 등급판정서 올리기(그룹 분할·재고 차감) + 출하 현황(필터·합계·건별) + 출하실적종합 대조
+import { DropCard } from '@/components/Drop';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { takeInbox } from '@/lib/inbox';
 import * as XLSX from 'xlsx';
@@ -108,7 +109,7 @@ export function ShipUpload() {
   };
 
   return (
-    <div className="card">
+    <DropCard accept=".xls,.xlsx,.csv" onFiles={(F) => onFile(F[0])}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
         <h2 className="h2">등급판정서 올리기</h2>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -157,7 +158,7 @@ export function ShipUpload() {
           </div>
         </>
       )}
-    </div>
+    </DropCard>
   );
 }
 
@@ -305,7 +306,7 @@ export function ShipImportCard() {
   };
   useEffect(() => { const h = (e: Event) => { onFile((e as CustomEvent<File>).detail); }; window.addEventListener('ship-import-file', h); return () => window.removeEventListener('ship-import-file', h); }); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <div className="card" style={{ marginTop: 16 }}>
+    <DropCard style={{ marginTop: 16 }} accept=".xls,.xlsx" onFiles={(F) => onFile(F[0])}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'space-between' }}>
         <h2 className="h2">출하 자료 올리기 <span className="muted" style={{ fontSize: 13, fontWeight: 400 }}>피그온 출하 · 팀 대시보드 출하기록</span></h2>
         <div><input ref={ref} type="file" accept=".xls,.xlsx" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }} /><button className="btn pri" onClick={() => ref.current?.click()}>파일 올리기</button></div>
@@ -321,6 +322,6 @@ export function ShipImportCard() {
           ))}
         </div>
       )}
-    </div>
+    </DropCard>
   );
 }

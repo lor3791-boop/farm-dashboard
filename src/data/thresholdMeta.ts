@@ -29,6 +29,7 @@ export const THRESHOLD_GROUPS: { title: string; note?: string; items: { k: K; la
     { k: 'firstShipWeightKg', label: '첫출하 체중', unit: 'kg' },
     { k: 'targetShipWeightKg', label: '출하평체 목표', unit: 'kg' },
     { k: 'defaultAdgKg', label: '일당증체량 기본값', unit: 'kg/일' },
+    { k: 'fcrEndKg', label: 'FCR 종료예상 출하평체', unit: 'kg' },
     { k: 'shipPeriodDays', label: '출하기간', unit: '일' },
     { k: 'emptyDays', label: '돈사 비움', unit: '일' },
     { k: 'truckHeadsMin', label: '차당 상차 (최소)', unit: '두' },

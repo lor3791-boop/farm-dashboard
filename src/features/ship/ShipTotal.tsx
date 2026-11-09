@@ -1,4 +1,5 @@
 // 출하실적종합(新) 올리기 → 그룹별 정산실적. 줄마다 그룹을 고칠 수 있다(자동 배정은 피그온 출하 → 선입선출 순).
+import { DropCard } from '@/components/Drop';
 import { useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '@/lib/auth';
@@ -52,7 +53,7 @@ export function ShipTotalCard() {
   const cur = open === '미배정' ? unassigned : gs.find((x) => x.g.who === open)?.L ?? [];
 
   return (
-    <div className="card" style={{ marginTop: 16 }}>
+    <DropCard style={{ marginTop: 16 }} accept=".xlsx,.xls" onFiles={(L) => load(L[0])}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
         <h2 className="h2" style={{ flex: 1 }}>출하실적종합 → 그룹별 정산실적</h2>
         <input ref={ref} type="file" accept=".xlsx,.xls" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) load(f); e.target.value = ''; }} />
@@ -93,6 +94,6 @@ export function ShipTotalCard() {
           ); })}
         </Sheet>
       )}
-    </div>
+    </DropCard>
   );
 }

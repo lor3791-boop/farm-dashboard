@@ -44,6 +44,7 @@ export interface Thresholds {
   emptyDays: number;             // 돈사 비움 (출하종료 → 다음 전입)
   firstShipWeightKg: number;     // 첫출하 목표 체중
   targetShipWeightKg: number;    // 출하평체 목표
+  fcrEndKg: number;             // FCR 종료예상 — 이 평체로 출하종료한다고 봄
   defaultAdgKg: number;          // 일당증체량 기본값 (농장 실적 없을 때)
   truckHeadsMin: number;         // 차당 상차두수
   truckHeadsMax: number;

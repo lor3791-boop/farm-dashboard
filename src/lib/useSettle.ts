@@ -16,6 +16,11 @@ export function useSettle() {
     all.map((g) => ({ farm: g.farm, group: g.group, date: g.date, sold: g.sold, stock: g.stock, ageRef: g.age - days(REF, TODAY) })),
     saved.shipGroup ?? {}, [...ships.filter((r) => r.group), ...imports.filter((r) => r.group)].map((r) => ({ farm: r.farm, date: r.date, n: r.n, group: r.group })), REF), [tot, all, saved.shipGroup, imports, ships]);
   const rowsOf = useCallback((g: { farm: string; group: string }): TotRow[] => tot.filter((r) => r.farm === g.farm && asg[r.key]?.group === g.group), [tot, asg]);
+  // 그룹 출하 생체 합계 = 출하실적종합(그룹 배정) + 그 뒤 등판서·직접 입력·피그온 출하
+  const shipLiveOf = (g: { farm: string; group: string }) => {
+    const L = rowsOf(g), last = L.reduce((a, r) => (r.date > a ? r.date : a), '');
+    return L.reduce((a, r) => a + r.live, 0) + [...ships, ...imports].filter((r) => r.farm === g.farm && r.group === g.group && r.date > last).reduce((a, r) => a + (r.live || 0), 0);
+  };
   const headsOf = (g: Group) => { const L = rowsOf(g); return L.length ? L.reduce((a, r) => a + r.n, 0) : g.sold; };
   // 선급금 한 건의 이번 회전 상계 예정액 (직접 고친 값 우선) — 두당 조건은 그 농장 정산예정 그룹 출하두수 합으로
   const farmHeads = (farm: string) => all.filter((g) => g.farm === farm && isPlanned(g)).reduce((a, g) => a + headsOf(g), 0);
@@ -30,5 +35,5 @@ export function useSettle() {
     const loan = loans.reduce((a, x) => a + x.amt, 0);
     return { monthly, loan, loans, total: monthly + loan };
   };
-  return { tot, asg, rowsOf, headsOf, aggOf: (g: Group) => totAgg(rowsOf(g)), loanPlan, offsetOf, has: { total: tot.length > 0, bonds: up.loans.rows.length + up.monthly.rows.length > 0 } };
+  return { tot, asg, rowsOf, headsOf, shipLiveOf, aggOf: (g: Group) => totAgg(rowsOf(g)), loanPlan, offsetOf, has: { total: tot.length > 0, bonds: up.loans.rows.length + up.monthly.rows.length > 0 } };
 }

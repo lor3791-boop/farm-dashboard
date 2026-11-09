@@ -42,6 +42,7 @@ export const SEED_THRESHOLDS: Thresholds = {
   emptyDays: 7,
   firstShipWeightKg: 113,
   targetShipWeightKg: 117,
+  fcrEndKg: 115,
   defaultAdgKg: 0.95,
   truckHeadsMin: 60,
   truckHeadsMax: 70

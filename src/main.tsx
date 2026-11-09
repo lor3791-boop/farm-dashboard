@@ -13,4 +13,6 @@ window.addEventListener('vite:preloadError', (e) => {
   } catch { /* 저장 불가 */ }
   location.reload();
 });
+// 끌어놓기 영역 밖에 파일을 떨어뜨려도 브라우저가 파일을 열지 않게
+['dragover', 'drop'].forEach((t) => window.addEventListener(t, (e) => { if ((e as DragEvent).dataTransfer?.types.includes('Files')) e.preventDefault(); }));
 createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>);

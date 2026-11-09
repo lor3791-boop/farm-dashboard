@@ -279,9 +279,7 @@ function Detail({ who, order, onDeath }: { who: string; order: string[]; onDeath
   const curDongs = dongsOf(d.dong);
   const saveDong = (L: string[]) => { const m = { ...(saved.groupDong ?? {}) }; m[d.who] = L.length ? [...L].sort((a, b) => a.localeCompare(b, 'ko', { numeric: true })).join('·') + '동' : '—'; save({ groupDong: m }); setDongEdit(null); };
   // FCR: 출하 생체 = 출하실적종합(그룹 배정) + 이후 등판서·직접 입력·피그온 출하
-  const totL = st.rowsOf(d), lastT = totL.reduce((a, r) => (r.date > a ? r.date : a), '');
-  const shipLive = totL.reduce((a, r) => a + r.live, 0) + [...ships, ...imports].filter((r) => r.farm === d.farm && r.group === d.group && r.date > lastT).reduce((a, r) => a + (r.live || 0), 0);
-  const fc = groupFcr(d, feed, shipLive, { adg: T.defaultAdgKg, target: T.firstShipWeightKg, today: TODAY });
+  const fc = groupFcr(d, feed, st.shipLiveOf(d), { endKg: T.fcrEndKg, today: TODAY });
   const ftone = (v: number | null) => (v === null ? {} : v < 2.4 ? { background: '#E3EFE7', color: '#1F4E3D' } : v < 2.7 ? { background: '#FBEFD5', color: '#7A4F00' } : { background: '#F8E1D8', color: '#9A3216' });
   return (
     <aside className="card" style={{ flex: '1 1 340px', maxWidth: 460, minWidth: 0, boxSizing: 'border-box' }}>
@@ -317,7 +315,7 @@ function Detail({ who, order, onDeath }: { who: string; order: string[]; onDeath
         <div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <div style={{ ...ftone(fc.now), borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 12 }}>현재 FCR</div><b style={{ fontSize: 20 }}>{fc.now ?? '—'}</b><div style={{ fontSize: 11 }}>누적 사료 {fmt(Math.round(fc.feed))}kg · 추정 {fc.wNow}kg</div></div>
-            <div style={{ ...ftone(fc.exp), borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 12 }}>정산 예상 FCR</div><b style={{ fontSize: 20 }}>{fc.exp ?? '—'}</b><div style={{ fontSize: 11 }}>{T.firstShipWeightKg}kg까지 키운다고 보고</div></div>
+            <div style={{ ...ftone(fc.exp), borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 12 }}>종료예상 FCR</div><b style={{ fontSize: 20 }}>{fc.exp ?? '—'}</b><div style={{ fontSize: 11 }}>{T.fcrEndKg}kg 출하종료 · 조견표 대비 {fc.k}배</div></div>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>{fc.months.map((x) => <span key={x.m} style={{ ...ftone(x.fcr), borderRadius: 6, padding: '2px 6px', fontSize: 12 }}>{Number(x.m.slice(5))}월 {x.fcr ?? '·'}</span>)}</div>
           <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>피그온 그룹 사료 기준 · 일당증체 {T.defaultAdgKg}kg 가정 추정치</div>

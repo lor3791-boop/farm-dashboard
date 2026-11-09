@@ -28,7 +28,8 @@
 ## 폴더 규칙
 - `src/app/` 뼈대(메뉴 `menu.ts`, 레이아웃, 로그인 관문)
 - `src/features/<메뉴>/` 메뉴별 화면: home · herd(사육현황: 돈군·전입등록·출하지연·FCR 추이) · ship(출하관리) · death(폐사관리) · analysis(성적분석: 예상육성률·폐사율 순위·보고자료) · settle(정산자료: 정산예정·엑셀·사료 사용·구제역 백신비) · settings · share. **메뉴끼리 서로 import 하지 않는다** (공용은 `src/lib`).
-- 사료: `src/lib/feedSheet.ts`(피그온 그룹 사료 읽기·합치기). 추정 FCR = 누적 사료 ÷ (살아 있는 두수 × 일당증체 기준값 × 전입 후 일수) — 정산용 사료(중간투입)와 따로 본다.
+- 사료: `src/lib/feedSheet.ts`(피그온 그룹 사료 읽기·합치기). 추정 FCR(`calc/fcr.ts`) = 누적 사료 ÷ 증체, 체중은 리더 정밀성장조견표(`src/data/growthTable.ts`, 전입평체 → 표 일령 + 전입 후 일수)로 추정. 종료예상 = 조견표 대비 실제 사료 계수 k로 남은 두수를 `fcrEndKg`(115kg)까지 키운 값. 출하 생체 = `useSettle().shipLiveOf`. 정산용 사료(중간투입)와 따로 본다.
+- 파일 올리기 카드는 `DropCard`(`src/components/Drop.tsx`)로 감싸 끌어놓기 지원. 홈 정산예정은 정산완료(saved.settled) 그룹 제외.
 - `src/lib/ui.tsx` 메뉴를 오가도 유지되는 화면 상태(필터·상세·탭) + 저장되는 체크값. `src/components/v5.tsx` 공통 부품(정렬 표, 세그먼트, 농장 선택 박스)
 - 스타일: `src/styles/index.css` 아래쪽에 목업 v5 CSS를 그대로 둠(.card .chip .btn .seg .gr …). v5 화면은 `.v5` 안.
 - `src/lib/repo.ts` 저장소 — 화면은 이 함수만 쓴다 (Firestore / 미리보기 두 구현)

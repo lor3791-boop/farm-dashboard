@@ -1,5 +1,6 @@
 // 농장채권 — 선급금(일반·시설·장기보증금)과 월대선급금(그룹별 미정산), 이번 정산 상계 예정을 농장별로 한눈에.
 // 파일 2개를 올려 갱신: 채권채무-선급금 정리파일 / 위탁수수료-월대선급금 정리파일
+import { DropCard } from '@/components/Drop';
 import { useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '@/lib/auth';
@@ -55,6 +56,13 @@ export function BondsPage() {
       setMsg({ ok: true, t: `월대 ${rows.length}개 그룹 반영${bins.length ? ` · 피드빈 ${bins.length}건` : ''}` });
     } catch (e) { setMsg({ ok: false, t: (e as Error).message }); } finally { setBusy(''); }
   };
+  // 끌어놓기: 시트 이름에 '월대'가 있으면 월대 파일, 아니면 선급금 파일
+  const upAuto = async (L: File[]) => {
+    for (const f of L) {
+      const names = XLSX.read(await f.arrayBuffer(), { type: 'array', bookSheets: true }).SheetNames;
+      if (names.some((x) => x.includes('월대'))) await upMonthly(f); else await upLoan(f);
+    }
+  };
 
   const loans = up.loans.rows, mon = up.monthly.rows, bins = up.monthly.bins;
   const F = useMemo(() => {
@@ -74,7 +82,7 @@ export function BondsPage() {
 
   return (
     <>
-      <div className="card">
+      <DropCard accept=".xlsx,.xls" onFiles={upAuto}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
           <h2 className="h2" style={{ flex: 1 }}>파일로 갱신</h2>
           <input ref={r1} type="file" accept=".xlsx,.xls" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) upLoan(f); e.target.value = ''; }} />
@@ -93,7 +101,7 @@ export function BondsPage() {
               <div className="muted small" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l}</div><div style={{ fontSize: 20, fontWeight: 700 }}>{man(v)}<span style={{ fontSize: 12, fontWeight: 400 }}>만원</span></div>
             </div>))}
         </div>
-      </div>
+      </DropCard>
 
       <div className="card" style={{ marginTop: 16 }}>
         <h2 className="h2" style={{ marginBottom: 8 }}>농장별 채권 · 상계</h2>

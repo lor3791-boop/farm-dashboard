@@ -32,7 +32,7 @@ export function HomePage() {
   ];
   const totStock = rows.reduce((a, r) => a + r.stock, 0), totDeath = rows.reduce((a, r) => a + r.death, 0), totNet = rows.reduce((a, r) => a + r.net, 0);
   const warnRows = rows.filter((r) => r.warn.length);
-  const planList = rows.filter(isPlanned).sort((a, b) => b.prog - a.prog);
+  const planList = rows.filter((r) => isPlanned(r) && !saved.settled[r.who]).sort((a, b) => b.prog - a.prog);
   const goDet = (who: string) => go('/herd', { herdTab: 'herd', det: who });
 
   const TaskRow = ({ t, small }: { t: (typeof tasks)[number]; small?: boolean }) => {

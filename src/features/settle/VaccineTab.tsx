@@ -1,4 +1,5 @@
 // 구제역 백신비 — 농장·접종일·대상 그룹·금액 + 영수증 첨부(사진은 줄여서, PDF는 700KB 이하) 저장
+import { DropCard } from '@/components/Drop';
 import { useEffect, useRef, useState } from 'react';
 import { useHerd } from '@/lib/ui';
 import { useAuth } from '@/lib/auth';
@@ -55,7 +56,7 @@ export function VaccineTab() {
   const rows = [...list].sort((a, b) => (a.date < b.date ? 1 : -1));
   return (
     <div style={{ display: 'grid', gap: 16 }}>
-      <div className="card">
+      <DropCard accept="image/*,application/pdf" onFiles={(F) => pick(F[0])}>
         <h2 className="h2">구제역 백신비 입력</h2>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'end', marginTop: 10 }}>
           <label className="small muted">농장<br /><select value={f.farm} onChange={(e) => setF({ ...f, farm: e.target.value, groups: [] })}>{farms.map((x) => <option key={x}>{x}</option>)}</select></label>
@@ -79,7 +80,7 @@ export function VaccineTab() {
         </div>
         {err && <div style={{ marginTop: 8 }}><span className="chip bad" style={{ whiteSpace: 'normal' }}>{err}</span></div>}
         {ok && <div style={{ marginTop: 8 }}><span className="chip ok">{ok}</span></div>}
-      </div>
+      </DropCard>
       <div className="card">
         <h2 className="h2">저장한 백신비 · {rows.length}건 <span className="muted" style={{ fontSize: 14, fontWeight: 400 }}>({fmt(rows.reduce((a, v) => a + v.amount, 0))}원)</span></h2>
         {rows.length === 0 && <div className="muted" style={{ marginTop: 8 }}>저장한 백신비가 없습니다</div>}

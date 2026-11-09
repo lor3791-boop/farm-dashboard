@@ -1,4 +1,5 @@
 // 폐사관리 — 폐사현황(일자별) / 폐사입력 / 폐사입력현황(미등록·등록완료 목록, 수정·삭제)
+import { DropCard } from '@/components/Drop';
 import { useState } from 'react';
 import { useHerd } from '@/lib/ui';
 import { useAuth } from '@/lib/auth';
@@ -79,7 +80,7 @@ function DeathEntry() {
   const cur = chosen ? dRows.find((r) => r.group === chosen) ?? null : null;
   const after = cur ? (() => { const c = Math.min(cnt, cur.claimLeft); const d = cur.death + cnt - c; return { c, d, stock: cur.stock - cnt, surv: survOf(cur.net, d) }; })() : null;
   return (
-          <div className="card" style={{ maxWidth: 560 }}>
+    <DropCard style={{ maxWidth: 560 }} accept="image/*" onFiles={(F) => { const dt = new DataTransfer(); F.forEach((f) => dt.items.add(f)); addPhotos(dt.files); }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
         <h2 className="h2">폐사 입력</h2>
         <span><input ref={pref} type="file" accept="image/*" multiple hidden onChange={(e) => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = ''; }} /><button className="btn" disabled={photos.length >= 3} onClick={() => pref.current?.click()}>사진 등록{photos.length ? ` (${photos.length}/3)` : ''}</button></span>
@@ -124,7 +125,7 @@ function DeathEntry() {
         <button className="btn" onClick={() => { setSaved('한 사진에 여러 동: 이 동을 저장한 뒤 동을 바꿔 한 번 더 저장하세요'); setSavedOk(true); }}>+ 동 추가 (한 사진에 여러 동)</button>
       </div>
       {saved && <div style={{ marginTop: 12 }}><span className={savedOk ? 'chip ok' : 'chip bad'} style={{ whiteSpace: 'normal' }}>{saved}</span></div>}
-    </div>
+    </DropCard>
   );
 }
 

@@ -1,4 +1,5 @@
 // 사료 사용 — 피그온 그룹 사료 사용 업로드 → 농장·그룹별 월별 확인 / 정산월 중간투입 입력·저장
+import { DropCard } from '@/components/Drop';
 import { useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { useHerd } from '@/lib/ui';
@@ -53,7 +54,7 @@ export function FeedTab() {
 
   return (
     <div style={{ display: 'grid', gap: 16 }}>
-      <div className="card">
+      <DropCard accept=".xls,.xlsx,.csv" onFiles={(L) => onFile(L[0])}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'space-between' }}>
           <h2 className="h2">피그온 그룹 사료 사용</h2>
           <div><input ref={ref} type="file" accept=".xls,.xlsx,.csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }} /><button className="btn pri" onClick={() => ref.current?.click()}>파일 올리기</button></div>
@@ -95,7 +96,7 @@ export function FeedTab() {
             )}
           </>
         )}
-      </div>
+      </DropCard>
       <FeedMidCard farms={farms} groupsOf={groupsOf} mids={mids} />
     </div>
   );
