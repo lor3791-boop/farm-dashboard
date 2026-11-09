@@ -15,7 +15,7 @@ export interface UiState {
   hView: 'table' | 'heat'; hMode: 'entry' | 'cal'; stage: 'all' | 'pre' | 'ship' | 'done'; warnOnly: boolean;
   hidden: Record<string, boolean>;
   anTab: 'surv' | 'rank' | 'report'; heat: boolean;
-  herdTab: 'herd' | 'entry' | 'warn' | 'fcr'; shipTab: 'status' | 'input' | 'grade'; deathTab: 'input' | 'status' | 'list'; setTab: 'plan' | 'excel' | 'feed' | 'vaccine';
+  herdTab: 'herd' | 'entry' | 'warn' | 'fcr'; shipTab: 'status' | 'input' | 'grade' | 'fc'; deathTab: 'input' | 'status' | 'list'; setTab: 'plan' | 'excel' | 'feed' | 'vaccine';
   rpTab: 'report' | 'settle'; sGroup: string;
   dFarm: string; dDong: string | null; dGroup: string | null;
 }
