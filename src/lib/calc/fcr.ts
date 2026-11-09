@@ -6,7 +6,8 @@
 // 4) 정산완료 그룹은 정산서(지급결의서 新양식 매입매출 M6)와 같은 식: ROUNDDOWN((사료 ÷ 출하두수) ÷ (출하평체 − 전입평체), 2)
 //    출하두수·생체 = 출하실적종합 + 폭염 인정두수, 출하평체 = ROUNDDOWN(생체 ÷ 두수, 2).
 //    사료 = 마지막 출하월 이전 월(마감) + 중간정산 직접투입 줄. 마지막 출하월의 '마감' 줄은 정산 뒤에 잡힌 양이라 뺀다.
-//    (2026-11 정산서 22개 그룹과 대조해 일치 확인)
+//    투입구분 칸이 없는 파일이면 마지막 출하월의 딱 떨어지는 양(10kg 단위 정수 = 직접투입)을 중간정산으로 본다.
+//    (2026-11 정산서 1~10월 31개 그룹 대조: 특수정산 2건·파일 중복 1건·민서 26-4(정산서가 10월 직접투입 2,970kg 누락) 외 일치)
 import { days } from './dates';
 import type { FeedRow } from '@/lib/feedSheet';
 import { GROWTH_AGE0, GROWTH_FEED, GROWTH_W } from '@/data/growthTable';
@@ -34,8 +35,9 @@ const floor2 = (x: number) => Math.floor(x * 100 + 1e-9) / 100;
 // 정산완료 그룹 FCR (정산서와 같은 식)
 export function settledFcr(g: { avgw: number }, rows: FeedRow[], s: SettledShip) {
   const lm = s.last.slice(0, 7);
-  const hasMid = rows.some((r) => r[5] === '중간');
-  const feed = rows.filter((r) => !lm || r[2] < lm || r[5] === '중간').reduce((a, r) => a + r[4], 0) + (hasMid ? 0 : s.mid ?? 0);
+  const isMid = (r: FeedRow) => r[5] === '중간' || (!r[5] && Number.isInteger(r[4]) && r[4] % 10 === 0);
+  const hasMid = rows.some((r) => r[2] === lm && isMid(r));
+  const feed = rows.filter((r) => !lm || r[2] < lm || isMid(r)).reduce((a, r) => a + r[4], 0) + (hasMid ? 0 : s.mid ?? 0);
   if (!s.heads || !feed) return null;
   const wOut = floor2(s.live / s.heads);
   const fcr = wOut > g.avgw ? floor2(feed / s.heads / (wOut - g.avgw)) : null;

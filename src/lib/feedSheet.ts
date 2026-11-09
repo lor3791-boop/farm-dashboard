@@ -1,5 +1,5 @@
 // 피그온 '그룹 사료 사용' 엑셀 읽기 — 세로형(월·품목·kg 칸) / 가로형(월이 열 제목) 모두 지원.
-// 결과 한 줄 = [농장, 그룹, 월 YYYY-MM, 사료 품목, kg, 투입구분('중간'=중간정산 직접투입, ''=마감)]
+// 결과 한 줄 = [농장, 그룹, 월 YYYY-MM, 사료 품목, kg, 투입구분('중간'=중간정산 직접투입, '마감', 없음=파일에 투입구분 칸 없음)]
 export type FeedRow = [string, string, string, string, number, string?];
 // Firestore는 배열 안 배열을 못 담아서 한 줄을 탭으로 이은 문자열로 저장한다
 export interface FeedUpload { file: string; at?: string; rows: string[] }
@@ -47,7 +47,7 @@ export function parseFeedSheet(aoa: unknown[][], resolveFarm: (name: string) => 
       const fRaw = x[cF] || lastF, gRaw = x[cG] || lastG; lastF = fRaw; lastG = gRaw;
       const farm = resolveFarm(fRaw); if (!farm) continue;
       const group = normGroup(gRaw), item = cI >= 0 ? x[cI] : '';
-      if (cM >= 0 && cK >= 0) { const m = normMonth(x[cM], year), kg = num(x[cK]); if (m && kg > 0) out.push(cT >= 0 && /중간/.test(x[cT]) ? [farm, group, m, item, kg, '중간'] : [farm, group, m, item, kg]); }
+      if (cM >= 0 && cK >= 0) { const m = normMonth(x[cM], year), kg = num(x[cK]); if (m && kg > 0) out.push(cT >= 0 ? [farm, group, m, item, kg, /중간/.test(x[cT]) ? '중간' : '마감'] : [farm, group, m, item, kg]); }
       else if (monthCols.length) monthCols.forEach(({ j, m }) => { const kg = num(x[j]); if (kg > 0) out.push([farm, group, m, item, kg]); });
     }
     if (out.length) return out;
@@ -60,7 +60,12 @@ export function mergeFeed(ups: FeedUpload[]): FeedRow[] {
   [...ups].sort((a, b) => ((a.at ?? '') < (b.at ?? '') ? -1 : 1)).forEach((u) => {
     const by = new Map<string, FeedRow[]>();
     u.rows.map(decodeFeed).forEach((r) => { const k = r.slice(0, 3).join('|'); by.set(k, [...(by.get(k) ?? []), r]); });
-    by.forEach((L, k) => m.set(k, L));
+    // 투입구분 없는 파일이 같은 양의 투입구분 있는 줄을 덮으면 구분을 잃으니 기존 줄을 살린다
+    by.forEach((L, k) => {
+      const old = m.get(k), sum = (X: FeedRow[]) => X.reduce((a, r) => a + r[4], 0);
+      if (old && old.some((r) => r[5]) && !L.some((r) => r[5]) && Math.abs(sum(old) - sum(L)) < 1) return;
+      m.set(k, L);
+    });
   });
   return [...m.values()].flat();
 }
