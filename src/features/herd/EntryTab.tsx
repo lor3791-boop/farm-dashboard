@@ -38,7 +38,7 @@ export function EntryTab() {
           <div className="card" style={{ marginTop: 16 }}>
             <h2 className="h2" style={{ marginBottom: 10 }}>동 배치표</h2>
             <div className="gt">
-              <div className="gr gh" style={{ gridTemplateColumns: gcols, minWidth: 900 }}><div>농장</div><div>그룹</div><div>동</div><div>전입일</div><div className="r">전입(실두수)</div><div className="r">크레임 (폐사/남음)</div><div className="r">폐사</div><div className="r">육성률</div><div className="r">재고</div><div>폐사 입력</div></div>
+              <div className="gr gh" style={{ gridTemplateColumns: gcols, minWidth: 900 }}><div>농장</div><div>그룹</div><div>동</div><div>전입일</div><div className="r">최초두수</div><div className="r">크레임 (폐사/남음)</div><div className="r">폐사</div><div className="r">육성률</div><div className="r">재고</div><div>폐사 입력</div></div>
               {entryRows.map((g) => <div key={g.key} className="gr" style={{ gridTemplateColumns: gcols, minWidth: 900 }}><div>{g.farm}</div><div>{g.group}</div><div>{g.dong}</div><div>{g.date}</div><div className="r">{g.inn}</div><div className="r">{g.claim}<div className="sub" style={{ fontSize: 12 }}>{g.claimDead}/{g.claimLeft}</div></div><div className="r">{g.death}</div><div className="r" style={{ color: g.bad ? '#9A3216' : undefined }}>{g.surv}%</div><div className="r b">{g.stock}</div><div><span className={g.cls}>{g.mode}</span></div></div>)}
             </div>
           </div>

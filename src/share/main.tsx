@@ -27,7 +27,7 @@ function App() {
   if (state === 'none' || !p) return <div className="v5 share" style={{ padding: 40, textAlign: 'center', fontSize: 15 }}>링크가 맞지 않습니다 · लिङ्क मिलेन</div>;
   return (
     <ShareView p={p} deaths={deaths}
-      onSaveDeath={async (d) => { await addDoc(collection(db, 'share', key, 'deaths'), { farm: p.farm, date: d.date, dong: d.dong, group: d.group, count: d.count, src: 'share', checked: false, at: now() }); }}
+      onSaveDeath={async (d) => { await addDoc(collection(db, 'share', key, 'deaths'), { farm: p.farm, date: d.date, dong: d.dong, group: d.group, count: d.count, ...(d.photos?.length ? { photos: d.photos } : {}), src: 'share', checked: false, at: now() }); }}
       onEditDeath={async (id, d) => { await updateDoc(doc(db, 'share', key, 'deaths', id), { date: d.date, dong: d.dong, group: d.group, count: d.count, checked: false, editedAt: now() }); }} />
   );
 }

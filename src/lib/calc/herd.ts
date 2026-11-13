@@ -11,15 +11,27 @@ export interface LiveShip { farm: string; group: string; date: string; n: number
 export interface ManualGroup { id?: string; farm: string; group: string; dongs: string[]; date: string; inn: number; claim: number; avgw: number; age: number; totalKg?: number; source?: string; memo?: string }
 export interface Live { deaths: DeathLike[]; ships: LiveShip[]; groups?: ManualGroup[]; dongs?: Record<string, string> } // dongs: 사육현황에서 고친 그룹별 동 ('민서 26-7' → '1·2동' 또는 '—')
 const mmdd = (d: string) => d.slice(5);
-// 직접 등록 그룹 → 스냅샷과 같은 모양(GRow + 로트)
-export function manualRows(T: Thresholds, L: ManualGroup[]): { row: GRow; lot: Lot }[] {
-  return L.map((m) => {
-    const light = m.avgw < T.workWeightKg;
-    const dew = light ? addIso(m.date, T.dewormDaysAfterEntry) : addIso(m.date, Math.max(T.minDaysAfterEntry, T.dewormAgeHeavy - m.age));
-    const fmd = light ? addIso(m.date, T.fmdDaysAfterEntry) : addIso(m.date, Math.max(T.minDaysAfterEntry, T.fmdAgeHeavy - m.age));
+// 두수 기준 (피그온): 최초두수 = 실제 농장 전입두수, 전입두수 = 최초두수 − 크레임.
+// 스냅샷 G[4]·로트 l[1]은 피그온 '전입두수'(크레임 뺀 값), 재고 G[7]도 크레임을 뺀 두수다.
+// 직접 등록 그룹의 입식두수(m.inn)는 최초두수(실제 농장 두수)로 받는다.
+const lotOf = (T: Thresholds, m: ManualGroup): Lot => {
+  const light = m.avgw < T.workWeightKg;
+  const dew = light ? addIso(m.date, T.dewormDaysAfterEntry) : addIso(m.date, Math.max(T.minDaysAfterEntry, T.dewormAgeHeavy - m.age));
+  const fmd = light ? addIso(m.date, T.fmdDaysAfterEntry) : addIso(m.date, Math.max(T.minDaysAfterEntry, T.fmdAgeHeavy - m.age));
+  return [mmdd(m.date), m.inn - m.claim, m.claim, m.age, mmdd(fmd), mmdd(dew), m.avgw];
+};
+// 직접 등록 그룹 → 스냅샷과 같은 모양(GRow + 로트). 같은 농장·그룹을 여러 번 등록하면(피그온에서 전입을 한 그룹으로 합친 경우) 한 그룹의 여러 차수로 합친다.
+export function manualRows(T: Thresholds, L: ManualGroup[]): { row: GRow; lots: Lot[] }[] {
+  const by = new Map<string, ManualGroup[]>();
+  [...L].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)).forEach((m) => { const k = m.farm + ' ' + m.group; by.set(k, [...(by.get(k) ?? []), m]); });
+  return [...by.values()].map((M) => {
+    const m = M[0], lots = M.map((x) => lotOf(T, x));
+    const net = lots.reduce((a, l) => a + l[1], 0);
+    const avgw = r1(M.reduce((a, x) => a + x.avgw * x.inn, 0) / Math.max(1, M.reduce((a, x) => a + x.inn, 0)));
+    const dongs = [...new Set(M.flatMap((x) => x.dongs))].sort();
     const week = Math.max(1, Math.floor(days(m.date, REF) / 7) + 1);
-    const row: GRow = [m.farm, m.group, m.dongs.length ? m.dongs.join('·') + '동' : '—', m.date, m.inn, 0, 0, m.inn, m.age, week, m.avgw, []];
-    return { row, lot: [mmdd(m.date), m.inn, m.claim, m.age, mmdd(fmd), mmdd(dew), m.avgw] as Lot };
+    const row: GRow = [m.farm, m.group, dongs.length ? dongs.join('·') + '동' : '—', m.date, net, 0, 0, net, m.age, week, avgw, []];
+    return { row, lots };
   });
 }
 
@@ -39,13 +51,18 @@ export { REF };
 
 export function buildGroups(T: Thresholds, firstShipByFarm: Record<string, number> = {}, live?: Live, splitOut?: Record<string, Split>): Group[] {
   const man = live?.groups ?? [];
-  const extra = manualRows(T, man.filter((m) => !G0.some((r) => r[0] === m.farm && r[1] === m.group)));
+  const inSnap = (m: ManualGroup) => G0.some((r) => r[0] === m.farm && r[1] === m.group);
+  const extra = manualRows(T, man.filter((m) => !inSnap(m)));
+  // 스냅샷(피그온)에 이미 있는 그룹에 기준일 뒤 전입을 더 등록하면 그 그룹의 차수로 더한다
+  const addLots: Record<string, Lot[]> = {};
+  man.filter((m) => inSnap(m) && m.date > REF).forEach((m) => { const k = m.farm + ' ' + m.group; addLots[k] = [...(addLots[k] ?? []), lotOf(T, m)]; });
   // 피그온에 들어온 그룹은 피그온 값을 쓰되, 동은 직접 등록 때 넣은 값을 살린다 (피그온엔 동이 없음)
-  const G = G0.map((r) => { const ov = live?.dongs?.[r[0] + ' ' + r[1]]; if (ov) return [...r.slice(0, 2), ov, ...r.slice(3)] as GRow; if (r[2] !== '—') return r; const m = man.find((x) => x.farm === r[0] && x.group === r[1]); return m?.dongs.length ? ([...r.slice(0, 2), m.dongs.join('·') + '동', ...r.slice(3)] as GRow) : r; }).concat(extra.map((x) => x.row));
+  const G = G0.map((r) => { const ad = addLots[r[0] + ' ' + r[1]]; if (!ad) return r; const n = ad.reduce((a, l) => a + l[1], 0); return [...r.slice(0, 4), r[4] + n, r[5], r[6], r[7] + n, ...r.slice(8)] as GRow; }).map((r) => { const ov = live?.dongs?.[r[0] + ' ' + r[1]]; if (ov) return [...r.slice(0, 2), ov, ...r.slice(3)] as GRow; if (r[2] !== '—') return r; const m = man.find((x) => x.farm === r[0] && x.group === r[1]); return m?.dongs.length ? ([...r.slice(0, 2), m.dongs.join('·') + '동', ...r.slice(3)] as GRow) : r; }).concat(extra.map((x) => x.row));
   const LOTS: Record<string, Lot[]> = { ...LOTS0 };
-  extra.forEach((x) => { LOTS[x.row[0] + ' ' + x.row[1]] = [x.lot]; });
+  extra.forEach((x) => { LOTS[x.row[0] + ' ' + x.row[1]] = x.lots; });
+  Object.entries(addLots).forEach(([k, L]) => { LOTS[k] = [...(LOTS[k] ?? []), ...L]; });
   const base: Record<string, DeathBase & { inDeath: number }> = {};
-  G.forEach((r) => { const who = r[0] + ' ' + r[1]; const claim = (LOTS[who] ?? []).reduce((a, l) => a + l[2], 0); base[who] = { death: r[5], stock: r[7], claimLeft: claim, inDeath: r[5] }; });
+  G.forEach((r) => { const who = r[0] + ' ' + r[1]; const claim = (LOTS[who] ?? []).reduce((a, l) => a + l[2], 0); base[who] = { death: r[5], stock: r[7] + claim, claimLeft: claim, inDeath: r[5] }; }); // 재고 = 실제 농장 두수(크레임 포함)
   const split = live ? applyDeaths(base, live.deaths, REF, (d) => d.farm + ' ' + d.group) : {};
   if (splitOut) Object.assign(splitOut, split);
   const shipped: Record<string, number> = {};
@@ -56,7 +73,7 @@ export function buildGroups(T: Thresholds, firstShipByFarm: Record<string, numbe
     const o = { farm, group, dong: r[2], date: r[3], inn: r[4], death: r[5], sold: r[6], stock: r[7], week: r[9], avgw: r[10], who, lots } as Group;
     const tot = lots.reduce((a, l) => a + l[1], 0) || 1;
     o.claim = lots.reduce((a, l) => a + l[2], 0);
-    o.net = o.inn - o.claim;
+    o.net = o.inn; o.inn = o.net + o.claim; // net = 전입두수(정산, 크레임 뺌) · inn = 최초두수(실제 농장 전입)
     const b = base[who];
     o.liveDeath = b.death - b.inDeath; o.death = b.death; o.claimLeft = b.claimLeft; o.claimDead = o.claim - b.claimLeft;
     o.liveSold = shipped[who] ?? 0; o.sold += o.liveSold; o.stock = b.stock - o.liveSold;
@@ -116,7 +133,7 @@ export function buildTasks(rows: Group[]): Task[] {
       ([['fmd', l[4], '구제역 백신'], ['dew', l[5], '구충제 · 사료 2호 변경']] as [string, string, string][]).forEach(([k, d, job]) => {
         const key = k + d;
         if (!map[key]) map[key] = { d, job, n: 0, idx: [] };
-        map[key].n += l[1] - l[2]; map[key].idx.push(i + 1);
+        map[key].n += l[1]; map[key].idx.push(i + 1);
       });
     });
     Object.values(map).forEach((t) => {

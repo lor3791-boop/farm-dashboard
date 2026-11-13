@@ -36,7 +36,7 @@ export function AnalysisPage() {
             {survRows.map((r) => { const h = s.heat ? Number(hv[r.who] || 0) : 0; return (
               <div key={r.who} className="gr" style={{ gridTemplateColumns: '1.2fr 0.6fr 0.6fr 0.6fr 1.6fr 1fr', minWidth: 560 }}>
                 <div className="b">{r.who}</div><div className="r">{fmt(r.net)}</div><div className="r">{fmt(r.sold)}</div><div className="r">{fmt(r.stock)}</div>
-                <div className="r"><b>{r.expSurv}%</b> <span className="muted">{h > 0 ? '(폭염 포함 ' + r1(((r.sold + r.stock - r.claim + h) / r.net) * 100) + '%)' : ''}</span></div>
+                <div className="r"><b>{r.expSurv}%</b> <span className="muted">{h > 0 ? '(폭염 포함 ' + r1(((r.sold + r.stock - r.claimLeft + h) / r.net) * 100) + '%)' : ''}</span></div>
                 <div className="r">{s.heat && <input type="number" placeholder="0" value={hv[r.who] || ''} style={{ width: 80 }} onChange={(e) => save({ heatVals: { ...hv, [r.who]: e.target.value } })} aria-label="폭염 인정두수" />}</div>
               </div>
             ); })}

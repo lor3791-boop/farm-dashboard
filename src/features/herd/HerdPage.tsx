@@ -267,7 +267,7 @@ function Detail({ who, order, onDeath }: { who: string; order: string[]; onDeath
   const d = all.find((r) => r.who === who);
   if (!d || !T) return null;
   const idx = order.indexOf(d.who);
-  const kpis: [string, string, string][] = [['전입', fmt(d.net) + '두', '클레임 ' + d.claim + '두 제외'], ['폐사', d.death + '두', '피그온'], ['육성률', d.surv + '%', d.bad ? T.problemSurvivalPct + '% 미만' : '기준 이상'], ['재고', fmt(d.stock) + '두', '출하 ' + fmt(d.sold) + '두 · ' + d.prog + '%']];
+  const kpis: [string, string, string][] = [['전입', fmt(d.net) + '두', '최초 ' + fmt(d.inn) + ' − 크레임 ' + d.claim], ['폐사', d.death + '두', '피그온'], ['육성률', d.surv + '%', d.bad ? T.problemSurvivalPct + '% 미만' : '기준 이상'], ['재고', fmt(d.stock) + '두', '출하 ' + fmt(d.sold) + '두 · ' + d.prog + '%']];
   const months = Array.from({ length: Math.ceil(d.week / 4) }, (_, mi) => ({ label: mi + 1 + '개월차', cells: [1, 2, 3, 4].map((k) => {
     const n = mi * 4 + k; const v = n <= d.week ? (d.weekly[n - 1] ?? 0) : null; const c = heat(v); const st = addIso(d.date, 7 * (n - 1));
     return { n: n + '주', v: v === null ? '' : v === 0 ? '·' : String(v), bg: v === null ? 'transparent' : c.bg, fg: c.fg, bd: n === d.week ? '2px solid #1F4E3D' : v === null ? '1px dashed #D9D3C6' : '1px solid transparent', tag: d.marks[n] || '', range: md(st) + '~' + md(addIso(st, 6)), title: n + '주차 · ' + md(st) + '~' + md(addIso(st, 6)) + (v === null ? ' · 아직' : ' · 폐사 ' + v + '두') };
@@ -343,7 +343,7 @@ function Detail({ who, order, onDeath }: { who: string; order: string[]; onDeath
       {sched.map(([l, v]) => <div key={l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, padding: '5px 0', borderBottom: '1px solid #EFEBE3' }}><span className="muted">{l}</span><b>{v}</b></div>)}
       <div className="b" style={{ margin: '16px 0 6px' }}>차수 (전입현황)</div>
       <div className="tblbox"><div style={{ minWidth: 380 }}>
-        <div className="gr gh small muted" style={{ gridTemplateColumns: lg }}><div>차수</div><div>전입일</div><div className="r">두수</div><div className="r">클레임</div><div className="r">일령</div><div className="r">평체</div><div>구충</div><div>FMD</div></div>
+        <div className="gr gh small muted" style={{ gridTemplateColumns: lg }}><div>차수</div><div>전입일</div><div className="r">전입두수</div><div className="r">크레임</div><div className="r">일령</div><div className="r">평체</div><div>구충</div><div>FMD</div></div>
         {d.lots.map((l, i) => <div key={i} className="gr small" style={{ gridTemplateColumns: lg }}><div>{i + 1}차</div><div>{l[0].replace('-', '/')}</div><div className="r">{fmt(l[1])}</div><div className="r">{l[2]}</div><div className="r">{l[3]}</div><div className="r">{l[6]}kg</div><div>{l[5].replace('-', '/')}</div><div>{l[4].replace('-', '/')}</div></div>)}
       </div></div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>

@@ -35,7 +35,8 @@ service cloud.firestore {
         }
         allow read: if isAdmin() || exists(/databases/$(database)/documents/share/$(key));
         allow create: if isAdmin() || (exists(/databases/$(database)/documents/share/$(key))
-          && request.resource.data.keys().hasOnly(['farm', 'date', 'dong', 'group', 'count', 'src', 'checked', 'at'])
+          && request.resource.data.keys().hasOnly(['farm', 'date', 'dong', 'group', 'count', 'photos', 'src', 'checked', 'at'])
+          && (!('photos' in request.resource.data) || (request.resource.data.photos is list && request.resource.data.photos.size() <= 3))
           && request.resource.data.checked == false && okDeath(request.resource.data));
         allow update: if isAdmin() || (exists(/databases/$(database)/documents/share/$(key))
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['date', 'dong', 'group', 'count', 'checked', 'editedAt'])
