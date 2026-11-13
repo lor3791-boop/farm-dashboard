@@ -22,7 +22,7 @@ export default defineConfig({
         // 폰 공유 목록에 '농장대시보드' — 폐사 사진은 폐사 입력, 등판서·출하 엑셀은 출하 올리기로
         share_target: {
           action: './share-target', method: 'POST', enctype: 'multipart/form-data',
-          params: { files: [{ name: 'files', accept: ['image/*', '.xls', '.xlsx', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'] }] }
+          params: { files: [{ name: 'files', accept: ['image/*', '.heic', '.heif', '.xls', '.xlsx', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'] }] }
         } as any,
         background_color: '#F4F2EC',
         theme_color: '#1F4E3D',

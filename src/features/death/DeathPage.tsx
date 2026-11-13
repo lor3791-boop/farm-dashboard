@@ -99,7 +99,7 @@ function DeathEntry() {
     <DropCard style={{ maxWidth: 560 }} accept="image/*" onFiles={(F) => { const dt = new DataTransfer(); F.forEach((f) => dt.items.add(f)); addPhotos(dt.files); }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
         <h2 className="h2">폐사 입력</h2>
-        <span><input ref={pref} type="file" accept="image/*" multiple hidden onChange={(e) => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = ''; }} /><button className="btn" disabled={photos.length >= 3} onClick={() => pref.current?.click()}>사진 등록{photos.length ? ` (${photos.length}/3)` : ''}</button></span>
+        <span><input ref={pref} type="file" accept="image/*,.heic,.heif" multiple hidden onChange={(e) => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = ''; }} /><button className="btn" disabled={photos.length >= 3} onClick={() => pref.current?.click()}>사진 등록{photos.length ? ` (${photos.length}/3)` : ''}</button></span>
       </div>
       {photos.length > 0 && (
         <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>

@@ -226,7 +226,7 @@ export function ShareView({ p, deaths = [], onSaveDeath, onEditDeath }: { p: Sha
           <div className="card" style={{ marginTop: 12 }}>
             <div style={{ fontWeight: 700 }}>{t.photo}</div>
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-              <input ref={pref} type="file" accept="image/*" multiple hidden onChange={(e) => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = ''; }} />
+              <input ref={pref} type="file" accept="image/*,.heic,.heif" multiple hidden onChange={(e) => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = ''; }} />
               {photos.map((s, i) => <div key={i} style={{ position: 'relative' }}><img src={s} alt={t.photo + ' ' + (i + 1)} style={{ width: 84, height: 84, objectFit: 'cover', borderRadius: 10, display: 'block' }} /><button aria-label="✕" onClick={() => setPhotos(photos.filter((_, j) => j !== i))} style={{ position: 'absolute', top: 2, right: 2, width: 28, height: 28, borderRadius: 14, border: 0, background: 'rgba(0,0,0,.55)', color: '#fff', cursor: 'pointer' }}>✕</button></div>)}
               {photos.length < 3 && <button onClick={() => pref.current?.click()} style={{ font: 'inherit', width: 84, height: 84, borderRadius: 10, border: '2px dashed #B9B3A6', background: '#fff', color: '#3E4B45', cursor: 'pointer', fontSize: 13 }}>+ {t.addPhoto}</button>}
             </div>

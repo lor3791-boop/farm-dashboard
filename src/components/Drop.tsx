@@ -7,6 +7,7 @@ export function useDrop(onFiles: (L: File[]) => void, accept?: string) {
   const ok = (f: File) => {
     if (!accept) return true;
     const name = f.name.toLowerCase();
+    if (accept.includes('image/') && /\.hei[cf]$/.test(name)) return true; // HEIC는 type이 비어 오는 경우가 있음
     return accept.split(',').map((x) => x.trim().toLowerCase()).some((a) => (a.startsWith('.') ? name.endsWith(a) : a.endsWith('/*') ? f.type.startsWith(a.slice(0, -1)) : f.type === a));
   };
   const has = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes('Files');

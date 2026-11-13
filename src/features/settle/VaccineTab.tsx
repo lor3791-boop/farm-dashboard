@@ -7,7 +7,7 @@ import { useCol } from '@/lib/useCol';
 import type { Vaccine } from '@/lib/feedSheet';
 import { fmt, md } from '@/lib/calc/dates';
 import { todayKST } from '@/lib/util';
-import { readUrl, shrinkImage } from '@/lib/image';
+import { isImageFile, readUrl, shrinkImage } from '@/lib/image';
 
 const MAX = 700 * 1024;
 const toBlobUrl = (d: string) => { const [h, b] = d.split(','); const bin = atob(b); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return URL.createObjectURL(new Blob([u], { type: h.slice(5, h.indexOf(';')) })); };
@@ -35,7 +35,7 @@ export function VaccineTab() {
   const pick = async (x: File) => {
     setErr(''); setOk('');
     try {
-      if (x.type.startsWith('image/')) setFile({ name: x.name, type: 'image/jpeg', data: await shrinkImage(x) });
+      if (isImageFile(x)) setFile({ name: x.name, type: 'image/jpeg', data: await shrinkImage(x) });
       else if (x.type === 'application/pdf') { if (x.size > MAX) throw new Error('PDF가 700KB를 넘습니다 — 사진으로 찍어 올려주세요'); setFile({ name: x.name, type: x.type, data: await readUrl(x) }); }
       else throw new Error('사진 또는 PDF만 올릴 수 있습니다');
     } catch (e) { setFile(null); setErr((e as Error).message); }
@@ -72,7 +72,7 @@ export function VaccineTab() {
           </div>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginTop: 14 }}>
-          <input ref={ref} type="file" accept="image/*,application/pdf" hidden onChange={(e) => { const x = e.target.files?.[0]; if (x) pick(x); e.target.value = ''; }} />
+          <input ref={ref} type="file" accept="image/*,.heic,.heif,application/pdf" hidden onChange={(e) => { const x = e.target.files?.[0]; if (x) pick(x); e.target.value = ''; }} />
           <button className="btn" onClick={() => ref.current?.click()}>파일 찾기 (영수증)</button>
           {file && <span className="chip info">{file.name}{file.type.startsWith('image/') ? ' · 줄여서 저장' : ''} <button aria-label="첨부 빼기" onClick={() => setFile(null)} style={{ marginLeft: 6 }}>✕</button></span>}
           <div style={{ flex: 1 }} />
