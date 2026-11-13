@@ -28,3 +28,15 @@ describe('전입두수·크레임 (피그온 기준)', () => {
     expect([g.inn - base.inn, g.net - base.net, g.stock - base.stock, g.lots.length - base.lots.length]).toEqual([100, 98, 100, 1]);
   });
 });
+
+describe('기준일 남은 크레임', () => {
+  it('피그온 폐사가 있으면 크레임은 이미 처리된 것 — 출하 끝난 그룹에 크레임이 남지 않음', () => {
+    const g = buildGroups(T).find((x) => x.who === '민서 26-7')!;
+    expect([g.claim, g.claimLeft, g.stock]).toEqual([8, 0, 0]);
+  });
+  it('피그온 폐사 0이면 기준일까지 처리한 폐사기록만큼 크레임에서 뺌', () => {
+    const d = [{ id: 'a', farm: '정축산', group: '26-4', date: '2026-11-03', count: 2, checked: true }];
+    const g = buildGroups(T, {}, live([], d)).find((x) => x.who === '정축산 26-4')!;
+    expect([g.claim, g.claimLeft, g.stock - 501]).toEqual([9, 7, 7]);
+  });
+});

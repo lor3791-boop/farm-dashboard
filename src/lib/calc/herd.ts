@@ -62,7 +62,18 @@ export function buildGroups(T: Thresholds, firstShipByFarm: Record<string, numbe
   extra.forEach((x) => { LOTS[x.row[0] + ' ' + x.row[1]] = x.lots; });
   Object.entries(addLots).forEach(([k, L]) => { LOTS[k] = [...(LOTS[k] ?? []), ...L]; });
   const base: Record<string, DeathBase & { inDeath: number }> = {};
-  G.forEach((r) => { const who = r[0] + ' ' + r[1]; const claim = (LOTS[who] ?? []).reduce((a, l) => a + l[2], 0); base[who] = { death: r[5], stock: r[7] + claim, claimLeft: claim, inDeath: r[5] }; }); // 재고 = 실제 농장 두수(크레임 포함)
+  // 기준일 남은 크레임: 크레임 돼지가 먼저 죽고 그 폐사는 피그온에 등록하지 않는다(크레임 처리).
+  // → 피그온 폐사가 1두라도 있으면 크레임은 이미 다 처리된 것(0). 피그온 폐사가 0이면 기준일까지 처리한 폐사기록만큼 뺀다.
+  // 재고 = 피그온 재고(크레임 뺀 두수) + 남은 크레임 = 실제 농장 두수
+  const preDead: Record<string, number> = {};
+  live?.deaths.forEach((d) => { if (d.date <= REF && d.checked !== false && d.count > 0) preDead[d.farm + ' ' + d.group] = (preDead[d.farm + ' ' + d.group] ?? 0) + d.count; });
+  G.forEach((r) => {
+    const who = r[0] + ' ' + r[1];
+    const added = (addLots[who] ?? []).reduce((a, l) => a + l[2], 0); // 기준일 뒤 더한 차수의 크레임은 그대로 남음
+    const claim = (LOTS[who] ?? []).reduce((a, l) => a + l[2], 0) - added;
+    const left = (r[5] > 0 ? 0 : Math.max(0, claim - (preDead[who] ?? 0))) + added;
+    base[who] = { death: r[5], stock: r[7] + left, claimLeft: left, inDeath: r[5] };
+  });
   const split = live ? applyDeaths(base, live.deaths, REF, (d) => d.farm + ' ' + d.group) : {};
   if (splitOut) Object.assign(splitOut, split);
   const shipped: Record<string, number> = {};
