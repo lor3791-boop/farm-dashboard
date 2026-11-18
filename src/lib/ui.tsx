@@ -5,8 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import type { UiSaved } from '@/data/types';
 import { useAuth } from './auth';
 import { useData } from './data';
-import { buildGroups, type Group } from './calc/herd';
-import { allShips, liveShipsOf } from './calc/ship';
+import { buildGroups, REF, type Group } from './calc/herd';
+import { allShips, shipAssign } from './calc/ship';
 import type { Split } from '@/share/applyDeaths';
 
 export interface UiState {
@@ -56,14 +56,19 @@ export function useHerd() {
   const { s, set, saved, save } = useUi();
   // 기준일 이후 폐사·출하를 반영한 그룹 + 폐사 기록별 나눔(크레임/폐사)
   // full = 정산완료 포함 전체, all = 정산완료 처리한 그룹을 뺀 목록(화면 대부분은 all만 씀)
-  const { full, split } = useMemo(() => {
+  // 출하 그룹 배정은 기준일 시점 그룹(출하 반영 전)으로 하고, 배정된 기준일 이후 출하를 재고에서 뺀다
+  const tot = up.total.rows;
+  const { full, split, asg, liveShips } = useMemo(() => {
     const sp: Record<string, Split> = {};
-    const g: Group[] = data ? buildGroups(data.thresholds, saved.firstShipByFarm, { deaths, groups, ships: liveShipsOf(ships, imports), dongs: saved.groupDong }, sp) : [];
-    return { full: g, split: sp };
-  }, [data, saved.firstShipByFarm, saved.groupDong, deaths, ships, groups, imports]);
+    if (!data) return { full: [] as Group[], split: sp, asg: {} as ReturnType<typeof shipAssign>['asg'], liveShips: [] as ReturnType<typeof shipAssign>['live'] };
+    const pre = buildGroups(data.thresholds, saved.firstShipByFarm, { deaths, groups, ships: [], dongs: saved.groupDong });
+    const caps = pre.map((g) => ({ farm: g.farm, group: g.group, date: g.date, sold: g.sold, stock: g.stock, ageRef: g.age })); // Group.age = 기준일 일령
+    const a = shipAssign(tot, imports, ships, saved.shipGroup ?? {}, caps, REF);
+    const g = buildGroups(data.thresholds, saved.firstShipByFarm, { deaths, groups, ships: a.live, dongs: saved.groupDong }, sp);
+    return { full: g, split: sp, asg: a.asg, liveShips: a.live };
+  }, [data, saved.firstShipByFarm, saved.groupDong, saved.shipGroup, deaths, ships, groups, imports, tot]);
   const all = useMemo(() => full.filter((r) => !saved.settled[r.who]), [full, saved.settled]);
   const shipRows = useMemo(() => allShips(ships, imports), [ships, imports, up.total.rows]); // eslint-disable-line react-hooks/exhaustive-deps
-  const liveShips = useMemo(() => liveShipsOf(ships, imports), [ships, imports]);
   const farms = useMemo(() => [...new Set(full.map((r) => r.farm))], [full]);
   const farmBad = useMemo(() => { const m: Record<string, boolean> = {}; farms.forEach((f) => { m[f] = all.some((r) => r.farm === f && r.bad); }); return m; }, [all, farms]);
   const selSet = s.fSel === null ? farms : s.fSel;
@@ -73,5 +78,5 @@ export function useHerd() {
   const isPlanned = (r: Group) => (saved.planned[r.who] === undefined ? r.rec : saved.planned[r.who]);
   const setPlanned = (r: Group, v: boolean) => save({ planned: { ...saved.planned, [r.who]: v } });
   const togglePlan = (r: Group) => () => setPlanned(r, !isPlanned(r));
-  return { all, full, rowsFull, split, deaths, ships, groups, imports, shipRows, liveShips, farms, farmBad, selSet, passFarm, rows, isPlanned, setPlanned, togglePlan, s, set, saved, save, T: data?.thresholds };
+  return { all, full, rowsFull, split, asg, deaths, ships, groups, imports, shipRows, liveShips, farms, farmBad, selSet, passFarm, rows, isPlanned, setPlanned, togglePlan, s, set, saved, save, T: data?.thresholds };
 }

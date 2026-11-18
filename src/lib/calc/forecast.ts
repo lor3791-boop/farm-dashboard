@@ -144,3 +144,16 @@ export function backRate(g: { indate: string; w0: number }, ships: { date: strin
   ships.forEach((x) => { if (!(x.n > 0 && x.live > 0) || x.date <= g.indate) return; const dc = cum(x.date) - base; if (dc <= 0) return; const r = (x.live / x.n - g.w0) / dc; if (r > 0.5 && r < 1.3) { wn += x.n; wr += r * x.n; } });
   return wn ? Math.round((wr / wn) * 1000) / 1000 : null;
 }
+
+/** 실제 출하 두수를 양식 주차 칸(segs)에 넣는다 — 같은 달 안에서 그 주 시작일 ≤ 출하일 < 다음 주 시작일. 달 첫 주 시작 전(주말 1일 등)은 첫 주로. */
+export function weekActual(segs: (FcSeg | null)[], ships: { date: string; farm: string; n: number }[], farms: string[]): Record<string, number[]> {
+  const out: Record<string, number[]> = {};
+  farms.forEach((f) => (out[f] = Array(segs.length).fill(0)));
+  const idx = (d: string) => {
+    const ym = d.slice(0, 7); let hit = -1;
+    segs.forEach((s, i) => { if (s && s.start.slice(0, 7) === ym && (hit < 0 || s.start <= d)) hit = i; });
+    return hit;
+  };
+  ships.forEach((x) => { if (!out[x.farm] || !(x.n > 0)) return; const i = idx(x.date); if (i >= 0) out[x.farm][i] += x.n; });
+  return out;
+}

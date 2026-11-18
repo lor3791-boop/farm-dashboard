@@ -128,3 +128,6 @@
 | 6 | 농장 공유 화면 + 후기자돈사 | 한 농장 1주일 시범 운영 |
 
 2단계: 정산서 자동 작성, 채권 탭(샘플 대기), 루카 완전 통합, 품의 자동화.
+- 출하 → 재고(2026-11-18): `useHerd`가 출하 반영 전 그룹(기준일 시점)으로 `shipAssign`(calc/ship.ts) 배정 → 배정된 기준일 이후 출하를 `buildGroups`에 넘김. 같은 날·농장은 종합 > 피그온(그룹) > 팀 대시보드 > 등판서·직접 하나만. 배정 결과 `asg`(출하실적종합 key, 팀은 `teamKey`)를 정산·출하현황·예상물량이 같이 씀. 직접 고른 그룹은 saved.shipGroup.
+- 원료돈 예상물량 기준값: config/fcBase {file, at, months: JSON{YYYY-MM: {농장: 주차5칸}}}, `lib/fcBase.ts` parseFcBase(담당자 줄~합계). 없으면 FC_HAND(10/26). 화면 값 = 지난 주차 실제 출하(`weekActual`, shipRows) / 이번 주 이후 실적+예상.
+- 표 스타일: 줄 번갈아 #F4F2EC, 가운데 정렬, tabular-nums (index.css 끝). 행 배경을 따로 줄 때만 Grid row.bg 사용.

@@ -3,7 +3,7 @@ import { r1 } from './dates';
 import { SHIP, type ShipRow } from '@/data/snapshot';
 import type { ManualShip } from '@/data/types';
 import type { ImpRow } from '@/lib/shipImport';
-import { totToRow, type TotRow } from '@/lib/shipTotal';
+import { assignGroups, totToRow, type GroupCap, type TotRow } from '@/lib/shipTotal';
 export interface ShipAgg { n: number; trucks: number; avgw: number; yld: number; pay: number; g11: number; gp: number; out: number }
 const sum = (L: ShipRow[], i: number) => L.reduce((a, x) => a + (x[i] as number), 0);
 export function shipAgg(L: ShipRow[]): ShipAgg {
@@ -37,12 +37,30 @@ export const allShips = (manual: ManualShip[], imp: ImpRow[] = []): ShipRow[] =>
   const ik = new Set(imp.map((r) => shipKey(r.date, r.farm)));
   return BASE.concat(pendingImports(imp).map(impToRow), pendingManual(manual).filter((m) => !ik.has(shipKey(m.date, m.farm))).map(manualToRow));
 };
-// 재고 차감용 출하(기준일 이후): 그룹이 있는 피그온 자료가 있으면 그 날·농장은 피그온, 아니면 등판서·직접 입력
-export const liveShipsOf = (manual: ManualShip[], imp: ImpRow[]) => {
-  const pk = new Set(imp.filter((r) => r.group).map((r) => shipKey(r.date, r.farm)));
-  return imp.filter((r) => r.group).map((r) => ({ farm: r.farm, group: r.group, date: r.date, n: r.n }))
-    .concat(manual.filter((m) => !pk.has(shipKey(m.date, m.farm))).map((m) => ({ farm: m.farm, group: m.group, date: m.date, n: m.n })));
-};
+export interface LiveShip { farm: string; group: string; date: string; n: number; src: '종합' | '피그온' | '팀 대시보드' | '직접·등판서' }
+// 팀 대시보드 출하(그룹 없음)를 출하실적종합과 같은 방식으로 배정하기 위한 열쇠
+export const teamKey = (r: { date: string; farm: string; n: number; live: number }) => ['팀', r.date, r.farm, r.n, Math.round(r.live)].join('|');
+/** 출하 → 그룹 배정 + 재고 차감용 출하(기준일 이후).
+ * 같은 날·같은 농장은 한 자료만 센다: 출하실적종합 > 피그온(그룹 있음) > 팀 대시보드 > 등판서·직접 입력.
+ * 그룹이 없는 출하(종합·팀 대시보드)는 직접 고른 그룹 > 같은 날 그룹 있는 기록 > 선입선출(140일령·출하누계)로 배정 (assignGroups).
+ * caps = 기준일 시점 그룹(출하 반영 전) — 배정 결과가 출하 반영 뒤에도 바뀌지 않게 */
+export function shipAssign(tot: TotRow[], imp: ImpRow[], manual: ManualShip[], over: Record<string, string>, caps: GroupCap[], ref: string) {
+  const totK = new Set(tot.map((r) => shipKey(r.date, r.farm)));
+  const pig = imp.filter((r) => r.group);
+  const pigK = new Set(pig.map((r) => shipKey(r.date, r.farm)));
+  const team = imp.filter((r) => !r.group && !totK.has(shipKey(r.date, r.farm)) && !pigK.has(shipKey(r.date, r.farm)))
+    .map((r) => ({ key: teamKey(r), date: r.date, farm: r.farm, raw: '', dest: r.dest, n: r.n, live: r.live, carc: 0, amount: 0, price: 0, pay: 0, g1p: 0, g1: 0, g2: 0, out: 0 } as TotRow));
+  const teamK = new Set(team.map((r) => shipKey(r.date, r.farm)));
+  const rows = [...tot, ...team].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const known = [...pig, ...manual.filter((m) => m.group)].map((r) => ({ farm: r.farm, date: r.date, n: r.n, group: r.group }));
+  const asg = assignGroups(rows, caps, over, known, ref);
+  const live: LiveShip[] = [];
+  tot.forEach((r) => { const g = asg[r.key]?.group; if (r.date > ref && g) live.push({ farm: r.farm, group: g, date: r.date, n: r.n, src: '종합' }); });
+  pig.forEach((r) => { if (r.date > ref && !totK.has(shipKey(r.date, r.farm))) live.push({ farm: r.farm, group: r.group, date: r.date, n: r.n, src: '피그온' }); });
+  team.forEach((r) => { const g = asg[r.key]?.group; if (r.date > ref && g) live.push({ farm: r.farm, group: g, date: r.date, n: r.n, src: '팀 대시보드' }); });
+  manual.forEach((m) => { const k = shipKey(m.date, m.farm); if (m.date > ref && m.group && !totK.has(k) && !pigK.has(k) && !teamK.has(k)) live.push({ farm: m.farm, group: m.group, date: m.date, n: m.n, src: '직접·등판서' }); });
+  return { asg, live };
+}
 // 종합이 아직 없는 출하의 예상 지급율: 같은 출하처의 최근 60일 종합 지급율(지육중량 가중)
 export function estPay(dest: string, date: string): number | null {
   const sd = shortDest(dest), from = new Date(Date.parse(date) - 60 * 864e5).toISOString().slice(0, 10);

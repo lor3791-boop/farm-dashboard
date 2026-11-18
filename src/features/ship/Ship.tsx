@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/auth';
 import { useData } from '@/lib/data';
 import { parseGradeSheet, segRows, segsByTrace, type GradeSheet, type Seg } from '@/lib/gradeSheet';
 import { SHIP } from '@/data/snapshot';
-import { shortDest, estPay, pendingImports, shipBase, baseHas, shipKey } from '@/lib/calc/ship';
+import { shortDest, estPay, pendingImports, shipBase, baseHas, shipKey, teamKey } from '@/lib/calc/ship';
 import { parseShipImport, type ShipImport } from '@/lib/shipImport';
 import { makeResolver } from '@/lib/names';
 import { fmt, md, r1 } from '@/lib/calc/dates';
@@ -162,20 +162,24 @@ export function ShipUpload() {
   );
 }
 
-interface Row { key: string; date: string; farm: string; group: string; dest: string; n: number; live: number; carc: number; pay: number | null; payEst: boolean; g1p: number; g1: number; g2: number; out: number; src: '종합' | '등판서' | '직접 입력' | '피그온' | '팀 대시보드' }
+interface Row { key: string; date: string; farm: string; group: string; dest: string; n: number; live: number; carc: number; pay: number | null; payEst: boolean; g1p: number; g1: number; g2: number; out: number; src: '종합' | '등판서' | '직접 입력' | '피그온' | '팀 대시보드'; tkey?: string }
 
 export function ShipStatus() {
-  const { ships, farms, imports } = useHerd();
+  const { ships, farms, imports, asg, full, saved, save } = useHerd();
+  const { up } = useData();
   const rows = useMemo<Row[]>(() => {
-    const a: Row[] = shipBase().map((x, i) => ({ key: 's' + i, date: x[0], farm: x[1], group: '', dest: x[2], n: x[3], live: x[4], carc: x[5], pay: x[6] > 0 ? r1(x[6] * 100) : null, payEst: false, g1p: x[7], g1: x[8], g2: x[9], out: x[10], src: '종합' }));
+    // 그룹 = 재고 계산에 쓴 배정 (출하실적종합·팀 대시보드는 선입선출 배정, 출하입력 › 출하실적종합에서 바꿀 수 있음)
+    const tk: Record<string, string> = {};
+    up.total.rows.forEach((r) => { tk[[r.date, r.farm, r.n, Math.round(r.live)].join('|')] = asg[r.key]?.group ?? ''; });
+    const a: Row[] = shipBase().map((x, i) => ({ key: 's' + i, date: x[0], farm: x[1], group: tk[[x[0], x[1], x[3], Math.round(x[4])].join('|')] ?? '', dest: x[2], n: x[3], live: x[4], carc: x[5], pay: x[6] > 0 ? r1(x[6] * 100) : null, payEst: false, g1p: x[7], g1: x[8], g2: x[9], out: x[10], src: '종합' }));
     const P = pendingImports(imports), ik = new Set(P.map((r) => shipKey(r.date, r.farm)));
-    P.forEach((r, i) => { const pay = r.pay ?? estPay(r.dest, r.date); a.push({ key: 'i' + i, date: r.date, farm: r.farm, group: r.group, dest: r.dest, n: r.n, live: r.live, carc: r.carc > 0 ? r.carc : r.live * 0.77, pay, payEst: r.pay == null && pay != null, g1p: r.g1p, g1: r.g1, g2: r.g2, out: r.out, src: r.src === 'pigon' ? '피그온' : '팀 대시보드' }); });
+    P.forEach((r, i) => { const pay = r.pay ?? estPay(r.dest, r.date); a.push({ key: 'i' + i, ...(r.group ? {} : { tkey: teamKey(r) }), date: r.date, farm: r.farm, group: r.group || asg[teamKey(r)]?.group || '', dest: r.dest, n: r.n, live: r.live, carc: r.carc > 0 ? r.carc : r.live * 0.77, pay, payEst: r.pay == null && pay != null, g1p: r.g1p, g1: r.g1, g2: r.g2, out: r.out, src: r.src === 'pigon' ? '피그온' : '팀 대시보드' }); });
     ships.filter((m) => !baseHas(m.date, m.farm) && !ik.has(shipKey(m.date, m.farm))).forEach((m) => {
       const pay = m.pay ?? estPay(m.dest, m.date);
       a.push({ key: m.id, date: m.date, farm: m.farm, group: m.group, dest: m.dest, n: m.n, live: m.live, carc: m.carc ?? r1((m.live * m.yld) / 100), pay, payEst: m.pay == null && pay != null, g1p: m.g1p, g1: m.g1, g2: m.g2, out: m.out, src: m.kind === 'grade' ? '등판서' : '직접 입력' });
     });
     return a;
-  }, [ships, imports]);
+  }, [ships, imports, asg, up.total.rows]);
   const months = useMemo(() => [...new Set([thisMonth(), ...rows.map((r) => r.date.slice(0, 7))])].sort().reverse(), [rows]);
   const [mon, setMon] = useState(thisMonth());
   const phone = useIsPhone();
@@ -264,6 +268,12 @@ export function ShipStatus() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, fontSize: 14 }}>
               {([['거래처', shortDest(r.dest)], ['총생체중', fmt(Math.round(r.live)) + 'kg'], ['출하평체', r1(r.live / r.n) + 'kg'], ['지급율', r.pay == null ? '—' : r.pay + '%' + (r.payEst ? ' (예상)' : '')], ['지육율', r1((r.carc / r.live) * 100) + '%'], ['등급율', r1(((r.g1p + r.g1) / r.n) * 100) + '%'], ['1+', String(r.g1p)], ['1 / 2', r.g1 + ' / ' + r.g2], ['등외', String(r.out)]] as const).map(([l, v]) => <div key={l}><div className="muted small">{l}</div><b>{v}</b></div>)}
             </div>
+            {r.tkey && <label style={{ display: 'block', marginTop: 14, fontSize: 14 }}>재고에서 뺄 그룹 <span className="muted small">({asg[r.tkey]?.how === 'manual' ? '직접 고름' : asg[r.tkey]?.how === 'pigon' ? '같은 날 입력 기록' : '선입선출 자동'})</span><br />
+              <select value={saved.shipGroup?.[r.tkey] ?? ''} onChange={(e) => { const m = { ...(saved.shipGroup ?? {}) }; if (e.target.value) m[r.tkey!] = e.target.value; else delete m[r.tkey!]; save({ shipGroup: m }); }}>
+                <option value="">자동 ({asg[r.tkey]?.group || '배정 없음'})</option>
+                {full.filter((g) => g.farm === r.farm).map((g) => <option key={g.group} value={g.group}>{g.group} (재고 {fmt(g.stock)})</option>)}
+                <option value="-">그룹 아님 (재고에서 안 뺌)</option>
+              </select></label>}
           </Sheet>) : null; })()}
         {!more && L.length > 40 && <button className="btn" style={{ marginTop: 10 }} onClick={() => setMore(true)}>{L.length - 40}건 더 보기</button>}
       </div>

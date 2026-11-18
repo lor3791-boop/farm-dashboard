@@ -1,6 +1,6 @@
 // 원료돈 예상물량 — 엑셀(LibreOffice 재계산) 결과와 같은지 검산
 import { describe, it, expect } from 'vitest';
-import { forecast, farmTable, weekSegments, phi, phiInv } from './forecast';
+import { forecast, farmTable, weekSegments, weekActual, phi, phiInv } from './forecast';
 import { FC_SETTINGS, FC_GROUPS, FC_ASOF } from '@/data/forecastSeed';
 import fx from '@/data/__fixtures__/forecast-2026-11-05.json';
 
@@ -32,5 +32,15 @@ describe('원료돈 예상물량', () => {
     const late = forecast(FC_GROUPS, { ...FC_SETTINGS, w1: 116 }, FC_ASOF, '2026-11').rows;
     const nov = (rs: typeof rows) => rs.reduce((a, r) => a + r.heads.slice(0, 5).reduce((x, y) => x + y, 0), 0);
     expect(nov(late)).toBeLessThan(nov(rows));
+  });
+});
+
+describe('실제 출하 → 주차 칸', () => {
+  it('11월: 11/1(일)은 1주, 11/7(토)는 1주, 11/9는 2주, 12/1은 12월 1주', () => {
+    const segs = weekSegments('2026-11', []);
+    const a = weekActual(segs, [{ date: '2026-11-01', farm: 'A', n: 10 }, { date: '2026-11-07', farm: 'A', n: 5 }, { date: '2026-11-09', farm: 'A', n: 20 }, { date: '2026-12-01', farm: 'A', n: 7 }, { date: '2026-11-09', farm: 'B', n: 3 }], ['A']);
+    expect(a.A.slice(0, 2)).toEqual([15, 20]);
+    expect(a.A[5]).toBe(7);
+    expect(a.B).toBeUndefined();
   });
 });

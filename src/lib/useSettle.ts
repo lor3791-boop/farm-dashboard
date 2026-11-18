@@ -1,20 +1,16 @@
 // 정산 공용 계산 — 출하실적종합 줄의 그룹 배정, 그룹별 정산실적, 그룹별 상계 예정(월대·선급금)
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import { useData } from './data';
 import { useHerd } from './ui';
-import { REF, TODAY, type Group } from './calc/herd';
-import { assignGroups, totAgg, type TotRow } from './shipTotal';
+import type { Group } from './calc/herd';
+import { totAgg, type TotRow } from './shipTotal';
 import { monthlyOwing, suggestLoan, type Loan } from './bonds';
 
-const days = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 864e5);
 
 export function useSettle() {
   const { up } = useData();
-  const { all, full, imports, ships, saved, isPlanned } = useHerd();
-  const tot = up.total.rows;
-  const asg = useMemo(() => assignGroups(tot,
-    full.map((g) => ({ farm: g.farm, group: g.group, date: g.date, sold: g.sold, stock: g.stock, ageRef: g.age - days(REF, TODAY) })),
-    saved.shipGroup ?? {}, [...ships.filter((r) => r.group), ...imports.filter((r) => r.group)].map((r) => ({ farm: r.farm, date: r.date, n: r.n, group: r.group })), REF), [tot, full, saved.shipGroup, imports, ships]);
+  const { all, imports, ships, saved, isPlanned, asg } = useHerd();
+  const tot = up.total.rows; // 그룹 배정(asg)은 useHerd에서 재고 계산과 함께 한 번만 (calc/ship.ts shipAssign)
   const rowsOf = useCallback((g: { farm: string; group: string }): TotRow[] => tot.filter((r) => r.farm === g.farm && asg[r.key]?.group === g.group), [tot, asg]);
   // 그룹 출하 생체 합계 = 출하실적종합(그룹 배정) + 그 뒤 등판서·직접 입력·피그온 출하
   const shipLiveOf = (g: { farm: string; group: string }) => {

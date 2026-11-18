@@ -54,7 +54,7 @@ export function Grid<T>({ cols, sort, onSort, rows, minW, scroll, noCards }: { c
         {sort.k && <button className="btn sm ghost" onClick={() => onSort(sort.k!)}>{sort.d > 0 ? '▲ 오름' : '▼ 내림'}</button>}
       </div>
       {rows.map((r) => (
-        <div key={r.key} className={'gcard' + (r.tone ? ' tone-' + r.tone : '')} style={{ ['--rowbg' as any]: r.bg ?? '#fff' }}>
+        <div key={r.key} className={'gcard' + (r.tone ? ' tone-' + r.tone : '')} style={r.bg ? { ['--rowbg' as any]: r.bg } : undefined}>
           {r.onClick && <button className="rowhit" onClick={r.onClick} aria-label={r.aria} />}
           <div style={{ fontWeight: 700 }}>{r.cells[0]}</div>
           <div className="kv2">{r.cells.slice(1).map((c, i) => <div key={i} style={{ minWidth: 0 }} ref={(el) => { if (el) { const t = (el.textContent ?? '').trim(); el.style.display = t === (cols[i + 1]?.l ?? '') || t === (cols[i + 1]?.l ?? '') + '—' ? 'none' : ''; } }}><small>{cols[i + 1]?.l}</small>{c}</div>)}</div>
@@ -77,7 +77,7 @@ export function Grid<T>({ cols, sort, onSort, rows, minW, scroll, noCards }: { c
           ); })}
         </div>
         {rows.map((r) => (
-          <div key={r.key} className={'gr rowx' + (r.tone ? ' tone-' + r.tone : '')} style={{ gridTemplateColumns: grid, background: r.bg ?? '#fff', ['--rowbg' as any]: r.bg ?? '#fff' }}>
+          <div key={r.key} className={'gr rowx' + (r.tone ? ' tone-' + r.tone : '')} style={{ gridTemplateColumns: grid, ...(r.bg ? { background: r.bg, ['--rowbg' as any]: r.bg } : {}) }}>
             {r.onClick && <button className="rowhit" onClick={r.onClick} aria-label={r.aria} title={r.aria} />}
             {r.cells.map((c, i) => <div key={i} className={i === 0 ? 'stick' : ''} style={{ minWidth: 0 }}>{c}</div>)}
           </div>

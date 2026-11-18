@@ -166,3 +166,18 @@
 .gcard .kv2{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px 10px;margin-top:6px;font-size:13px}
 .gcard .kv2 .r{text-align:left}
 .gcard .kv2 small{display:block;color:#8A877E;font-size:11px}
+
+/* 표 보기 좋게 (2026-11-18) — 줄마다 흰색/옅은 회색 번갈아, 머리글·값 가운데 정렬, 숫자는 같은 폭 숫자(tabular)로 자리 맞춤 */
+.v5 th,.v5 td{text-align:center}
+.v5 td.r,.v5 th.r{text-align:center}
+.v5 tbody tr:nth-child(even)>td{background:#F4F2EC}
+.v5 tbody tr:hover>td{background:#ECE8DF}
+.v5 td{font-variant-numeric:tabular-nums}
+.gr>*{text-align:center;font-variant-numeric:tabular-nums}
+.gr .r,.gcard .kv2 .r{text-align:center}
+.gcard .kv2{text-align:center}
+.th,.th.r{justify-content:center}
+.gr:nth-child(even of .gr:not(.gh)){background:#F4F2EC;--rowbg:#F4F2EC}
+.gr:not(.gh):hover{background:#ECE8DF;--rowbg:#ECE8DF}
+.gcard:nth-child(even of .gcard){--rowbg:#F4F2EC}
+.gr .th{width:100%}
