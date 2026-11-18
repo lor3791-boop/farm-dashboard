@@ -81,7 +81,7 @@ function EditPanel({ r, onDone }: { r: DeathRow; onDone: () => void }) {
 function Item({ r, open, onOpen, onCheck }: { r: DeathRow; open: boolean; onOpen: () => void; onCheck: () => void }) {
   const { split } = useHerd();
   const x = split[r.id];
-  const extra = [nPhotos(r) ? '사진 ' + nPhotos(r) : '', r.heat ? '폭염' : '', x?.claim ? '크레임 ' + x.claim : ''].filter(Boolean).join(' · ');
+  const extra = [nPhotos(r) ? '사진 ' + nPhotos(r) : '', r.heat ? '폭염' : '', x?.claim ? (x.death ? `크레임 ${x.claim} · 피그온 등록 ${x.death}두` : `크레임 ${x.claim} (피그온 등록 안 함)`) : ''].filter(Boolean).join(' · ');
   return (
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid #EFEBE3', background: open ? '#EEF3EF' : undefined }}>
@@ -92,11 +92,12 @@ function Item({ r, open, onOpen, onCheck }: { r: DeathRow; open: boolean; onOpen
           </div>
           <b style={{ fontSize: 17, fontVariantNumeric: 'tabular-nums' }}>{r.count}<span style={{ fontSize: 13, fontWeight: 400 }}>두</span></b>
         </button>
+        {!r.checked && x && x.death === 0 && x.claim > 0 ? <span className="chip" style={{ fontSize: 12, marginRight: 6 }} title="크레임 폐사 — 피그온에 등록하지 않음">크레임</span> :
         <button onClick={onCheck} aria-pressed={r.checked} aria-label={r.checked ? '등록완료 풀기' : '피그온 등록완료'}
           style={{ minWidth: 64, minHeight: 40, borderRadius: 20, font: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer', marginRight: 4,
             ...(r.checked ? { background: '#E6EFE9', color: '#1F4E3D', border: '1px solid #E6EFE9' } : { background: '#fff', color: '#1F4E3D', border: '1px solid #1F4E3D' }) }}>
           {r.checked ? '✓ 완료' : '○ 등록'}
-        </button>
+        </button>}
       </div>
     </>
   );
@@ -110,8 +111,11 @@ export const openUnregWindow = () => {
 
 type St = 'no' | 'ok' | 'all';
 export function DeathRecords({ popup = false }: { popup?: boolean }) {
-  const { deaths, passFarm } = useHerd();
+  const { deaths, passFarm, split } = useHerd();
   const { repo, email } = useAuth();
+  // 크레임으로만 처리되는 폐사(피그온에 안 올림)는 미등록이 아님 → '등록완료' 쪽에 둔다
+  const claimOnly = (r: DeathRow) => !r.checked && !!split[r.id] && split[r.id].death === 0 && split[r.id].claim > 0;
+  const done = (r: DeathRow) => r.checked || claimOnly(r);
   const [st, setSt] = useState<St>('no');
   const [farm, setFarm] = useState('');
   const [mon, setMon] = useState(thisMonth());
@@ -119,8 +123,8 @@ export function DeathRecords({ popup = false }: { popup?: boolean }) {
   const [allOk, setAllOk] = useState(false);
   const [more, setMore] = useState(false);
   const base = deaths.filter((r) => popup || passFarm(r.farm));
-  const unregN = base.filter((r) => !r.checked).length;
-  const inSt = base.filter((r) => st === 'all' || (st === 'ok') === r.checked);
+  const unregN = base.filter((r) => !done(r)).length;
+  const inSt = base.filter((r) => st === 'all' || (st === 'ok') === done(r));
   const months = useMemo(() => [...new Set([thisMonth(), ...base.map((r) => r.date.slice(0, 7))])].sort().reverse(), [base]);
   const monF = st === 'no' ? '' : mon;
   const byFarm = useMemo(() => { const m: Record<string, number> = {}; inSt.filter((r) => !monF || r.date.startsWith(monF)).forEach((r) => { m[r.farm] = (m[r.farm] ?? 0) + r.count; }); return m; }, [inSt, monF]);

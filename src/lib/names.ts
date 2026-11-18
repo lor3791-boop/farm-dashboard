@@ -9,11 +9,12 @@ export function makeResolver(farms: string[], nameMap: NameMapRow[] = []) {
   const fn = (raw: string) => {
     const n = (raw ?? '').trim(); if (!n) return '';
     if (farms.includes(n)) return n;
+    if (farms.includes(strip(n))) return strip(n); // 설정에 담당농장으로 넣은 이름은 '담당 아님' 맞춤보다 우선 (예: 예성 추가)
     const m = hit(n);
     if (m) return m.excluded || !farms.includes(m.target) ? '' : m.target;
     return farms.find((f) => n.includes(f)) ?? '';
   };
   // 담당 아님으로 정해 둔 이름이면 true (알림에 띄우지 않음)
-  fn.excluded = (raw: string) => { const n = (raw ?? '').trim(); return !n || n === '-' || !!hit(n)?.excluded; };
+  fn.excluded = (raw: string) => { const n = (raw ?? '').trim(); return !n || n === '-' || (!fn(n) && !!hit(n)?.excluded); };
   return fn;
 }

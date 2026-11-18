@@ -10,8 +10,10 @@ import { REF, type ManualGroup } from '@/lib/calc/herd';
 const BASE_SOW = ['익산', '그린피그팜', '장수GGP'];
 
 export function GroupAdd({ onClose }: { onClose: () => void }) {
-  const { all, full, farms, saved, save: saveUi } = useHerd();
+  const { all, full, farms: gFarms, saved, save: saveUi } = useHerd();
   const { data, groups } = useData();
+  // 그룹이 아직 없는 농장(설정에서 새로 넣은 담당농장)도 고를 수 있게 — 후기자돈사 제외
+  const farms = [...new Set([...gFarms, ...(data?.farms ?? []).filter((x) => x.type !== '후기자돈사').map((x) => x.name)])];
   const { repo, email } = useAuth();
   const farmOf = (n: string) => data?.farms.find((f) => f.name === n);
   const nextGroup = (n: string) => { const L = all.filter((r) => r.farm === n).map((r) => r.group).filter((g) => /^\d{2}-\d+$/.test(g)); const yy = todayKST().slice(2, 4); const max = Math.max(0, ...L.filter((g) => g.startsWith(yy + '-')).map((g) => Number(g.split('-')[1]))); return `${yy}-${max + 1}`; };

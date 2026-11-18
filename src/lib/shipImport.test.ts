@@ -20,3 +20,13 @@ describe('출하 자료 읽기', () => {
     expect(m.length).toBe(1); expect(m[0]).toMatchObject({ group: '26-7', pay: 76.6, carc: 1495, src: 'pigon' });
   });
 });
+
+import { makeResolver } from './names';
+describe('담당농장 추가 시 이름 맞춤', () => {
+  it("설정에 '예성'을 넣으면 '담당 아님' 기본 맞춤보다 우선", () => {
+    expect(makeResolver(['명임'])('예성')).toBe('');
+    const r = makeResolver(['명임', '예성']);
+    expect(r('예성')).toBe('예성');
+    expect(r.excluded('예성')).toBe(false);
+  });
+});

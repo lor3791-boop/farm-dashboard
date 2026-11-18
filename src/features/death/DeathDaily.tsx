@@ -43,14 +43,16 @@ export function DeathDaily() {
   const colTot = (c: string) => rows.filter((r) => keyOf(r) === c).reduce((a, r) => a + r.count, 0);
   const total = rows.reduce((a, r) => a + r.count, 0);
   const claimTot = rows.reduce((a, r) => a + (split[r.id]?.claim ?? 0), 0);
-  const unreg = rows.filter((r) => !r.checked).reduce((a, r) => a + r.count, 0);
+  // 미등록 = 피그온에 올릴 두수 (크레임 몫은 피그온에 안 올림)
+  const reg = (r: { id: string; count: number }) => split[r.id]?.death ?? r.count;
+  const unreg = rows.filter((r) => !r.checked).reduce((a, r) => a + reg(r), 0);
   const grid = `70px repeat(${cols.length}, minmax(54px, 1fr)) 54px`;
   const xl = () => downloadXlsx('폐사현황', [{ name: '일자별', head: ['날짜', ...cols, '합계'], rows: dates.map((d) => [d, ...cols.map((c) => cell(d, c)), byDay[d] ?? 0]) }, { name: '기록', head: ['날짜', '농장', '동', '그룹', '두수', '크레임', '폐사', '피그온'], rows: [...rows].sort((a, b) => (a.date < b.date ? -1 : 1)).map((r) => [r.date, r.farm, r.dong, r.group, r.count, split[r.id]?.claim ?? 0, split[r.id]?.death ?? r.count, r.checked ? '등록완료' : '미등록']) }]);
 
   // 농장별 → 동·그룹별 합계
   const farmSum = useMemo(() => {
     const m = new Map<string, { n: number; claim: number; unreg: number; g: Map<string, number> }>();
-    rows.forEach((r) => { const x = m.get(r.farm) ?? { n: 0, claim: 0, unreg: 0, g: new Map() }; x.n += r.count; x.claim += split[r.id]?.claim ?? 0; if (!r.checked) x.unreg += r.count; x.g.set(dg(r), (x.g.get(dg(r)) ?? 0) + r.count); m.set(r.farm, x); });
+    rows.forEach((r) => { const x = m.get(r.farm) ?? { n: 0, claim: 0, unreg: 0, g: new Map() }; x.n += r.count; x.claim += split[r.id]?.claim ?? 0; if (!r.checked) x.unreg += reg(r); x.g.set(dg(r), (x.g.get(dg(r)) ?? 0) + r.count); m.set(r.farm, x); });
     return [...m].sort((a, b) => b[1].n - a[1].n);
   }, [rows, split]);
 
@@ -158,7 +160,7 @@ export function DeathDaily() {
           {rows.filter((r) => r.date === day).sort((a, b) => a.farm.localeCompare(b.farm, 'ko')).map((r) => (
             <div key={r.id} style={{ display: 'flex', gap: 10, padding: '10px 0', borderBottom: '1px solid #EFEBE3', alignItems: 'center' }}>
               <div style={{ flex: 1, minWidth: 0 }}><b>{r.farm}</b> {dg(r)}{split[r.id]?.claim ? <div className="muted small">크레임 {split[r.id].claim}</div> : null}</div>
-              {!r.checked && <span className="chip warn" style={{ fontSize: 11 }}>미등록</span>}
+              {!r.checked && reg(r) > 0 && <span className="chip warn" style={{ fontSize: 11 }}>미등록</span>}
               <b>{r.count}두</b>
             </div>
           ))}
