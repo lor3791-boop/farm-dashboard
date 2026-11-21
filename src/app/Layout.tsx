@@ -85,11 +85,11 @@ export function Layout({ children }: { children: ReactNode }) {
       <div style={{ color: '#A9C6B8', fontSize: 12, padding: '0 8px 14px' }}>(피그온 {refLabel} 업데이트)</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {MENU.map((m) => (
-          <NavLink key={m.path} to={m.path} end={m.path === '/'} onClick={() => setOpen(false)} className={({ isActive }) => (isActive ? 'nav on' : 'nav') + (m.accent ? ' acc' : '')}>{m.label}</NavLink>
+          <div key={m.path} style={{ display: 'contents' }}>
+            <NavLink to={m.sub ? m.path + '/' + m.sub[0][0] : m.path} end={m.path === '/'} onClick={() => { if (!m.sub) setOpen(false); }} className={() => (cur.path === m.path && !m.sub ? 'nav on' : 'nav') + (m.accent ? ' acc' : '') + (m.sub && cur.path === m.path ? ' grp' : '')}>{m.label}{m.sub && <span aria-hidden="true" style={{ marginLeft: 'auto', fontSize: 11 }}>{cur.path === m.path ? '▾' : '▸'}</span>}</NavLink>
+            {m.sub && cur.path === m.path && m.sub.map(([k, l]) => <NavLink key={k} to={m.path + '/' + k} onClick={() => setOpen(false)} className={({ isActive }) => (isActive ? 'nav sub on' : 'nav sub')}>{l}</NavLink>)}
+          </div>
         ))}
-      </div>
-      <div style={{ margin: '22px 8px 0', paddingTop: 14, borderTop: '1px solid #2F6B55', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <a href="https://lor3791-boop.github.io/luka-piglets/" target="_blank" rel="noreferrer" style={{ color: '#FCE3A6', fontSize: 14 }}>루카 현황판 ↗</a>
       </div>
       <div style={{ marginTop: 'auto', padding: '24px 8px 0', color: '#A9C6B8', fontSize: 12 }}>
         {name && <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>}

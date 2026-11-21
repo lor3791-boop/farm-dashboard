@@ -193,3 +193,5 @@
 .totop{position:fixed;right:max(23px,calc(env(safe-area-inset-right,0px) + 7px));bottom:calc(140px + env(safe-area-inset-bottom,0px));z-index:31;width:44px;height:44px;border-radius:22px;background:#fff;color:#1F4E3D;border:1px solid #CFC9BC;box-shadow:0 4px 12px rgba(20,30,25,.18);cursor:pointer;display:flex;align-items:center;justify-content:center}
 @media (min-width:1024px){.totop{bottom:96px;right:35px}}
 .totop.low{bottom:calc(20px + env(safe-area-inset-bottom,0px))}
+.v5 a.nav.grp{color:#fff;font-weight:700}
+.v5 a.nav.sub{padding:8px 12px 8px 26px;min-height:38px;font-size:14px;color:#C9DDD3}.v5 a.nav.sub.on{color:#fff;background:#2F6B55;font-weight:700}
