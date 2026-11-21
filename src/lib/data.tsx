@@ -71,7 +71,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const off = onPyesaChange(load);
     return () => { alive = false; clearInterval(t); off(); };
   }, [key, farmNames]);
-  const deaths = useMemo(() => fsDeaths.concat(sheet), [fsDeaths, sheet]);
+  // 공유 화면 폐사를 시트로 보낸 것(sheetAt)은 원본을 빼고 시트 줄 하나로 본다 (열쇠는 이어받아 공유 화면 계산이 겹치지 않게)
+  const deaths = useMemo(() => {
+    const ck = (d: DeathRow) => [d.date, d.farm, d.group, d.count].join('|'); // 동은 표기가 달 수 있어 비교에서 뺌
+    const pool = new Map<string, DeathRow[]>(); sheet.forEach((r) => { const k = ck(r); pool.set(k, [...(pool.get(k) ?? []), r]); });
+    const take = new Map<string, string>(); // 시트 줄 id → 공유 화면 열쇠
+    const fs = fsDeaths.filter((d) => { if (!(d as any).sheetAt) return true; const m = (pool.get(ck(d)) ?? []).filter((r) => !take.has(r.id)).sort((a, b) => Number(String(b.dong).replace(/\D/g, '') === String(d.dong).replace(/\D/g, '')) - Number(String(a.dong).replace(/\D/g, '') === String(d.dong).replace(/\D/g, '')) || Number(b.sheetRow) - Number(a.sheetRow))[0]; if (!m) return true; take.set(m.id, d.key); return false; });
+    return fs.concat(sheet.map((r) => (take.has(r.id) ? { ...r, key: take.get(r.id)! } : r)));
+  }, [fsDeaths, sheet]);
   const loading = !st.data || (!!key && !sheetReady);
   const refresh = useCallback(() => loadRef.current(), []);
   return <Ctx.Provider value={{ ...st, deaths, ships, groups, uploads, imports, sheetErr, loading, refresh, up }}>{children}</Ctx.Provider>;

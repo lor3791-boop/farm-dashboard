@@ -1,4 +1,5 @@
 // 뼈대 — 좌측 메뉴(초록), 제목 줄, 공통 필터 띠. 폰: 하단 탭바 + ☰(더보기), 옆으로 밀어 탭 넘기기, 당겨서 새로고침. 어디서나 + 버튼(폐사·출하 입력).
+import { useDeathSync } from '@/lib/useDeathSync';
 import { useRef, useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { MENU, tabOf } from './menu';
@@ -77,6 +78,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const loc = useLocation();
   const { s: ui, go } = useUi();
   useSharePublisher();
+  useDeathSync();
   const cur = MENU.find((m) => (m.path === '/' ? loc.pathname === '/' : loc.pathname.startsWith(m.path))) ?? MENU[0];
 
   const nav = (
