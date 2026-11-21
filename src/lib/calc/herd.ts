@@ -88,7 +88,8 @@ export function buildGroups(T: Thresholds, firstShipByFarm: Record<string, numbe
     const b = base[who];
     o.liveDeath = b.death - b.inDeath; o.death = b.death; o.claimLeft = b.claimLeft; o.claimDead = o.claim - b.claimLeft;
     o.liveSold = shipped[who] ?? 0; o.sold += o.liveSold; o.stock = b.stock - o.liveSold;
-    o.age = Math.round(lots.reduce((a, l) => a + l[1] * (l[3] + days(iso(l[0]), REF)), 0) / tot);
+    o.age = Math.round(lots.reduce((a, l) => a + l[1] * (l[3] + days(iso(l[0]), TODAY)), 0) / tot); // 오늘 기준 일령
+    o.week = Math.max(o.week, Math.floor(days(o.date, TODAY) / 7) + 1);
     o.prog = o.sold + o.stock ? Math.round((o.sold / (o.sold + o.stock)) * 100) : 0;
     o.surv = r1(((o.net - o.death) / o.net) * 100);
     o.expSurv = r1(((o.sold + o.stock - o.claimLeft) / o.net) * 100);
@@ -127,11 +128,11 @@ export function buildGroups(T: Thresholds, firstShipByFarm: Record<string, numbe
   });
 }
 
-export interface Agg { net: number; death: number; sold: number; stock: number; claim: number; claimLeft: number; exp: number; surv: number; prog: number; mort: number }
+export interface Agg { inn: number; net: number; death: number; sold: number; stock: number; claim: number; claimLeft: number; exp: number; surv: number; prog: number; mort: number }
 export function agg(g: Group[]): Agg {
   const s = (k: keyof Group) => g.reduce((a, r) => a + (r[k] as number), 0);
   const net = s('net'), death = s('death'), sold = s('sold'), stock = s('stock');
-  return { net, death, sold, stock, claim: s('claim'), claimLeft: s('claimLeft'), exp: s('exp'), surv: net ? r1(((net - death) / net) * 100) : 0, prog: sold + stock ? Math.round((sold / (sold + stock)) * 100) : 0, mort: net ? r1((death / net) * 100) : 0 };
+  return { inn: s('inn'), net, death, sold, stock, claim: s('claim'), claimLeft: s('claimLeft'), exp: s('exp'), surv: net ? r1(((net - death) / net) * 100) : 0, prog: sold + stock ? Math.round((sold / (sold + stock)) * 100) : 0, mort: net ? r1((death / net) * 100) : 0 };
 }
 
 // 작업 알림 — 로트별 예정일(전입현황)을 날짜·작업별로 묶는다

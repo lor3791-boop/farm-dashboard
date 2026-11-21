@@ -48,8 +48,10 @@ function HerdTable() {
     { k: 'week', l: '주차', w: '50px', num: true, sv: (r) => r.week },
     { k: 'age', l: '일령', w: '52px', num: true, sv: (r) => r.age },
     { k: 'avgw', l: '전입평체', w: '68px', num: true, sv: (r) => r.avgw },
+    { k: 'inn', l: '최초두수', w: '68px', num: true, sv: (r) => r.inn },
+    { k: 'crm', l: '크레임', w: '58px', num: true, sv: (r) => r.claim },
     { k: 'net', l: '전입', w: '62px', num: true, sv: (r) => r.net },
-    { k: 'claim', l: '클레임', w: '58px', num: true, sv: (r) => r.claim },
+    { k: 'claimLeft', l: '크레임잔여', w: '72px', num: true, sv: (r) => r.claimLeft },
     { k: 'death', l: '폐사', w: '54px', num: true, sv: (r) => r.death },
     { k: 'surv', l: '육성률', w: '64px', num: true, sv: (r) => r.surv },
     { k: 'sold', l: '출하', w: '56px', num: true, sv: (r) => r.sold },
@@ -73,8 +75,10 @@ function HerdTable() {
       case 'week': return <Num v={r.week + '주'} />;
       case 'age': return <Num v={r.age} />;
       case 'avgw': return <Num v={r.avgw + 'kg'} />;
+      case 'inn': return <Num v={fmt(r.inn)} />;
       case 'net': return <Num v={fmt(r.net)} />;
-      case 'claim': return <Num v={r.claim} />;
+      case 'crm': return <Num v={r.claim || '—'} />;
+      case 'claimLeft': return <Num v={r.claimLeft || '—'} />;
       case 'death': return <Num v={r.death} />;
       case 'surv': return <Num v={r.surv + '%'} cls={r.bad ? 'neg' : ''} />;
       case 'sold': return <Num v={fmt(r.sold)} />;
@@ -99,8 +103,10 @@ function HerdTable() {
     const a = agg(g);
     switch (k) {
       case 'who': return <Lnk v={f} sub={g.length + '개 그룹 ' + (expOf(f) ? '▾' : '▸')} />;
+      case 'inn': return <Num v={fmt(a.inn)} cls="b" />;
       case 'net': return <Num v={fmt(a.net)} cls="b" />;
-      case 'claim': return <Num v={a.claim} cls="b" />;
+      case 'crm': return <Num v={a.claim || '—'} cls="b" />;
+      case 'claimLeft': return <Num v={a.claimLeft || '—'} cls="b" />;
       case 'death': return <Num v={a.death} cls="b" />;
       case 'surv': return <Num v={a.surv + '%'} cls={a.surv < T.problemSurvivalPct ? 'b neg' : 'b'} />;
       case 'sold': return <Num v={fmt(a.sold)} cls="b" />;
@@ -267,7 +273,7 @@ function Detail({ who, order, onDeath }: { who: string; order: string[]; onDeath
   const d = all.find((r) => r.who === who);
   if (!d || !T) return null;
   const idx = order.indexOf(d.who);
-  const kpis: [string, string, string][] = [['전입', fmt(d.net) + '두', '최초 ' + fmt(d.inn) + ' − 크레임 ' + d.claim], ['폐사', d.death + '두', '피그온'], ['육성률', d.surv + '%', d.bad ? T.problemSurvivalPct + '% 미만' : '기준 이상'], ['재고', fmt(d.stock) + '두', '출하 ' + fmt(d.sold) + '두 · ' + d.prog + '%']];
+  const kpis: [string, string, string][] = [['전입', fmt(d.net) + '두', '최초 ' + fmt(d.inn) + ' − 크레임 ' + d.claim], ['폐사', d.death + '두', '피그온'], ['육성률', d.surv + '%', d.bad ? T.problemSurvivalPct + '% 미만' : '기준 이상'], ['재고', fmt(d.stock) + '두', (d.claimLeft ? '크레임잔여 ' + d.claimLeft + '두 포함 · ' : '') + '출하 ' + fmt(d.sold) + '두 · ' + d.prog + '%']];
   const months = Array.from({ length: Math.ceil(d.week / 4) }, (_, mi) => ({ label: mi + 1 + '개월차', cells: [1, 2, 3, 4].map((k) => {
     const n = mi * 4 + k; const v = n <= d.week ? (d.weekly[n - 1] ?? 0) : null; const c = heat(v); const st = addIso(d.date, 7 * (n - 1));
     return { n: n + '주', v: v === null ? '' : v === 0 ? '·' : String(v), bg: v === null ? 'transparent' : c.bg, fg: c.fg, bd: n === d.week ? '2px solid #1F4E3D' : v === null ? '1px dashed #D9D3C6' : '1px solid transparent', tag: d.marks[n] || '', range: md(st) + '~' + md(addIso(st, 6)), title: n + '주차 · ' + md(st) + '~' + md(addIso(st, 6)) + (v === null ? ' · 아직' : ' · 폐사 ' + v + '두') };

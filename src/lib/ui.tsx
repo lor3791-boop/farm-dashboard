@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import type { UiSaved } from '@/data/types';
 import { useAuth } from './auth';
 import { useData } from './data';
-import { buildGroups, REF, type Group } from './calc/herd';
+import { buildGroups, REF, TODAY, type Group } from './calc/herd';
 import { allShips, shipAssign } from './calc/ship';
 import type { Split } from '@/share/applyDeaths';
 
@@ -21,7 +21,7 @@ export interface UiState {
 }
 const init: UiState = {
   fSel: null, fOpen: false, fQ: '', fStatus: 'all', det: null, exp: {},
-  hView: 'table', hMode: 'entry', stage: 'all', warnOnly: false, hidden: { claim: true, end: true, next: true },
+  hView: 'table', hMode: 'entry', stage: 'all', warnOnly: false, hidden: { end: true, next: true },
   anTab: 'surv', heat: false, rpTab: 'report', sGroup: '민서 26-3', herdTab: 'herd', shipTab: 'status', deathTab: 'status', setTab: 'plan', dFarm: '산성농원', dDong: '4', dGroup: null
 };
 
@@ -62,7 +62,7 @@ export function useHerd() {
     const sp: Record<string, Split> = {};
     if (!data) return { full: [] as Group[], split: sp, asg: {} as ReturnType<typeof shipAssign>['asg'], liveShips: [] as ReturnType<typeof shipAssign>['live'] };
     const pre = buildGroups(data.thresholds, saved.firstShipByFarm, { deaths, groups, ships: [], dongs: saved.groupDong });
-    const caps = pre.map((g) => ({ farm: g.farm, group: g.group, date: g.date, sold: g.sold, stock: g.stock, ageRef: g.age })); // Group.age = 기준일 일령
+    const caps = pre.map((g) => ({ farm: g.farm, group: g.group, date: g.date, sold: g.sold, stock: g.stock, ageRef: g.age - Math.round((Date.parse(TODAY) - Date.parse(REF)) / 864e5) })); // Group.age = 오늘 일령 → 기준일 일령으로
     const a = shipAssign(tot, imports, ships, saved.shipGroup ?? {}, caps, REF);
     const g = buildGroups(data.thresholds, saved.firstShipByFarm, { deaths, groups, ships: a.live, dongs: saved.groupDong }, sp);
     return { full: g, split: sp, asg: a.asg, liveShips: a.live };
