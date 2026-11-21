@@ -19,7 +19,8 @@ function App() {
   const [state, setState] = useState<'loading' | 'ok' | 'none'>('loading');
   useEffect(() => {
     if (!/^[A-Za-z0-9]{12,40}$/.test(key)) { setState('none'); return; }
-    const u1 = onSnapshot(doc(db, 'share', key), (s) => { if (s.exists()) { setP(s.data() as SharePayload); setState('ok'); } else setState('none'); }, () => setState('none'));
+    // today는 올린 날이 아니라 지금 날짜(한국) — 대시보드를 며칠 안 열어도 날짜·일령이 맞게
+    const u1 = onSnapshot(doc(db, 'share', key), (s) => { if (s.exists()) { setP({ ...(s.data() as SharePayload), today: new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10) }); setState('ok'); } else setState('none'); }, () => setState('none'));
     const u2 = onSnapshot(collection(db, 'share', key, 'deaths'), (s) => setDeaths(s.docs.map((d) => ({ ...(d.data() as any), id: d.id }))), () => {});
     return () => { u1(); u2(); };
   }, []);

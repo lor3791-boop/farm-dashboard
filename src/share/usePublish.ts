@@ -15,12 +15,16 @@ export function useSharePublisher() {
     const tasks = buildTasks(all), rows = shipRows;
         Object.entries(saved.shareLinks).forEach(([farm, key]) => {
       if (!key) return;
-      const g = buildGroups(T, saved.firstShipByFarm, { deaths: deaths.filter((d) => d.key !== key || d.path.startsWith('shareDeaths/')), ships: liveShips, groups });
-      const p = buildSharePayload(farm, g, tasks, rows, REF, TODAY, T.problemSurvivalPct);
+      // 이 농장 앱(열쇠)에서 등록한 폐사는 농장 앱이 직접 더하므로 빼고 계산. 동 매칭·정산완료 숨김은 대시보드와 같게
+      const own = (d: (typeof deaths)[number]) => d.key === key && !d.path.startsWith('shareDeaths/');
+      // 농장 앱이 다시 더하는 건 기준일 이후·미확인 폐사뿐 → 그 이전 확인분은 여기서 그대로 반영(빠지면 크레임·재고가 틀어짐)
+      const later = (d: (typeof deaths)[number]) => own(d) && (d.date > REF || d.checked === false);
+      const g = buildGroups(T, saved.firstShipByFarm, { deaths: deaths.filter((d) => !later(d)), ships: liveShips, groups, dongs: saved.groupDong }).filter((r) => !saved.settled[r.who]);
+      const p = buildSharePayload(farm, g, tasks, rows, REF, TODAY, T.problemSurvivalPct, undefined, deaths.filter((d) => d.farm === farm && !own(d) && d.count > 0));
       const j = JSON.stringify(p);
       if (last.current[key] === j) return;
       last.current[key] = j;
       repo.put('share', key, { ...p, updatedAt: new Date().toISOString() }).catch(() => { delete last.current[key]; });
     });
-  }, [repo, all, saved.shareLinks, saved.firstShipByFarm, deaths, shipRows, liveShips, groups, T]);
+  }, [repo, all, saved.shareLinks, saved.firstShipByFarm, saved.groupDong, saved.settled, deaths, shipRows, liveShips, groups, T]);
 }

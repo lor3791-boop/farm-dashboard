@@ -61,7 +61,10 @@ export function ShareView({ p, deaths = [], onSaveDeath, onEditDeath }: { p: Sha
     const b = base[r.group], weekly = [...r.weekly];
     deaths.forEach((d) => { const x = sp[d.id]; if (!x || !x.death || d.group !== r.group) return; const w = Math.floor((Date.parse(d.date) - Date.parse(r.date)) / 6048e5); if (w < 0) return; while (weekly.length <= w) weekly.push(0); weekly[w] += x.death; });
     const surv = survOf(r.net, b.death);
-    return { ...r, death: b.death, stock: b.stock, claimLeft: b.claimLeft, surv, bad: surv < (p.badPct ?? 94), weekly, week: Math.max(r.week, weekly.length) };
+    // 일령·주차는 기준일(asOf) 값 → 오늘로 맞춤
+    const shift = Math.max(0, Math.round((Date.parse(p.today) - Date.parse(p.asOf)) / 864e5));
+    const wkNow = Math.floor((Date.parse(p.today) - Date.parse(r.date)) / 6048e5) + 1;
+    return { ...r, age: r.age + shift, death: b.death, stock: b.stock, claimLeft: b.claimLeft, surv, bad: surv < (p.badPct ?? 94), weekly, week: Math.max(r.week, weekly.length, wkNow) };
   });
   const noDong = G.every((r) => r.dong === '—');
   const dongs = [...new Set(G.flatMap((r) => dongsOf(r.dong)))].sort();
@@ -115,11 +118,13 @@ export function ShareView({ p, deaths = [], onSaveDeath, onEditDeath }: { p: Sha
             ) : (
               <div key={x.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, padding: '6px 0', borderBottom: '1px solid #EFEBE3' }}>
                 <span style={{ flex: 1 }}>{md(x.date)} · {x.dong ? x.dong + '동 ' : ''}({x.group})</span><b>{x.count} {t.unit}</b>
-                {onEditDeath && <button className="pill" style={{ minHeight: 40, fontSize: 14 }} onClick={() => { setEd({ id: x.id, date: x.date, dg: (x.dong ?? '') + '|' + x.group, count: String(x.count) }); setSaved(null); }}>{t.edit}</button>}
+                {onEditDeath && !('other' in x) && <button className="pill" style={{ minHeight: 40, fontSize: 14 }} onClick={() => { setEd({ id: x.id, date: x.date, dg: (x.dong ?? '') + '|' + x.group, count: String(x.count) }); setSaved(null); }}>{t.edit}</button>}
               </div>
             );
   const recentList = list.filter((x) => x.date >= addIso(p.today, -6));
-  const stList = list.filter((x) => x.date >= addIso(p.today, -(range - 1)));
+  // 폐사현황 = 이 앱에서 등록한 것 + 대시보드·폐사입력 앱에서 입력한 것(수정 불가)
+  const others = (p.others ?? []).map((x, i) => ({ id: 'o' + i, ...x, checked: true, other: true }));
+  const stList = [...list, ...others].filter((x) => x.date >= addIso(p.today, -(range - 1)));
   const stDays = [...new Set(stList.map((x) => x.date))];
   const saveEdit = async () => {
     if (!ed || !onEditDeath || busy) return;
