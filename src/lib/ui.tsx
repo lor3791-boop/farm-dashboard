@@ -61,12 +61,12 @@ export function useHerd() {
   const { full, split, asg, liveShips } = useMemo(() => {
     const sp: Record<string, Split> = {};
     if (!data) return { full: [] as Group[], split: sp, asg: {} as ReturnType<typeof shipAssign>['asg'], liveShips: [] as ReturnType<typeof shipAssign>['live'] };
-    const pre = buildGroups(data.thresholds, saved.firstShipByFarm, { deaths, groups, ships: [], dongs: saved.groupDong });
+    const pre = buildGroups(data.thresholds, saved.firstShipByFarm, { deaths, groups, ships: [], dongs: saved.groupDong, claimFix: saved.claimFix });
     const caps = pre.map((g) => ({ farm: g.farm, group: g.group, date: g.date, sold: g.sold, stock: g.stock, ageRef: g.age - Math.round((Date.parse(TODAY) - Date.parse(REF)) / 864e5) })); // Group.age = 오늘 일령 → 기준일 일령으로
     const a = shipAssign(tot, imports, ships, saved.shipGroup ?? {}, caps, REF);
-    const g = buildGroups(data.thresholds, saved.firstShipByFarm, { deaths, groups, ships: a.live, dongs: saved.groupDong, lastShip: a.last }, sp);
+    const g = buildGroups(data.thresholds, saved.firstShipByFarm, { deaths, groups, ships: a.live, dongs: saved.groupDong, claimFix: saved.claimFix, lastShip: a.last }, sp);
     return { full: g, split: sp, asg: a.asg, liveShips: a.live };
-  }, [data, saved.firstShipByFarm, saved.groupDong, saved.shipGroup, deaths, ships, groups, imports, tot]);
+  }, [data, saved.firstShipByFarm, saved.groupDong, saved.claimFix, saved.shipGroup, deaths, ships, groups, imports, tot]);
   const all = useMemo(() => full.filter((r) => !saved.settled[r.who]), [full, saved.settled]);
   const shipRows = useMemo(() => allShips(ships, imports), [ships, imports, up.total.rows]); // eslint-disable-line react-hooks/exhaustive-deps
   const farms = useMemo(() => [...new Set(full.map((r) => r.farm))], [full]);

@@ -352,6 +352,18 @@ function Detail({ who, order, onDeath }: { who: string; order: string[]; onDeath
         </div>
       ))}
       <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>{d.wkDiff > 0 ? '주차 기록 합 ' + d.wkSum + '두 · 피그온 ' + d.death + '두 (주차 미기록 ' + d.wkDiff + '두)' : '주차 기록 합 ' + d.wkSum + '두 = 피그온'}</div>
+      {d.claim > 0 && (() => { const fx = saved.claimFix?.[d.who]; return (
+        <div style={{ marginTop: 14, padding: '10px 12px', background: '#F7F5F0', borderRadius: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span className="b">크레임 {d.claim}두 · 남은 크레임 {d.claimLeft}두</span>
+            <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <span className="muted small">{md(REF)} 기준 잔여</span>
+              <input type="number" min={0} max={d.claim} aria-label="기준일 크레임 잔여" defaultValue={fx ?? ''} key={String(fx)} placeholder="자동" onBlur={(e) => { const v = e.target.value; const o = { ...(saved.claimFix ?? {}) }; if (v === '') delete o[d.who]; else o[d.who] = Math.max(0, Math.min(d.claim, Math.round(Number(v)))); save({ claimFix: o }); }} style={{ width: 64, minHeight: 34, textAlign: 'right' }} />
+              <button className="btn sm ghost" onClick={() => save({ claimFix: { ...(saved.claimFix ?? {}), [d.who]: 0 } })}>다 죽음</button>
+            </span>
+          </div>
+          {fx !== undefined && <div className="muted small" style={{ marginTop: 4 }}>직접 지정 {fx}두 (비우면 자동 계산)</div>}
+        </div>); })()}
       <div className="b" style={{ margin: '16px 0 6px' }}>출하 배정</div>
       {(() => { const L = liveShips.filter((x) => x.farm === d.farm && x.group === d.group).sort((a, b) => (a.date < b.date ? -1 : 1)); return (<>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, padding: '5px 0', borderBottom: '1px solid #EFEBE3' }}><span className="muted">피그온 출하 ({md(REF)}까지)</span><b>{fmt(d.sold - d.liveSold)}두</b></div>

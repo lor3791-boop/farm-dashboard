@@ -75,6 +75,8 @@ export interface UiSaved {
   groupDong?: Record<string, string>;     // 그룹별 동 매칭('민서 26-7' → '1·2동', 동 없음은 '—')      // 선급금(key) → 이번 회전 상계 예정액(직접 고친 값)         // '민서 26-7' → 정산완료 처리한 날 (다시 누르면 해제)
   sowFarms: string[];
   pyesaKey: string;                        // 폐사입력 서버 접속 키 (설정 › 폐사입력 앱 연결)                      // 그룹 직접 등록의 자돈농장 선택지에 추가한 이름
+  claimFix?: Record<string, number>;   // 그룹별 기준일(피그온) 크레임 잔여 직접 지정 — 0 = 크레임 다 죽음
+  claimMarked?: Record<string, string>; // 크레임이라 시트에 등록체크한 폐사 줄 (날짜|농장|그룹|동|두수 → 체크한 날)
 }
 
 export interface AppData {

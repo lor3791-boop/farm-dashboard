@@ -9,7 +9,7 @@ import { applyDeaths, type DeathLike, type Split, type DeathBase } from '@/share
 export interface LiveShip { farm: string; group: string; date: string; n: number }
 // 직접 등록한 그룹 (피그온 전입현황 업로드 전) — dongs: ['1','2'] (동 없이 관리면 빈 배열)
 export interface ManualGroup { id?: string; farm: string; group: string; dongs: string[]; date: string; inn: number; claim: number; avgw: number; age: number; totalKg?: number; source?: string; memo?: string }
-export interface Live { deaths: DeathLike[]; ships: LiveShip[]; groups?: ManualGroup[]; dongs?: Record<string, string>; lastShip?: Record<string, string> } // dongs: 사육현황에서 고친 그룹별 동 ('민서 26-7' → '1·2동' 또는 '—')
+export interface Live { deaths: DeathLike[]; ships: LiveShip[]; groups?: ManualGroup[]; dongs?: Record<string, string>; lastShip?: Record<string, string>; claimFix?: Record<string, number> } // dongs: 사육현황에서 고친 그룹별 동 ('민서 26-7' → '1·2동' 또는 '—')
 const mmdd = (d: string) => d.slice(5);
 // 두수 기준 (피그온): 최초두수 = 실제 농장 전입두수, 전입두수 = 최초두수 − 크레임.
 // 스냅샷 G[4]·로트 l[1]은 피그온 '전입두수'(크레임 뺀 값), 재고 G[7]도 크레임을 뺀 두수다.
@@ -71,7 +71,8 @@ export function buildGroups(T: Thresholds, firstShipByFarm: Record<string, numbe
     const who = r[0] + ' ' + r[1];
     const added = (addLots[who] ?? []).reduce((a, l) => a + l[2], 0); // 기준일 뒤 더한 차수의 크레임은 그대로 남음
     const claim = (LOTS[who] ?? []).reduce((a, l) => a + l[2], 0) - added;
-    const left = (r[5] > 0 ? 0 : Math.max(0, claim - (preDead[who] ?? 0))) + added;
+    const fix = live?.claimFix?.[who];
+    const left = (fix !== undefined ? Math.max(0, Math.min(fix, claim)) : r[5] > 0 ? 0 : Math.max(0, claim - (preDead[who] ?? 0))) + added; // 직접 지정이 있으면 그 값
     base[who] = { death: r[5], stock: r[7] + left, claimLeft: left, inDeath: r[5] };
   });
   const split = live ? applyDeaths(base, live.deaths, REF, (d) => d.farm + ' ' + d.group) : {};

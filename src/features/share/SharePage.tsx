@@ -16,7 +16,7 @@ export function SharePage() {
   // 이 농장 폐사는 농장 앱 화면이 직접 더하므로 빼고 계산
   const mine = deaths.filter((d) => d.farm === farm);
   const later = (d: (typeof deaths)[number]) => d.farm === farm && (d.date > REF || d.checked === false);
-  const g = buildGroups(T, saved.firstShipByFarm, { deaths: deaths.filter((d) => !later(d)), ships: liveShips, groups, dongs: saved.groupDong }).filter((r) => !saved.settled[r.who]);
+  const g = buildGroups(T, saved.firstShipByFarm, { deaths: deaths.filter((d) => !later(d)), ships: liveShips, groups, dongs: saved.groupDong, claimFix: saved.claimFix }).filter((r) => !saved.settled[r.who]);
   const p = { ...buildSharePayload(farm, g, buildTasks(all), shipRows, REF, TODAY, T.problemSurvivalPct, undefined, [], saved.done), today: todayKST() };
   const key = saved.shareLinks[farm] ?? '';
   return (

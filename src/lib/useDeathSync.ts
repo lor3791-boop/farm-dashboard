@@ -11,9 +11,11 @@ import { pyesaOn, saveToSheet, markSheet, editSheetCount } from './pyesa';
 import type { DeathRow } from './repo';
 
 const FROM = '2026-10-01'; // 이보다 오래된 미등록은 건드리지 않음
+// 11/21 처음 돌렸을 때 크레임으로 체크한 줄 (기록 장치가 생기기 전) — 날짜|농장|그룹|두수
+const SEED: Record<string, string> = Object.fromEntries(['2026-11-19|민서|26-10|4', '2026-11-19|민서|26-9|1', '2026-11-21|민서|26-11|1', '2026-11-17|아멘|26-9|1', '2026-11-16|재성|26-9|2', '2026-11-19|재성|26-9|2', '2026-11-15|정축산|26-4|1'].map((k) => [k, '2026-11-21']));
 export function useDeathSync() {
   const { deaths, loading } = useData();
-  const { split, saved } = useHerd();
+  const { split, saved, save } = useHerd();
   const { repo } = useAuth();
   const busy = useRef(false);
   const tried = useRef<Set<string>>(new Set());
@@ -24,7 +26,11 @@ export function useDeathSync() {
     const fwd = deaths.find((d) => !isSheet(d) && d.src === 'share' && !d.checked && !(d as any).sheetAt && d.count > 0 && d.date >= FROM && !tried.current.has('f' + d.id));
     // 2) 크레임 줄
     const cl = deaths.find((d) => isSheet(d) && !d.checked && d.date >= FROM && (split[d.id]?.claim ?? 0) > 0 && !saved.settled[d.farm + ' ' + d.group] && !tried.current.has('c' + d.id + '|' + d.count));
-    if (!fwd && !cl) return;
+    // 3) 크레임이라 체크했던 줄이 이제 폐사로 바뀌면(크레임 잔여를 고친 경우 등) 체크를 다시 푼다 → 피그온 등록 대상으로
+    const MK = { ...SEED, ...(saved.claimMarked ?? {}) };
+    const ck = (d: DeathRow) => [d.date, d.farm, d.group, d.count].join('|');
+    const un = deaths.find((d) => isSheet(d) && d.checked && MK[ck(d)] && (split[d.id]?.claim ?? 0) === 0 && (split[d.id]?.death ?? 0) > 0 && !tried.current.has('u' + d.id));
+    if (!fwd && !cl && !un) return;
     busy.current = true;
     (async () => {
       try {
@@ -35,15 +41,20 @@ export function useDeathSync() {
         } else if (cl) {
           tried.current.add('c' + cl.id + '|' + cl.count);
           const s = split[cl.id];
-          if (s.death <= 0) await markSheet([Number(cl.sheetRow)], true);
+          if (s.death <= 0) { await markSheet([Number(cl.sheetRow)], true); save({ claimMarked: { ...MK, [ck(cl)]: new Date().toISOString().slice(0, 10) } }); }
           else {
             await editSheetCount(cl, s.claim);
             await markSheet([Number(cl.sheetRow)], true);
             await saveToSheet({ date: cl.date, farm: cl.farm, dong: cl.dong, group: cl.group, count: s.death, photos: [] }, true);
+            save({ claimMarked: { ...MK, [[cl.date, cl.farm, cl.group, s.claim].join('|')]: new Date().toISOString().slice(0, 10) } });
           }
+        } else if (un) {
+          tried.current.add('u' + un.id);
+          await markSheet([Number(un.sheetRow)], false);
+          const o = { ...MK }; delete o[ck(un)]; save({ claimMarked: o });
         }
       } catch (e) { console.warn('[폐사정리]', e); }
       finally { busy.current = false; }
     })();
-  }, [deaths, split, loading, repo, saved.settled]);
+  }, [deaths, split, loading, repo, saved.settled, saved.claimMarked, save]);
 }
