@@ -1,5 +1,5 @@
 // 돈군 — 표(농장 소계 + 그룹) / 주차 히트맵 / 오른쪽 그룹 상세 (목업 v5)
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { todayKST } from '@/lib/util';
 import { useData } from '@/lib/data';
 import { useSettle } from '@/lib/useSettle';
@@ -8,7 +8,7 @@ import { mergeFeed, type FeedMid, type FeedUpload } from '@/lib/feedSheet';
 import { groupFcr } from '@/lib/calc/fcr';
 
 import { useHerd, useUi } from '@/lib/ui';
-import { agg, dongsOf, heat, TODAY, type Group } from '@/lib/calc/herd';
+import { agg, byDong, dongsOf, heat, REF, TODAY, type Group } from '@/lib/calc/herd';
 import { addIso, fmt, md } from '@/lib/calc/dates';
 import { Chip, Grid, Lnk, Num, Segs, Tabs, Txt, sortRows, useSorts, type Col, type GRowView } from '@/components/v5';
 import { EntryTab } from './EntryTab';
@@ -43,7 +43,7 @@ function HerdTable() {
 
   const HC: Col<Group>[] = [
     { k: 'who', l: '농장 · 그룹', w: 'minmax(120px,1.3fr)', sv: (r) => r.farm + r.group.padStart(5, '0'), fixed: true },
-    { k: 'dong', l: '동', w: '76px', sv: (r) => r.dong },
+    { k: 'dong', l: '동', w: '76px', sv: (r) => { const m = r.dong.match(/\d+/); return m ? Number(m[0]) : 9999; } },
     { k: 'date', l: '전입일', w: '62px', sv: (r) => r.date },
     { k: 'week', l: '주차', w: '50px', num: true, sv: (r) => r.week },
     { k: 'age', l: '일령', w: '52px', num: true, sv: (r) => r.age },
@@ -82,7 +82,7 @@ function HerdTable() {
       case 'death': return <Num v={r.death} />;
       case 'surv': return <Num v={r.surv + '%'} cls={r.bad ? 'neg' : ''} />;
       case 'sold': return <Num v={fmt(r.sold)} />;
-      case 'stock': return <Num v={fmt(r.stock)} cls="b" />;
+      case 'stock': return <Num v={fmt(r.stock)} cls={r.stock < 0 ? 'b neg' : 'b'} />;
       case 'prog': return <Num v={r.prog + '%'} />;
       case 'exp': return <Num v={fmt(r.exp)} />;
       case 'first': return r.sold > 0 ? <Chip t="info">출하 중</Chip> : r.firstOver > 0 ? <Txt v={md(r.first)} sub={r.firstOver + '일 경과'} cls="neg" /> : md(r.first);
@@ -129,9 +129,9 @@ function HerdTable() {
   hFarmSorted.forEach((f) => {
     const g = hRows0.filter((r) => r.farm === f);
     herdRows.push({ key: 'f:' + f, bg: '#F1EEE6', tone: g.some((r) => r.bad) ? 'bad' : g.some((r) => r.warn.length) ? 'warn' : undefined, aria: f + ' 펼치기/접기', onClick: () => set({ exp: { ...s.exp, [f]: !expOf(f) } }), cells: vis.map((c) => aggCell(g, c.k, f)) });
-    const sorted = sortRows(hs, HC, g);
+    const sorted = hs.k ? sortRows(hs, HC, g) : byDong(g);
     sorted.forEach((r) => detOrder.push(r.who));
-    if (expOf(f)) sorted.forEach((r) => herdRows.push({ key: r.who, bg: s.det === r.who ? '#E4ECF3' : undefined, tone: r.bad ? 'bad' : r.warn.length ? 'warn' : undefined, aria: r.who + ' 상세 열기', onClick: () => goDet(r.who), cells: vis.map((c) => cellOf(r, c.k)) }));
+    if (expOf(f)) sorted.forEach((r) => herdRows.push({ key: r.who, bg: s.det === r.who ? '#E4ECF3' : undefined, tone: r.bad || r.stock < 0 ? 'bad' : r.warn.length ? 'warn' : undefined, aria: r.who + ' 상세 열기', onClick: () => goDet(r.who), cells: vis.map((c) => cellOf(r, c.k)) }));
   });
   const tot = agg(hRows0);
   const reset = () => set({ fSel: null, fStatus: 'all', fQ: '', stage: 'all', warnOnly: false });
@@ -263,8 +263,11 @@ function Heatmap({ farms, rows, mode, setMode, det, onOpen }: { farms: string[];
 }
 
 function Detail({ who, order, onDeath }: { who: string; order: string[]; onDeath: (g: Group) => void }) {
-  const { full: all, set, isPlanned, togglePlan, T, saved, save, ships, imports } = useHerd();
+  const { full: all, set, isPlanned, togglePlan, T, saved, save, ships, imports, liveShips } = useHerd();
   const { data } = useData();
+  // 다른 화면(홈 등)에서 그룹을 눌러 들어오면 상세가 화면에 보이게
+  const box = useRef<HTMLElement>(null);
+  useEffect(() => { const el = box.current; if (!el) return; const r = el.getBoundingClientRect(); if (r.top < 0 || r.top > window.innerHeight * 0.6) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, [who]);
   const st = useSettle();
   const ups = useCol<FeedUpload>('feed');
   const feed = useMemo(() => mergeFeed(ups), [ups]);
@@ -290,7 +293,7 @@ function Detail({ who, order, onDeath }: { who: string; order: string[]; onDeath
   const fc = groupFcr(d, feed, st.shipLiveOf(d), { endKg: T.fcrEndKg, today: TODAY, settled: saved.settled[d.who] ? { ...st.settledShipOf(d), mid: midKg } : undefined });
   const ftone = (v: number | null) => (v === null ? {} : v < 2.4 ? { background: '#E3EFE7', color: '#1F4E3D' } : v < 2.7 ? { background: '#FBEFD5', color: '#7A4F00' } : { background: '#F8E1D8', color: '#9A3216' });
   return (
-    <aside className="card" style={{ flex: '1 1 340px', maxWidth: 460, minWidth: 0, boxSizing: 'border-box' }}>
+    <aside ref={box} className="card" style={{ scrollMarginTop: 12, flex: '1 1 340px', maxWidth: 460, minWidth: 0, boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 8 }}>
         <div><div style={{ fontSize: 20, fontWeight: 700 }}>{d.farm} {d.group}</div><div className="muted small">{(d.dong === '—' ? '동 없이 관리' : d.dong) + ' · 전입 ' + md(d.date) + ' · ' + d.week + '주차 · ' + d.age + '일령'}</div></div>
         <button className="btn sm ghost" onClick={() => set({ det: null })} aria-label="상세 닫기">닫기</button>
@@ -345,6 +348,13 @@ function Detail({ who, order, onDeath }: { who: string; order: string[]; onDeath
         </div>
       ))}
       <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>{d.wkDiff > 0 ? '주차 기록 합 ' + d.wkSum + '두 · 피그온 ' + d.death + '두 (주차 미기록 ' + d.wkDiff + '두)' : '주차 기록 합 ' + d.wkSum + '두 = 피그온'}</div>
+      <div className="b" style={{ margin: '16px 0 6px' }}>출하 배정</div>
+      {(() => { const L = liveShips.filter((x) => x.farm === d.farm && x.group === d.group).sort((a, b) => (a.date < b.date ? -1 : 1)); return (<>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, padding: '5px 0', borderBottom: '1px solid #EFEBE3' }}><span className="muted">피그온 출하 ({md(REF)}까지)</span><b>{fmt(d.sold - d.liveSold)}두</b></div>
+        {L.map((x, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, padding: '5px 0', borderBottom: '1px solid #EFEBE3' }}><span>{md(x.date)} <span className="muted small">{x.src}</span></span><b>{fmt(x.n)}두</b></div>)}
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, padding: '5px 0' }}><span className="muted">합계 · 재고</span><b className={d.stock < 0 ? 'neg' : ''}>{fmt(d.sold)}두 · {fmt(d.stock)}두</b></div>
+        {d.stock < 0 && <div className="chip bad" style={{ display: 'block', whiteSpace: 'normal', marginTop: 6 }}>출하가 {fmt(-d.stock)}두 많이 붙음 → 출하관리 출하내역에서 그룹 변경</div>}
+      </>); })()}
       <div className="b" style={{ margin: '16px 0 6px' }}>일정</div>
       {sched.map(([l, v]) => <div key={l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, padding: '5px 0', borderBottom: '1px solid #EFEBE3' }}><span className="muted">{l}</span><b>{v}</b></div>)}
       <div className="b" style={{ margin: '16px 0 6px' }}>차수 (전입현황)</div>

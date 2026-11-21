@@ -61,8 +61,8 @@ export const totToRow = (r: TotRow): ShipRow => [r.date, r.farm, r.dest, r.n, r.
 
 export interface GroupCap { farm: string; group: string; date: string; sold: number; stock: number; ageRef: number } // ageRef: 기준일(ref) 일령
 /** 그룹 배정. over: 직접 고른 그룹(key → group, '-'는 '그룹 아님'), pig: 피그온 출하(그룹 있음), ref: 피그온 기준일 */
-export function assignGroups(rows: TotRow[], groups: GroupCap[], over: Record<string, string>, pig: { farm: string; date: string; n: number; group: string }[], ref: string): Record<string, { group: string; how: 'manual' | 'pigon' | 'auto' | '' }> {
-  const res: Record<string, { group: string; how: 'manual' | 'pigon' | 'auto' | '' }> = {};
+export function assignGroups(rows: TotRow[], groups: GroupCap[], over: Record<string, string>, pig: { farm: string; date: string; n: number; group: string }[], ref: string): Record<string, { group: string; how: 'manual' | 'pigon' | 'auto' | ''; parts?: { group: string; n: number }[] }> {
+  const res: Record<string, { group: string; how: 'manual' | 'pigon' | 'auto' | ''; parts?: { group: string; n: number }[] }> = {};
   // 누계는 기준일 전·후를 따로 센다: 전 = 피그온 출하누계(sold)까지, 후 = 기준일 재고(stock)까지
   const used: Record<string, number> = {};
   const uk = (r: { farm: string; date: string }, g: string) => (r.date <= ref ? 'pre ' : 'post ') + r.farm + ' ' + g;
@@ -77,7 +77,15 @@ export function assignGroups(rows: TotRow[], groups: GroupCap[], over: Record<st
     // 선입선출: 출하일에 140일령 이상이고 전입 뒤인 그룹 중, 피그온 출하 누계(기준일 이후면 기준일 재고)를 아직 다 못 채운 가장 오래된 그룹
     const cand = byFarm(r.farm).filter((g) => r.date > g.date && g.ageRef + (Date.parse(r.date) - Date.parse(ref)) / 864e5 >= 140);
     const cap = (g: GroupCap) => (r.date <= ref ? g.sold : g.stock);
-    const g = cand.find((x) => (used[uk(r, x.group)] ?? 0) < cap(x));
+    const left = (x: GroupCap) => cap(x) - (used[uk(r, x.group)] ?? 0);
+    const g = cand.find((x) => left(x) > 0);
+    // 한 차가 앞 그룹 남은 두수보다 많으면 나머지는 다음 그룹으로 나눠 뺀다 (앞 그룹 재고 마이너스 방지)
+    if (g && left(g) < r.n) {
+      const parts: { group: string; n: number }[] = []; let rest = r.n;
+      for (const x of cand) { const k = Math.min(rest, left(x)); if (k <= 0) continue; parts.push({ group: x.group, n: k }); used[uk(r, x.group)] = (used[uk(r, x.group)] ?? 0) + k; rest -= k; if (!rest) break; }
+      if (rest) { parts[parts.length - 1].n += rest; used[uk(r, parts[parts.length - 1].group)] += rest; }
+      res[r.key] = { group: g.group, how: 'auto', parts }; continue;
+    }
     if (g) { res[r.key] = { group: g.group, how: 'auto' }; used[uk(r, g.group)] = (used[uk(r, g.group)] ?? 0) + r.n; }
     else res[r.key] = { group: '', how: '' };
   }

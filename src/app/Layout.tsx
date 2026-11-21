@@ -10,6 +10,8 @@ import { useUi } from '@/lib/ui';
 import { REF } from '@/lib/calc/herd';
 import { pageTabs } from '@/components/v5';
 import { Sheet, Toaster } from '@/components/Sheet';
+import { ToTop } from '@/components/ToTop';
+import { useSwipeFx } from '@/lib/swipeFx';
 
 const I = (d: string) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>;
 const TABS: [string, string, string][] = [
@@ -52,18 +54,25 @@ export function Layout({ children }: { children: ReactNode }) {
   const [pull, setPull] = useState(0);
   const [busy, setBusy] = useState(false);
   const t0 = useRef<{ x: number; y: number; top: boolean; h: boolean } | null>(null);
+  const fx = useSwipeFx();
   const onStart = (e: React.TouchEvent) => { const t = e.touches[0]; t0.current = { x: t.clientX, y: t.clientY, top: window.scrollY <= 0, h: inHScroll(e.target) }; };
-  const onMove = (e: React.TouchEvent) => { const s0 = t0.current; if (!s0 || !s0.top) return; const dy = e.touches[0].clientY - s0.y, dx = Math.abs(e.touches[0].clientX - s0.x); if (dy > 0 && dy > dx && !document.querySelector('.sheet')) setPull(Math.min(dy, 120)); };
+  const onMove = (e: React.TouchEvent) => {
+    const s0 = t0.current; if (!s0) return;
+    const dy = e.touches[0].clientY - s0.y, ddx = e.touches[0].clientX - s0.x, dx = Math.abs(ddx);
+    if (!s0.h && dx > 12 && dx > Math.abs(dy) * 1.4 && pageTabs() && !document.querySelector('.sheet')) { fx.drag(ddx); return; }
+    if (!s0.top) return;
+    if (dy > 0 && dy > dx && !document.querySelector('.sheet')) setPull(Math.min(dy, 120));
+  };
   const onEnd = async (e: React.TouchEvent) => {
     const s0 = t0.current; t0.current = null;
     if (pull > 80) { setPull(0); setBusy(true); try { await Promise.all([refresh(), new Promise((r) => setTimeout(r, 700))]); } finally { setBusy(false); } return; }
     setPull(0);
-    if (!s0 || s0.h || document.querySelector('.sheet')) return;
+    if (!s0 || s0.h || document.querySelector('.sheet')) { fx.release(); return; }
     const t = e.changedTouches[0], dx = t.clientX - s0.x, dy = t.clientY - s0.y;
-    if (Math.abs(dx) < 70 || Math.abs(dy) > 45) return;
-    const T = pageTabs(); if (!T) return;
+    if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.7) { fx.release(); return; }
+    const T = pageTabs(); if (!T) { fx.release(); return; }
     const i = T.opts.findIndex(([k]) => k === T.value), j = i + (dx < 0 ? 1 : -1);
-    if (j >= 0 && j < T.opts.length) { T.onPick(T.opts[j][0]); window.scrollTo({ top: 0 }); }
+    if (j >= 0 && j < T.opts.length) { T.onPick(T.opts[j][0]); window.scrollTo({ top: 0 }); fx.enter(dx < 0 ? 'l' : 'r'); } else fx.release();
   };
   const loc = useLocation();
   useSharePublisher();
@@ -76,11 +85,10 @@ export function Layout({ children }: { children: ReactNode }) {
       <div style={{ color: '#A9C6B8', fontSize: 12, padding: '0 8px 14px' }}>(피그온 {refLabel} 업데이트)</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {MENU.map((m) => (
-          <NavLink key={m.path} to={m.path} end={m.path === '/'} onClick={() => setOpen(false)} className={({ isActive }) => (isActive ? 'nav on' : 'nav')}>{m.label}</NavLink>
+          <NavLink key={m.path} to={m.path} end={m.path === '/'} onClick={() => setOpen(false)} className={({ isActive }) => (isActive ? 'nav on' : 'nav') + (m.accent ? ' acc' : '')}>{m.label}</NavLink>
         ))}
       </div>
       <div style={{ margin: '22px 8px 0', paddingTop: 14, borderTop: '1px solid #2F6B55', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <a href="#/share?farm=민서" onClick={() => setOpen(false)} style={{ color: '#FCE3A6', fontSize: 14 }}>농장 공유 화면 보기 →</a>
         <a href="https://lor3791-boop.github.io/luka-piglets/" target="_blank" rel="noreferrer" style={{ color: '#FCE3A6', fontSize: 14 }}>루카 현황판 ↗</a>
       </div>
       <div style={{ marginTop: 'auto', padding: '24px 8px 0', color: '#A9C6B8', fontSize: 12 }}>
@@ -116,12 +124,13 @@ export function Layout({ children }: { children: ReactNode }) {
           <div className="card skel" aria-busy="true" aria-label="불러오는 중">
             <i style={{ width: '40%' }} /><i style={{ width: '85%' }} /><i style={{ width: '70%' }} /><i style={{ width: '90%' }} /><i style={{ width: '60%' }} /><i style={{ width: '75%' }} />
           </div>
-        ) : (<>{cur.filter && <FilterBar />}{children}</>)}
+        ) : (<>{cur.filter && <FilterBar />}<div className={fx.cls} style={fx.style}>{children}</div></>)}
       </main>
       <nav className="tabbar lg:hidden" aria-label="주요 메뉴">
         {TABS.map(([p, l, d]) => <NavLink key={p} to={p} end={p === '/'} className={({ isActive }) => (isActive ? 'on' : '')}>{I(d)}{l}</NavLink>)}
         <button onClick={() => setOpen(true)} className={TABS.some(([p]) => p === cur.path) ? '' : 'on'}>{I('M4 6h16M4 12h16M4 18h16')}더보기</button>
       </nav>
+      <ToTop />
       <Fab />
       <Toaster />
     </div>

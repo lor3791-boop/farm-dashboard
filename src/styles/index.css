@@ -181,3 +181,15 @@
 .gr:not(.gh):hover{background:#ECE8DF;--rowbg:#ECE8DF}
 .gcard:nth-child(even of .gcard){--rowbg:#F4F2EC}
 .gr .th{width:100%}
+
+/* 메뉴 중 공유링크 — 같은 모양, 색만 다르게 */
+.v5 a.nav.acc{color:#FCE3A6}.v5 a.nav.acc:hover{color:#FFF1CC}.v5 a.nav.acc.on{color:#1F4E3D;background:#FCE3A6}
+/* 밀어서 탭 넘기기 — 새 탭이 옆에서 들어옴 */
+.swin-l{animation:swin-l .28s cubic-bezier(.2,.7,.3,1)}.swin-r{animation:swin-r .28s cubic-bezier(.2,.7,.3,1)}
+@keyframes swin-l{from{transform:translateX(36%);opacity:.25}to{transform:none;opacity:1}}
+@keyframes swin-r{from{transform:translateX(-36%);opacity:.25}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.swin-l,.swin-r{animation:none}}
+/* 맨 위로 */
+.totop{position:fixed;right:max(23px,calc(env(safe-area-inset-right,0px) + 7px));bottom:calc(140px + env(safe-area-inset-bottom,0px));z-index:31;width:44px;height:44px;border-radius:22px;background:#fff;color:#1F4E3D;border:1px solid #CFC9BC;box-shadow:0 4px 12px rgba(20,30,25,.18);cursor:pointer;display:flex;align-items:center;justify-content:center}
+@media (min-width:1024px){.totop{bottom:96px;right:35px}}
+.totop.low{bottom:calc(20px + env(safe-area-inset-bottom,0px))}

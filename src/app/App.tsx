@@ -1,3 +1,4 @@
+import { ShareLinks } from '@/features/share/ShareLinks';
 import { HashRouter, Route, Routes, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/lib/auth';
 import { DataProvider } from '@/lib/data';
@@ -39,6 +40,7 @@ export function App() {
                       <Route path="/herd" element={<HerdPage />} />
                       <Route path="/analysis" element={<AnalysisPage />} />
                       <Route path="/settings" element={<SettingsPage />} />
+                      <Route path="/links" element={<ShareLinks />} />
                       <Route path="*" element={<Navigate to="/" />} />
                     </Routes>
                   </Layout>

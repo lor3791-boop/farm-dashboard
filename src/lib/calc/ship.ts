@@ -55,9 +55,10 @@ export function shipAssign(tot: TotRow[], imp: ImpRow[], manual: ManualShip[], o
   const known = [...pig, ...manual.filter((m) => m.group)].map((r) => ({ farm: r.farm, date: r.date, n: r.n, group: r.group }));
   const asg = assignGroups(rows, caps, over, known, ref);
   const live: LiveShip[] = [];
-  tot.forEach((r) => { const g = asg[r.key]?.group; if (r.date > ref && g) live.push({ farm: r.farm, group: g, date: r.date, n: r.n, src: '종합' }); });
+  const push = (r: TotRow, src: LiveShip['src']) => { const a = asg[r.key]; if (r.date <= ref || !a?.group) return; (a.parts ?? [{ group: a.group, n: r.n }]).forEach((p) => live.push({ farm: r.farm, group: p.group, date: r.date, n: p.n, src })); };
+  tot.forEach((r) => push(r, '종합'));
   pig.forEach((r) => { if (r.date > ref && !totK.has(shipKey(r.date, r.farm))) live.push({ farm: r.farm, group: r.group, date: r.date, n: r.n, src: '피그온' }); });
-  team.forEach((r) => { const g = asg[r.key]?.group; if (r.date > ref && g) live.push({ farm: r.farm, group: g, date: r.date, n: r.n, src: '팀 대시보드' }); });
+  team.forEach((r) => push(r, '팀 대시보드'));
   manual.forEach((m) => { const k = shipKey(m.date, m.farm); if (m.date > ref && m.group && !totK.has(k) && !pigK.has(k) && !teamK.has(k)) live.push({ farm: m.farm, group: m.group, date: m.date, n: m.n, src: '직접·등판서' }); });
   return { asg, live };
 }

@@ -33,14 +33,15 @@ export function HomePage() {
   const totStock = rows.reduce((a, r) => a + r.stock, 0), totDeath = rows.reduce((a, r) => a + r.death, 0), totNet = rows.reduce((a, r) => a + r.net, 0);
   const warnRows = rows.filter((r) => r.warn.length);
   const planList = rows.filter((r) => isPlanned(r) && !saved.settled[r.who]).sort((a, b) => b.prog - a.prog);
-  const goDet = (who: string) => go('/herd', { herdTab: 'herd', det: who });
+  const goDet = (who: string) => { const g = rows.find((r) => r.who === who); go('/herd', { herdTab: 'herd', det: who, hView: 'table', stage: 'all', warnOnly: false, fStatus: 'all', ...(g ? { exp: { ...s.exp, [g.farm]: true } } : {}), ...(g && s.fSel && !s.fSel.includes(g.farm) ? { fSel: null } : {}) }); };
+  const dongOf = (who: string) => { const d = rows.find((r) => r.who === who)?.dong; return d && d !== '—' ? d : ''; };
 
   const TaskRow = ({ t, small }: { t: (typeof tasks)[number]; small?: boolean }) => {
     const on = isDone(t.key);
     return (
       <div style={{ display: 'grid', gridTemplateColumns: '52px minmax(0, 1fr) 88px 86px', gap: 10, alignItems: 'center', padding: small ? 8 : '10px 8px', borderBottom: '1px solid #EFEBE3', borderRadius: 6, background: on ? '#E1F0E7' : 'transparent' }}>
         <div className={small ? '' : 'b'}>{t.d.replace('-', '/')}</div>
-        <div style={{ textDecoration: on ? 'line-through' : 'none' }}><div className={small ? 'b small' : 'b'}>{t.who}</div><div className={small ? 'sub' : 'small muted'}>{t.job}</div></div>
+        <div style={{ textDecoration: on ? 'line-through' : 'none' }}><button className={small ? 'b small' : 'b'} style={{ textAlign: 'left', textDecoration: 'underline', textDecorationColor: '#C9C2B3', textUnderlineOffset: 3 }} onClick={() => goDet(t.who)}>{t.who}{dongOf(t.who) ? ' · ' + dongOf(t.who) : ''}</button><div className={small ? 'sub' : 'small muted'}>{t.job}</div></div>
         <div className={'r' + (small ? ' small' : '')}><b>{t.heads}</b><div className="sub">{t.sub}</div></div>
         <div className="r"><button className={on ? 'btn pri sm' : 'btn sm'} onClick={() => toggleDone(t.key)}>{on ? '완료 ✓' : '완료'}</button></div>
       </div>

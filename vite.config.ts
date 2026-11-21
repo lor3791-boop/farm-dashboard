@@ -10,7 +10,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'autoUpdate', injectRegister: false, // 등록은 src/main.tsx (앱을 다시 열 때마다 새 버전 확인 → 바로 적용)
       includeAssets: ['icon-192.png', 'icon-512.png', 'share-sw.js'],
       manifest: {
         name: '담당농장 대시보드',

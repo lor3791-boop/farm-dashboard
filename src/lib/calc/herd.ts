@@ -109,8 +109,10 @@ export function buildGroups(T: Thresholds, firstShipByFarm: Record<string, numbe
     else if (o.age > T.delayNoShipAge && o.sold === 0) why.push(`${T.delayNoShipAge}일령 초과 · 출하 0두`);
     if (o.since !== null && o.since >= T.settleLastShipDays && o.prog < T.stallProgressPct) why.push(`출하 멈춤 ${o.since}일`);
     if (o.sold === 0 && o.firstOver >= T.firstShipOverdueDays) why.push(`첫출하예정 ${o.firstOver}일 경과`);
+    // 재고 마이너스 = 출하가 이 그룹에 너무 많이 붙음(그룹 매칭 확인) — 맨 앞에 빨갛게
+    if (o.stock < 0) why.unshift(`출하 매칭 확인 · 재고 ${o.stock}두`);
     o.warn = why;
-    o.warnBad = o.age > T.delayRemainAge && o.stock > 0;
+    o.warnBad = (o.age > T.delayRemainAge && o.stock > 0) || o.stock < 0;
     o.weekly = [...(WEEKLY[who] || [])];
     live?.deaths.forEach((d) => { const sp = split[d.id]; if (!sp || !sp.death || d.farm + ' ' + d.group !== who) return; const w = Math.floor(days(o.date, d.date) / 7); if (w < 0) return; while (o.weekly.length <= w) o.weekly.push(0); o.weekly[w] += sp.death; });
     if (o.weekly.length > o.week) o.week = o.weekly.length;
@@ -165,3 +167,5 @@ export function heat(v: number | null) {
   if (v <= 9) return { bg: '#D9773F', fg: '#FFFFFF' };
   return { bg: '#9A3216', fg: '#FFFFFF' };
 }
+
+export { byDong } from '@/lib/dongSort';
