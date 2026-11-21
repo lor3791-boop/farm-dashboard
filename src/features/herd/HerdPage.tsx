@@ -1,4 +1,6 @@
 // 돈군 — 표(농장 소계 + 그룹) / 주차 히트맵 / 오른쪽 그룹 상세 (목업 v5)
+import { VaxTags } from '@/components/VaxTags';
+import { vaxOf } from '@/lib/vax';
 import { SUBS } from '@/app/menu';
 import type { UiState } from '@/lib/ui';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -44,7 +46,7 @@ function HerdTable() {
   if (!T) return null;
 
   const HC: Col<Group>[] = [
-    { k: 'who', l: '농장 · 그룹', w: 'minmax(120px,1.3fr)', sv: (r) => r.farm + r.group.padStart(5, '0'), fixed: true },
+    { k: 'who', l: '농장 · 그룹', w: 'minmax(190px,1.6fr)', sv: (r) => r.farm + r.group.padStart(5, '0'), fixed: true },
     { k: 'dong', l: '동', w: '76px', sv: (r) => { const m = r.dong.match(/\d+/); return m ? Number(m[0]) : 9999; } },
     { k: 'date', l: '전입일', w: '62px', sv: (r) => r.date },
     { k: 'week', l: '주차', w: '50px', num: true, sv: (r) => r.week },
@@ -71,7 +73,7 @@ function HerdTable() {
 
   const cellOf = (r: Group, k: string): ReactNode => {
     switch (k) {
-      case 'who': return <Lnk v={r.group} sub={r.farm} />;
+      case 'who': return <Lnk v={<>{r.group}<VaxTags v={vaxOf(r, saved.done, TODAY)} /></>} sub={r.farm} />;
       case 'dong': return <span className="small">{r.dong === '—' ? '그룹만' : r.dong}</span>;
       case 'date': return md(r.date);
       case 'week': return <Num v={r.week + '주'} />;
@@ -297,7 +299,7 @@ function Detail({ who, order, onDeath }: { who: string; order: string[]; onDeath
   return (
     <aside ref={box} className="card" style={{ scrollMarginTop: 12, flex: '1 1 340px', maxWidth: 460, minWidth: 0, boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 8 }}>
-        <div><div style={{ fontSize: 20, fontWeight: 700 }}>{d.farm} {d.group}</div><div className="muted small">{(d.dong === '—' ? '동 없이 관리' : d.dong) + ' · 전입 ' + md(d.date) + ' · ' + d.week + '주차 · ' + d.age + '일령'}</div></div>
+        <div><div style={{ fontSize: 20, fontWeight: 700 }}>{d.farm} {d.group}<VaxTags v={vaxOf(d, saved.done, TODAY)} /></div><div className="muted small">{(d.dong === '—' ? '동 없이 관리' : d.dong) + ' · 전입 ' + md(d.date) + ' · ' + d.week + '주차 · ' + d.age + '일령'}</div></div>
         <button className="btn sm ghost" onClick={() => set({ det: null })} aria-label="상세 닫기">닫기</button>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 }}>
