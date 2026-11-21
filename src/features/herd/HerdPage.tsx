@@ -1,4 +1,6 @@
 // 돈군 — 표(농장 소계 + 그룹) / 주차 히트맵 / 오른쪽 그룹 상세 (목업 v5)
+import { SUBS } from '@/app/menu';
+import type { UiState } from '@/lib/ui';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { todayKST } from '@/lib/util';
 import { useData } from '@/lib/data';
@@ -21,7 +23,7 @@ export function HerdPage() {
   const open = (who: string) => set({ herdTab: 'herd', det: who });
   return (
     <>
-      <Tabs opts={[['herd', '돈군'], ['entry', '전입등록'], ['warn', '출하지연'], ['fcr', 'FCR 추이']]} value={s.herdTab} onPick={(k) => set({ herdTab: k })} />
+      <Tabs opts={SUBS.herd as [UiState['herdTab'], string][]} value={s.herdTab} onPick={(k) => set({ herdTab: k })} />
       {s.herdTab === 'herd' && <HerdTable />}
       {s.herdTab === 'entry' && <EntryTab />}
       {s.herdTab === 'warn' && <DelayTab onOpen={open} />}

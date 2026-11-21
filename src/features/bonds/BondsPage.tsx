@@ -12,6 +12,9 @@ import { owing, parseFeedBin, parseLoans, parseMonthly, ST_LABEL, type Loan, typ
 import { fmt, md } from '@/lib/calc/dates';
 import { nowIso } from '@/lib/util';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { Tabs } from '@/components/v5';
+import { SUBS } from '@/app/menu';
+import type { UiState } from '@/lib/ui';
 
 const won = (n: number) => fmt(Math.round(n));
 const kst = (iso: string) => md(new Date(Date.parse(iso) + 9 * 3600e3).toISOString().slice(0, 10));
@@ -22,7 +25,7 @@ const ST_CLS: Record<MSt, string> = { unpaid: 'chip warn', pending: 'chip info',
 export function BondsPage() {
   const { repo } = useAuth();
   const { data, up } = useData();
-  const { all, farms, saved, save, isPlanned } = useHerd();
+  const { all, farms, saved, save, isPlanned, s, set } = useHerd();
   const { loanPlan, offsetOf } = useSettle();
   const phone = useIsPhone();
   const r1 = useRef<HTMLInputElement>(null), r2 = useRef<HTMLInputElement>(null);
@@ -80,8 +83,59 @@ export function BondsPage() {
   const setPlan = (l: Loan, v: number | null) => { const m = { ...(saved.bondPlan ?? {}) }; if (v === null) delete m[l.key]; else m[l.key] = v; save({ bondPlan: m }); };
   const col = 'minmax(90px,1fr) repeat(5, minmax(76px, 110px)) minmax(90px, 120px)';
 
+  const tab = s.bondTab;
+  const head = (x: (typeof F)[number], right: string) => <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '10px 0 4px', borderTop: '2px solid #D9D3C6', marginTop: 6 }}><b style={{ fontSize: 16 }}>{x.f}</b><span className="b">{right}</span></div>;
+  const LoanTab = () => (
+    <div className="card" style={{ marginTop: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginBottom: 8 }}>
+        {([['선급금 합계', T.gen + T.fac + T.etc], ['일반', T.gen], ['시설', T.fac], ['기타', T.etc]] as const).map(([l, v]) => <div key={l} style={{ background: '#F7F5F0', borderRadius: 10, padding: '10px 12px' }}><div className="muted small">{l}</div><div style={{ fontSize: 20, fontWeight: 700 }}>{man(v)}<span style={{ fontSize: 12, fontWeight: 400 }}>만원</span></div></div>)}
+      </div>
+      {F.filter((x) => x.L.length).length === 0 && <div className="muted">채권채무-선급금 파일을 올리면 여기 나옵니다.</div>}
+      {F.filter((x) => x.L.length).map((x) => <div key={x.f}>{head(x, man(x.gen + x.fac + x.etc) + '만원')}
+{x.L.map((l) => { const p = loanPlan(l); return (
+          <div key={l.key} style={{ display: 'grid', gridTemplateColumns: phone ? '1fr' : 'minmax(160px,1.2fr) minmax(200px,2fr) minmax(170px,1fr)', gap: 8, padding: '8px 0', borderTop: '1px solid #F1EEE6', alignItems: 'center' }}>
+            <div><span className="chip info">{KIND(l.kind) === '기타' ? l.kind : KIND(l.kind)}</span> <b>{won(l.balance)}</b><div className="muted" style={{ fontSize: 12 }}>{l.date} 지급 {won(l.orig)} · 회수 {won(l.recovered)}</div></div>
+            <div className="small" style={{ minWidth: 0 }}>{l.note || <span className="muted">상계 조건 없음</span>}</div>
+            <div style={{ textAlign: phone ? 'left' : 'right' }}>
+              {edit === l.key ? (
+                <span style={{ display: 'inline-flex', gap: 6 }}><input aria-label="상계 예정액" inputMode="numeric" value={val} onChange={(e) => setVal(e.target.value)} style={{ width: 120, minHeight: 36 }} /><button className="btn sm pri" onClick={() => { setPlan(l, Math.max(0, Number(val.replace(/[^\d]/g, '')) || 0)); setEdit(null); }}>저장</button></span>
+              ) : (
+                <button className="btn sm ghost" onClick={() => { setEdit(l.key); setVal(String(p.amt)); }} title="눌러서 고치기">상계 {won(p.amt)}</button>
+              )}
+              <div className="muted" style={{ fontSize: 11 }}>{p.how}{saved.bondPlan?.[l.key] !== undefined && <button className="lnk" style={{ fontSize: 11, marginLeft: 6 }} onClick={() => setPlan(l, null)}>자동으로</button>}</div>
+            </div>
+          </div>
+        ); })}
+      </div>)}
+    </div>
+  );
+  const MonthTab = () => (
+    <div className="card" style={{ marginTop: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginBottom: 8 }}>
+        {([['월대 미정산 합계', T.mOwe], ['상계 예정', T.plan]] as const).map(([l, v]) => <div key={l} style={{ background: '#F7F5F0', borderRadius: 10, padding: '10px 12px' }}><div className="muted small">{l}</div><div style={{ fontSize: 20, fontWeight: 700 }}>{man(v)}<span style={{ fontSize: 12, fontWeight: 400 }}>만원</span></div></div>)}
+      </div>
+      {F.filter((x) => x.M.length).length === 0 && <div className="muted">위탁수수료-월대선급금 파일을 올리면 여기 나옵니다.</div>}
+      {F.filter((x) => x.M.length).map((x) => <div key={x.f}>{head(x, man(x.mOwe) + '만원 미정산')}
+        {[...x.M].filter((m) => showDone[x.f] || m.cells.some((c) => owing(c.st))).sort((a, b) => (a.group || 'zz').localeCompare(b.group || 'zz', 'ko', { numeric: true })).map((m, i) => { const o = m.cells.filter((c) => owing(c.st)).reduce((a, c) => a + c.amt, 0); const g = all.find((z) => z.farm === m.farm && z.group === m.group); return (
+                      <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '6px 0', borderTop: '1px solid #F1EEE6', flexWrap: 'wrap', opacity: o ? 1 : 0.6 }}>
+                        <b style={{ width: 70 }}>{m.group || '분할'}</b>
+                        <div style={{ flex: 1, display: 'flex', gap: 4, flexWrap: 'wrap', minWidth: 0 }}>{m.cells.map((c) => <span key={c.m} className={ST_CLS[c.st]} title={ST_LABEL[c.st]} style={{ fontSize: 11, fontWeight: 400 }}>{c.m.slice(2).replace('-', '.')} {man(c.amt)}{c.st !== 'done' ? ' ' + ST_LABEL[c.st] : ''}</span>)}</div>
+                        <div style={{ textAlign: 'right', minWidth: 110 }}>{o ? <b>{man(o)}만 미정산</b> : <span className="muted small">정산 끝</span>}{g && isPlanned(g) && o > 0 && <div className="small" style={{ color: '#1F4E3D' }}>정산예정 → 상계</div>}</div>
+                      </div>
+                    ); })}
+                    {x.M.some((m) => !m.cells.some((c) => owing(c.st))) && <button className="lnk" style={{ fontSize: 13, marginTop: 6 }} onClick={() => setShowDone({ ...showDone, [x.f]: !showDone[x.f] })}>{showDone[x.f] ? '정산 끝난 그룹 숨기기' : `정산 끝난 그룹 ${x.M.filter((m) => !m.cells.some((c) => owing(c.st))).length}개 보기`}</button>}
+                  
+        {x.bin.length > 0 && <div className="small muted">피드빈 설치대금 {x.bin.map((b) => `${won(b.amount)}원 (${b.date} 지급, ${b.until}까지 거래하면 회수 없음)`).join(' · ')}</div>}
+      </div>)}
+    </div>
+  );
   return (
     <>
+      <Tabs opts={SUBS.bond as [UiState['bondTab'], string][]} value={tab} onPick={(k) => set({ bondTab: k })} />
+      <div style={{ marginTop: 14 }} />
+      {tab === 'loan' && LoanTab()}
+      {tab === 'monthly' && MonthTab()}
+      {tab === 'sum' && <>
       <DropCard accept=".xlsx,.xls" onFiles={upAuto}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
           <h2 className="h2" style={{ flex: 1 }}>파일로 갱신</h2>
@@ -104,7 +158,7 @@ export function BondsPage() {
       </DropCard>
 
       <div className="card" style={{ marginTop: 16 }}>
-        <h2 className="h2" style={{ marginBottom: 8 }}>농장별 채권 · 상계</h2>
+        <h2 className="h2" style={{ marginBottom: 8 }}>농장별 채권 종합 · 상계</h2>
         {F.length === 0 && <div className="muted">위 두 파일을 올리면 담당농장 채권이 여기 나옵니다.</div>}
         {!phone && F.length > 0 && <div className="gr gh small muted" style={{ gridTemplateColumns: col }}><div>농장</div><div className="r">일반</div><div className="r">시설</div><div className="r">기타</div><div className="r">월대 미정산</div><div className="r b">채권 합계</div><div className="r">상계 예정</div></div>}
         {F.map((x) => (
@@ -120,38 +174,6 @@ export function BondsPage() {
             </button>
             {exp[x.f] && (
               <div style={{ padding: '8px 4px 14px', display: 'grid', gap: 14 }}>
-                {x.L.length > 0 && (
-                  <div>
-                    <div className="b small" style={{ marginBottom: 6 }}>선급금 (단위 원)</div>
-                    {x.L.map((l) => { const p = loanPlan(l); return (
-                      <div key={l.key} style={{ display: 'grid', gridTemplateColumns: phone ? '1fr' : 'minmax(160px,1.2fr) minmax(200px,2fr) minmax(170px,1fr)', gap: 8, padding: '8px 0', borderTop: '1px solid #F1EEE6', alignItems: 'center' }}>
-                        <div><span className="chip info">{KIND(l.kind) === '기타' ? l.kind : KIND(l.kind)}</span> <b>{won(l.balance)}</b><div className="muted" style={{ fontSize: 12 }}>{l.date} 지급 {won(l.orig)} · 회수 {won(l.recovered)}</div></div>
-                        <div className="small" style={{ minWidth: 0 }}>{l.note || <span className="muted">상계 조건 없음</span>}</div>
-                        <div style={{ textAlign: phone ? 'left' : 'right' }}>
-                          {edit === l.key ? (
-                            <span style={{ display: 'inline-flex', gap: 6 }}><input aria-label="상계 예정액" inputMode="numeric" value={val} onChange={(e) => setVal(e.target.value)} style={{ width: 120, minHeight: 36 }} /><button className="btn sm pri" onClick={() => { setPlan(l, Math.max(0, Number(val.replace(/[^\d]/g, '')) || 0)); setEdit(null); }}>저장</button></span>
-                          ) : (
-                            <button className="btn sm ghost" onClick={() => { setEdit(l.key); setVal(String(p.amt)); }} title="눌러서 고치기">상계 {won(p.amt)}</button>
-                          )}
-                          <div className="muted" style={{ fontSize: 11 }}>{p.how}{saved.bondPlan?.[l.key] !== undefined && <button className="lnk" style={{ fontSize: 11, marginLeft: 6 }} onClick={() => setPlan(l, null)}>자동으로</button>}</div>
-                        </div>
-                      </div>
-                    ); })}
-                  </div>
-                )}
-                {x.M.length > 0 && (
-                  <div>
-                    <div className="b small" style={{ marginBottom: 6 }}>월대선급금 (그룹별, 단위 만원)</div>
-                    {[...x.M].filter((m) => showDone[x.f] || m.cells.some((c) => owing(c.st))).sort((a, b) => (a.group || 'zz').localeCompare(b.group || 'zz', 'ko', { numeric: true })).map((m, i) => { const o = m.cells.filter((c) => owing(c.st)).reduce((a, c) => a + c.amt, 0); const g = all.find((z) => z.farm === m.farm && z.group === m.group); return (
-                      <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '6px 0', borderTop: '1px solid #F1EEE6', flexWrap: 'wrap', opacity: o ? 1 : 0.6 }}>
-                        <b style={{ width: 70 }}>{m.group || '분할'}</b>
-                        <div style={{ flex: 1, display: 'flex', gap: 4, flexWrap: 'wrap', minWidth: 0 }}>{m.cells.map((c) => <span key={c.m} className={ST_CLS[c.st]} title={ST_LABEL[c.st]} style={{ fontSize: 11, fontWeight: 400 }}>{c.m.slice(2).replace('-', '.')} {man(c.amt)}{c.st !== 'done' ? ' ' + ST_LABEL[c.st] : ''}</span>)}</div>
-                        <div style={{ textAlign: 'right', minWidth: 110 }}>{o ? <b>{man(o)}만 미정산</b> : <span className="muted small">정산 끝</span>}{g && isPlanned(g) && o > 0 && <div className="small" style={{ color: '#1F4E3D' }}>정산예정 → 상계</div>}</div>
-                      </div>
-                    ); })}
-                    {x.M.some((m) => !m.cells.some((c) => owing(c.st))) && <button className="lnk" style={{ fontSize: 13, marginTop: 6 }} onClick={() => setShowDone({ ...showDone, [x.f]: !showDone[x.f] })}>{showDone[x.f] ? '정산 끝난 그룹 숨기기' : `정산 끝난 그룹 ${x.M.filter((m) => !m.cells.some((c) => owing(c.st))).length}개 보기`}</button>}
-                  </div>
-                )}
                 {x.bin.length > 0 && <div className="small muted">피드빈 설치대금 {x.bin.map((b) => `${won(b.amount)}원 (${b.date} 지급, ${b.until}까지 거래하면 회수 없음)`).join(' · ')}</div>}
                 {all.filter((g) => g.farm === x.f && isPlanned(g)).length > 0 && (
                   <div style={{ background: '#F3F8F4', borderRadius: 8, padding: '8px 10px' }}>
@@ -167,6 +189,7 @@ export function BondsPage() {
         ))}
         {F.length > 0 && !phone && <div className="gr gh b" style={{ gridTemplateColumns: col, borderTop: '1px solid #D9D3C6' }}><div>합계 (만원)</div><div className="r">{man(T.gen)}</div><div className="r">{man(T.fac)}</div><div className="r">{man(T.etc)}</div><div className="r">{man(T.mOwe)}</div><div className="r">{man(T.sum)}</div><div className="r">{man(T.plan)}</div></div>}
       </div>
+      </>}
     </>
   );
 }

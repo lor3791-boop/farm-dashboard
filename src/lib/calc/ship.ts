@@ -60,7 +60,13 @@ export function shipAssign(tot: TotRow[], imp: ImpRow[], manual: ManualShip[], o
   pig.forEach((r) => { if (r.date > ref && !totK.has(shipKey(r.date, r.farm))) live.push({ farm: r.farm, group: r.group, date: r.date, n: r.n, src: '피그온' }); });
   team.forEach((r) => push(r, '팀 대시보드'));
   manual.forEach((m) => { const k = shipKey(m.date, m.farm); if (m.date > ref && m.group && !totK.has(k) && !pigK.has(k) && !teamK.has(k)) live.push({ farm: m.farm, group: m.group, date: m.date, n: m.n, src: '직접·등판서' }); });
-  return { asg, live };
+  // 그룹별 마지막 출하일 — 기준일 전후 모든 출하(종합·피그온·팀·직접입력) 중 그 그룹에 붙은 것
+  const last: Record<string, string> = {};
+  const mark = (farm: string, g: string, d: string) => { if (!g) return; const k = farm + ' ' + g; if (!last[k] || d > last[k]) last[k] = d; };
+  [...tot, ...team].forEach((r) => { const a = asg[r.key]; (a?.parts ?? (a?.group ? [{ group: a.group }] : [])).forEach((p) => mark(r.farm, p.group, r.date)); });
+  pig.forEach((r) => mark(r.farm, r.group, r.date));
+  manual.forEach((m) => mark(m.farm, m.group, m.date));
+  return { asg, live, last };
 }
 // 종합이 아직 없는 출하의 예상 지급율: 같은 출하처의 최근 60일 종합 지급율(지육중량 가중)
 export function estPay(dest: string, date: string): number | null {

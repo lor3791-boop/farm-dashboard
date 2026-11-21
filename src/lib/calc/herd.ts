@@ -9,7 +9,7 @@ import { applyDeaths, type DeathLike, type Split, type DeathBase } from '@/share
 export interface LiveShip { farm: string; group: string; date: string; n: number }
 // 직접 등록한 그룹 (피그온 전입현황 업로드 전) — dongs: ['1','2'] (동 없이 관리면 빈 배열)
 export interface ManualGroup { id?: string; farm: string; group: string; dongs: string[]; date: string; inn: number; claim: number; avgw: number; age: number; totalKg?: number; source?: string; memo?: string }
-export interface Live { deaths: DeathLike[]; ships: LiveShip[]; groups?: ManualGroup[]; dongs?: Record<string, string> } // dongs: 사육현황에서 고친 그룹별 동 ('민서 26-7' → '1·2동' 또는 '—')
+export interface Live { deaths: DeathLike[]; ships: LiveShip[]; groups?: ManualGroup[]; dongs?: Record<string, string>; lastShip?: Record<string, string> } // dongs: 사육현황에서 고친 그룹별 동 ('민서 26-7' → '1·2동' 또는 '—')
 const mmdd = (d: string) => d.slice(5);
 // 두수 기준 (피그온): 최초두수 = 실제 농장 전입두수, 전입두수 = 최초두수 − 크레임.
 // 스냅샷 G[4]·로트 l[1]은 피그온 '전입두수'(크레임 뺀 값), 재고 G[7]도 크레임을 뺀 두수다.
@@ -94,7 +94,7 @@ export function buildGroups(T: Thresholds, firstShipByFarm: Record<string, numbe
     o.surv = r1(((o.net - o.death) / o.net) * 100);
     o.expSurv = r1(((o.sold + o.stock - o.claimLeft) / o.net) * 100);
     o.bad = o.surv < T.problemSurvivalPct;
-    o.last = LAST_SHIP[who] || null;
+    { const a = LAST_SHIP[who], b = live?.lastShip?.[who]; o.last = (a && b ? (a > b ? a : b) : a || b) || null; } // 피그온 기준일 값 + 이후 출하
     o.since = o.last ? days(o.last, TODAY) : null;
     o.first = addIso(o.date, Math.round(((firstShipByFarm[farm] || T.firstShipWeightKg) - o.avgw) / T.defaultAdgKg));
     o.firstOver = o.sold === 0 ? days(o.first, TODAY) : 0;

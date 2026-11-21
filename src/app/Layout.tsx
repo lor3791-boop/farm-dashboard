@@ -1,12 +1,12 @@
 // 뼈대 — 좌측 메뉴(초록), 제목 줄, 공통 필터 띠. 폰: 하단 탭바 + ☰(더보기), 옆으로 밀어 탭 넘기기, 당겨서 새로고침. 어디서나 + 버튼(폐사·출하 입력).
 import { useRef, useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { MENU } from './menu';
+import { MENU, tabOf } from './menu';
 import { FilterBar } from './FilterBar';
 import { useAuth } from '@/lib/auth';
 import { useData } from '@/lib/data';
 import { useSharePublisher } from '@/share/usePublish';
-import { useUi } from '@/lib/ui';
+import { useUi, type UiState } from '@/lib/ui';
 import { REF } from '@/lib/calc/herd';
 import { pageTabs } from '@/components/v5';
 import { Sheet, Toaster } from '@/components/Sheet';
@@ -75,6 +75,7 @@ export function Layout({ children }: { children: ReactNode }) {
     if (j >= 0 && j < T.opts.length) { T.onPick(T.opts[j][0]); window.scrollTo({ top: 0 }); fx.enter(dx < 0 ? 'l' : 'r'); } else fx.release();
   };
   const loc = useLocation();
+  const { s: ui, go } = useUi();
   useSharePublisher();
   const cur = MENU.find((m) => (m.path === '/' ? loc.pathname === '/' : loc.pathname.startsWith(m.path))) ?? MENU[0];
 
@@ -86,8 +87,10 @@ export function Layout({ children }: { children: ReactNode }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {MENU.map((m) => (
           <div key={m.path} style={{ display: 'contents' }}>
-            <NavLink to={m.sub ? m.path + '/' + m.sub[0][0] : m.path} end={m.path === '/'} onClick={() => { if (!m.sub) setOpen(false); }} className={() => (cur.path === m.path && !m.sub ? 'nav on' : 'nav') + (m.accent ? ' acc' : '') + (m.sub && cur.path === m.path ? ' grp' : '')}>{m.label}{m.sub && <span aria-hidden="true" style={{ marginLeft: 'auto', fontSize: 11 }}>{cur.path === m.path ? '▾' : '▸'}</span>}</NavLink>
-            {m.sub && cur.path === m.path && m.sub.map(([k, l]) => <NavLink key={k} to={m.path + '/' + k} onClick={() => setOpen(false)} className={({ isActive }) => (isActive ? 'nav sub on' : 'nav sub')}>{l}</NavLink>)}
+            <NavLink to={m.sub && !m.tab ? m.path + '/' + m.sub[0][0] : m.path} end={m.path === '/'} onClick={() => { if (!m.sub) setOpen(false); }} className={() => (cur.path === m.path && !m.sub ? 'nav on' : 'nav') + (m.accent ? ' acc' : '') + (m.sub && cur.path === m.path ? ' grp' : '')}>{m.label}{m.sub && <span aria-hidden="true" style={{ marginLeft: 'auto', fontSize: 11 }}>{cur.path === m.path ? '▾' : '▸'}</span>}</NavLink>
+            {m.sub && cur.path === m.path && m.sub.map(([k, l]) => m.tab
+              ? <a key={k} href={'#' + m.path} onClick={(e) => { e.preventDefault(); go(m.path, { [m.tab!]: k } as Partial<UiState>); setOpen(false); }} className={tabOf(ui, m.tab) === k ? 'nav sub on' : 'nav sub'}>{l}</a>
+              : <NavLink key={k} to={m.path + '/' + k} onClick={() => setOpen(false)} className={({ isActive }) => (isActive ? 'nav sub on' : 'nav sub')}>{l}</NavLink>)}
           </div>
         ))}
       </div>

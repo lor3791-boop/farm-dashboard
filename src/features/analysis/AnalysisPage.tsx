@@ -1,4 +1,6 @@
 // 성적분석 — 예상육성률 / 폐사율 순위 / 보고자료(농장별 현황보고서)
+import { SUBS } from '@/app/menu';
+import type { UiState } from '@/lib/ui';
 import { useHerd, useUi } from '@/lib/ui';
 import { agg } from '@/lib/calc/herd';
 import { fmt, r1 } from '@/lib/calc/dates';
@@ -26,7 +28,7 @@ export function AnalysisPage() {
 
   return (
     <>
-      <Tabs opts={[['surv', '예상육성률'], ['rank', '폐사율 순위'], ['report', '보고자료']]} value={s.anTab} onPick={(k) => set({ anTab: k })} />
+      <Tabs opts={SUBS.an as [UiState['anTab'], string][]} value={s.anTab} onPick={(k) => set({ anTab: k })} />
       {s.anTab === 'surv' && (
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}><h2 className="h2">예상육성률 (정산예정 그룹)</h2><label className="small" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={s.heat} onChange={() => set({ heat: !s.heat })} style={{ minHeight: 0, width: 18, height: 18 }} /> 하절기 항목 보기</label></div>

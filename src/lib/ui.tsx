@@ -15,14 +15,14 @@ export interface UiState {
   hView: 'table' | 'heat'; hMode: 'entry' | 'cal'; stage: 'all' | 'pre' | 'ship' | 'done'; warnOnly: boolean;
   hidden: Record<string, boolean>;
   anTab: 'surv' | 'rank' | 'report'; heat: boolean;
-  herdTab: 'herd' | 'entry' | 'warn' | 'fcr'; shipTab: 'status' | 'input' | 'grade' | 'fc'; deathTab: 'input' | 'status' | 'list'; setTab: 'plan' | 'excel' | 'feed' | 'vaccine';
+  herdTab: 'herd' | 'entry' | 'warn' | 'fcr'; shipTab: 'status' | 'input' | 'grade' | 'fc'; deathTab: 'input' | 'status' | 'list'; setTab: 'plan' | 'excel' | 'feed' | 'vaccine'; bondTab: 'sum' | 'loan' | 'monthly';
   rpTab: 'report' | 'settle'; sGroup: string;
   dFarm: string; dDong: string | null; dGroup: string | null;
 }
 const init: UiState = {
   fSel: null, fOpen: false, fQ: '', fStatus: 'all', det: null, exp: {},
   hView: 'table', hMode: 'entry', stage: 'all', warnOnly: false, hidden: { end: true, next: true },
-  anTab: 'surv', heat: false, rpTab: 'report', sGroup: '민서 26-3', herdTab: 'herd', shipTab: 'status', deathTab: 'status', setTab: 'plan', dFarm: '산성농원', dDong: '4', dGroup: null
+  anTab: 'surv', heat: false, rpTab: 'report', sGroup: '민서 26-3', herdTab: 'herd', shipTab: 'status', deathTab: 'status', setTab: 'plan', bondTab: 'sum', dFarm: '산성농원', dDong: '4', dGroup: null
 };
 
 interface Ctx {
@@ -64,7 +64,7 @@ export function useHerd() {
     const pre = buildGroups(data.thresholds, saved.firstShipByFarm, { deaths, groups, ships: [], dongs: saved.groupDong });
     const caps = pre.map((g) => ({ farm: g.farm, group: g.group, date: g.date, sold: g.sold, stock: g.stock, ageRef: g.age - Math.round((Date.parse(TODAY) - Date.parse(REF)) / 864e5) })); // Group.age = 오늘 일령 → 기준일 일령으로
     const a = shipAssign(tot, imports, ships, saved.shipGroup ?? {}, caps, REF);
-    const g = buildGroups(data.thresholds, saved.firstShipByFarm, { deaths, groups, ships: a.live, dongs: saved.groupDong }, sp);
+    const g = buildGroups(data.thresholds, saved.firstShipByFarm, { deaths, groups, ships: a.live, dongs: saved.groupDong, lastShip: a.last }, sp);
     return { full: g, split: sp, asg: a.asg, liveShips: a.live };
   }, [data, saved.firstShipByFarm, saved.groupDong, saved.shipGroup, deaths, ships, groups, imports, tot]);
   const all = useMemo(() => full.filter((r) => !saved.settled[r.who]), [full, saved.settled]);

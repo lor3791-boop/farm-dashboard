@@ -1,4 +1,6 @@
 // 출하관리 — 출하현황(이번 달) / 출하입력(등판서·직접 입력·자료 올리기·등록 기록) / 농장별 출하성적
+import { SUBS } from '@/app/menu';
+import type { UiState } from '@/lib/ui';
 import { ShipTotalCard } from './ShipTotal';
 import { useHerd } from '@/lib/ui';
 import { Tabs } from '@/components/v5';
@@ -11,7 +13,7 @@ export function ShipPage() {
   const { s, set } = useHerd();
   return (
     <>
-      <Tabs opts={[['status', '출하현황'], ['input', '출하입력'], ['grade', '농장별 출하성적'], ['fc', '원료돈 예상물량']]} value={s.shipTab} onPick={(k) => set({ shipTab: k })} />
+      <Tabs opts={SUBS.ship as [UiState['shipTab'], string][]} value={s.shipTab} onPick={(k) => set({ shipTab: k })} />
       {s.shipTab === 'status' && <ShipStatus />}
       {s.shipTab === 'input' && (<><ShipUpload /><ShipTotalCard /><ShipImportCard /><ShipManualList /></>)}
       {s.shipTab === 'fc' && <Forecast />}

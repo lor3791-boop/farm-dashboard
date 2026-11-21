@@ -1,0 +1,2758 @@
+// @ts-nocheck
+// 루카 현황판(index.html)의 계산·엑셀 가져오기/내보내기·달력 이미지 코드를 그대로 옮긴 것 — 결과가 기존 현황판과 똑같도록 손대지 않는다.
+// 원본: lor3791-boop/luka-piglets index.html 470~3219행. 화면(render) 함수는 쓰지 않는다.
+export function makeLuka(__S, __R) {
+  "use strict";
+  // ---------- constants ----------
+  var DAY_MS = 86400000;
+  var ANCHOR_MS = Date.UTC(2026, 0, 4); // 2026-01-04, Sunday — matches 수급계획 파일 기준일
+  var WEEKDAY_KR = ['일','월','화','수','목','금','토'];
+  var IN_FARM_NAME = '익산 자돈사';
+  var BASE_DATE_ISO = '2026-08-16';
+  var BASE_STOCK = 1961;
+
+  function todayMs() {
+    var d = new Date();
+    return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+  function parseISO(s) {
+    var p = s.split('-').map(Number);
+    return Date.UTC(p[0], p[1] - 1, p[2]);
+  }
+  function toISO(ms) {
+    var d = new Date(ms);
+    var y = d.getUTCFullYear(), m = d.getUTCMonth() + 1, day = d.getUTCDate();
+    return y + '-' + String(m).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+  }
+  function fmtShort(ms) {
+    var d = new Date(ms);
+    return (d.getUTCMonth() + 1) + '월 ' + d.getUTCDate() + '일(' + WEEKDAY_KR[d.getUTCDay()] + ')';
+  }
+  function fmtSlash(ms) {
+    var d = new Date(ms);
+    return (d.getUTCMonth() + 1) + '/' + d.getUTCDate() + '(' + WEEKDAY_KR[d.getUTCDay()] + ')';
+  }
+  function fmtNum(n) { return (n || 0).toLocaleString('ko-KR'); }
+
+  // ---------- week model (replicates 수급계획 파일의 고정 수식: 시작일 anchor + 7일 반복) ----------
+  var weekCache = new Map();
+  function computeWeek(idx) {
+    if (weekCache.has(idx)) return weekCache.get(idx);
+    var startMs = ANCHOR_MS + idx * 7 * DAY_MS;
+    var endMs = startMs + 6 * DAY_MS;
+    var counts = {};
+    for (var i = 0; i < 7; i++) {
+      var d = new Date(startMs + i * DAY_MS);
+      var key = d.getUTCFullYear() + '-' + (d.getUTCMonth() + 1);
+      counts[key] = (counts[key] || 0) + 1;
+    }
+    var labelKey = null, max = 0;
+    for (var k in counts) { if (counts[k] > max) { max = counts[k]; labelKey = k; } }
+    var parts = labelKey.split('-').map(Number);
+    var ly = parts[0], lm = parts[1];
+    var weekNum;
+    if (idx <= 0) {
+      weekNum = 1;
+    } else {
+      var prev = computeWeek(idx - 1);
+      weekNum = (prev.year === ly && prev.month === lm) ? prev.weekNum + 1 : 1;
+    }
+    var result = { idx: idx, start: startMs, end: endMs, year: ly, month: lm, weekNum: weekNum,
+      label: lm + '월 ' + weekNum + '주' };
+    weekCache.set(idx, result);
+    return result;
+  }
+  function weekIndexOf(ms) { return Math.floor((ms - ANCHOR_MS) / (7 * DAY_MS)); }
+  function weekOf(ms) { return computeWeek(weekIndexOf(ms)); }
+
+  // ---------- state ----------
+  var db = null, useLocal = false;
+  var settings = defaultSettings();
+  var records = [];
+  var activeTab = 'lukaStatus';
+  var calMonthCursor = (function () { var t = new Date(); return { y: t.getFullYear(), m: t.getMonth() }; })();
+  var calendarCopyState = null;
+  var calDayEditISO = null;
+  // 전입전출 시뮬레이션 — 화면에서만 확인하는 가안 상태. simOverrides/simActiveScenarioId/simSaveNameDraft는
+  // 저장 버튼을 눌러야만 settings.simScenarios(최대 3개)에 반영된다.
+  var simMonthCursor = (function () { var t = new Date(); return { y: t.getFullYear(), m: t.getMonth() }; })();
+  var simOverrides = {};
+  var simActiveScenarioId = null;
+  var simDayEditISO = null;
+  var simSaveNameDraft = '';
+  var confirmingDeleteId = null;
+  var pendingImport = null;
+  var importBusy = false;
+  var importError = null;
+  var recordsExpanded = false;
+  var recordFilterMonth = toISO(todayMs()).slice(0, 7);
+  var recordFilterKind = '';
+  var recordFilterFarm = '';
+  var weekFilterMonth = toISO(todayMs()).slice(0, 7);
+  var pendingWorkbookImport = null;
+  var workbookImportBusy = false;
+  var workbookImportError = null;
+  var openEditModal = null;
+  var modalMouseDownOnBackdrop = false;
+  var lukaStatusFilterMonth = toISO(todayMs()).slice(0, 7);
+  var reshipFilterMonth = toISO(todayMs()).slice(0, 7);
+  var reshipFilterFarm = '';
+  // 수정/추가 팝업의 일괄삭제(체크박스) 모드 — 탭별로 독립.
+  var statusBulkMode = {};
+  var statusBulkChecked = {};
+  var statusBulkConfirming = {};
+
+  function defaultSettings() {
+    return {
+      defaultWeeklyDeath: 20,
+      weeklyDeaths: {},
+      lukaStatusRows: [],
+      reshipRows: [],
+      feedCostRows: [],
+      simScenarios: []
+    };
+  }
+
+  // ---------- persistence ----------
+  var LOCAL_KEY = 'lukapig_v1';
+  function loadLocal() {
+    try {
+      var raw = localStorage.getItem(LOCAL_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        settings = Object.assign(defaultSettings(), parsed.settings || {});
+        records = parsed.records || [];
+      }
+    } catch (e) {}
+  }
+  function saveLocal() {
+    try { localStorage.setItem(LOCAL_KEY, JSON.stringify({ settings: settings, records: records })); } catch (e) {}
+  }
+
+  function setSyncStatus(mode) {
+    var pill = document.getElementById('syncPill');
+    var dot = document.getElementById('syncDot');
+    var text = document.getElementById('syncText');
+    if (!dot) return;
+    if (mode === 'live') {
+      if (pill) pill.classList.remove('warn');
+      dot.className = 'dot'; text.textContent = '실시간 동기화';
+    } else if (mode === 'local') {
+      if (pill) pill.classList.add('warn');
+      dot.className = 'dot off';
+      text.innerHTML = '이 브라우저에만 저장(공유 불가) — 서버 연결 실패 ' +
+        '<button type="button" class="sync-retry-btn" data-action="retryConnect">다시 시도</button>';
+    } else {
+      if (pill) pill.classList.remove('warn');
+      dot.className = 'dot off'; text.textContent = '연결 중…';
+    }
+  }
+
+  // Firestore가 응답하지 않을 때(보안 규칙 만료, 네트워크 차단 등) 데이터가
+  // 통째로 사라지지 않도록 이 브라우저의 localStorage 저장으로 전환하고,
+  // 연결이 복구되면 자동으로 다시 붙도록 주기적으로 재시도한다.
+  var reconnectTimer = null;
+  function scheduleReconnect() {
+    if (reconnectTimer) return;
+    reconnectTimer = setInterval(function () {
+      if (!useLocal) { clearInterval(reconnectTimer); reconnectTimer = null; return; }
+      initStore();
+    }, 60000);
+  }
+  function fallbackToLocal() {
+    if (useLocal) return;
+    useLocal = true;
+    db = null;
+    setSyncStatus('local');
+    scheduleReconnect();
+  }
+
+  var unsubSettings = null, unsubRecords = null;
+  async function initStore() {
+    if (unsubSettings) { try { unsubSettings(); } catch (e) {} unsubSettings = null; }
+    if (unsubRecords) { try { unsubRecords(); } catch (e) {} unsubRecords = null; }
+    db = dbAdapter;
+    if (!db) {
+      useLocal = true;
+      loadLocal();
+      setSyncStatus('local');
+      render();
+      scheduleReconnect();
+      return;
+    }
+    setSyncStatus('live');
+    var settingsRef = db.doc('settings/main');
+    unsubSettings = settingsRef.onSnapshot(function (snap) {
+      useLocal = false;
+      if (reconnectTimer) { clearInterval(reconnectTimer); reconnectTimer = null; }
+      if (snap.exists) {
+        settings = Object.assign(defaultSettings(), snap.data());
+      } else {
+        settings = defaultSettings();
+        settingsRef.set(settings).catch(function () {});
+      }
+      render();
+    }, function (err) {
+      console.error('[Firestore] settings 구독 실패 — Firebase 콘솔의 Firestore 보안 규칙(만료 여부 포함)을 확인하세요:', err);
+      fallbackToLocal(); loadLocal(); render();
+    });
+
+    var recordsRef = db.collection('records').orderBy('date', 'asc').limit(1000);
+    unsubRecords = recordsRef.onSnapshot(function (snap) {
+      useLocal = false;
+      if (reconnectTimer) { clearInterval(reconnectTimer); reconnectTimer = null; }
+      records = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      render();
+    }, function (err) {
+      console.error('[Firestore] records 구독 실패 — Firebase 콘솔의 Firestore 보안 규칙(만료 여부 포함)을 확인하세요:', err);
+      fallbackToLocal(); loadLocal(); render();
+    });
+  }
+
+  async function addRecord(rec) {
+    if (db) {
+      try { await db.collection('records').add(rec); return; }
+      catch (e) { fallbackToLocal(); }
+    }
+    rec.id = 'local_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    records.push(rec); records.sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+    saveLocal(); render();
+  }
+  async function deleteRecord(id) {
+    if (db) {
+      try { await db.doc('records/' + id).delete(); return; }
+      catch (e) { fallbackToLocal(); }
+    }
+    records = records.filter(function (r) { return r.id !== id; });
+    saveLocal(); render();
+  }
+  async function updateRecordHead(id, head) {
+    var rec = records.find(function (r) { return r.id === id; });
+    if (!rec) return;
+    if (db) {
+      // head 필드만 병합 저장 — 로컬의 다른 필드가 최신이 아니어도 그 필드는 건드리지 않는다.
+      try { await db.doc('records/' + id).set({ head: head }, { merge: true }); return; }
+      catch (e) { fallbackToLocal(); }
+    }
+    records = records.map(function (r) { return r.id === id ? Object.assign({}, r, { head: head }) : r; });
+    saveLocal(); render();
+  }
+  async function replaceAllRecords(newRecords) {
+    if (db) {
+      try {
+        var snap = await db.collection('records').get();
+        await Promise.all(snap.docs.map(function (d) { return db.doc('records/' + d.id).delete(); }));
+        await Promise.all(newRecords.map(function (r) { return db.collection('records').add(r); }));
+        return;
+      } catch (e) { fallbackToLocal(); }
+    }
+    records = newRecords.map(function (r, i) {
+      return Object.assign({ id: 'local_import_' + Date.now() + '_' + i }, r);
+    });
+    saveLocal(); render();
+  }
+  async function saveSettings(patch) {
+    settings = Object.assign({}, settings, patch);
+    if (db) {
+      // patch만 병합 저장한다(merge:true) — 재접속 직후처럼 로컬의 settings가 아직
+      // 클라우드의 최신 값을 못 받아온 순간에 저장해도, 전체를 덮어써서 다른 필드
+      // (예: lukaStatusRows 등)를 지워버리지 않도록 하기 위함.
+      try { await db.doc('settings/main').set(patch, { merge: true }); return; }
+      catch (e) { fallbackToLocal(); }
+    }
+    saveLocal(); render();
+  }
+
+  // ---------- ledger / stock math ----------
+  function deathForWeek(weekStartISO) {
+    var v = settings.weeklyDeaths[weekStartISO];
+    return (v === undefined || v === null || v === '') ? settings.defaultWeeklyDeath : Number(v);
+  }
+
+  function buildLedger(maxMs, overrides) {
+    // actual transactions — dates present in `overrides` are replaced by the override's
+    // in/out_farm/out_external triple instead of the real records on that date, so the
+    // 시뮬레이션 캘린더 can preview "what if" numbers without touching real data.
+    var overrideSet = null;
+    if (overrides) {
+      overrideSet = {};
+      Object.keys(overrides).forEach(function (iso) { overrideSet[parseISO(iso)] = true; });
+    }
+    var events = records.filter(function (r) {
+      return !overrideSet || !overrideSet[parseISO(r.date)];
+    }).map(function (r) {
+      var delta = r.type === 'in' ? Number(r.head) : -Number(r.head);
+      return { date: parseISO(r.date), delta: delta, kind: 'tx', ref: r };
+    });
+    if (overrides) {
+      Object.keys(overrides).forEach(function (iso) {
+        var o = overrides[iso] || {};
+        var dms = parseISO(iso);
+        var inH = Number(o.in) || 0, outFarm = Number(o.out_farm) || 0, outExt = Number(o.out_external) || 0;
+        if (inH) events.push({ date: dms, delta: inH, kind: 'tx' });
+        if (outFarm) events.push({ date: dms, delta: -outFarm, kind: 'tx' });
+        if (outExt) events.push({ date: dms, delta: -outExt, kind: 'tx' });
+      });
+    }
+    // synthetic weekly death deductions, from base week through maxMs's week
+    var baseMs = parseISO(BASE_DATE_ISO);
+    var startIdx = weekIndexOf(baseMs);
+    var endIdx = weekIndexOf(maxMs);
+    for (var idx = startIdx; idx <= endIdx; idx++) {
+      var wk = computeWeek(idx);
+      var wkStartISO = toISO(wk.start);
+      var death = deathForWeek(wkStartISO);
+      if (death) events.push({ date: wk.end, delta: -death, kind: 'death', ref: { week: wk.label } });
+    }
+    events.sort(function (a, b) {
+      if (a.date !== b.date) return a.date - b.date;
+      var pa = a.kind === 'death' ? 1 : 0, pb = b.kind === 'death' ? 1 : 0;
+      return pa - pb;
+    });
+    return events;
+  }
+
+  function stockAsOf(queryMs, overrides) {
+    var baseMs = parseISO(BASE_DATE_ISO);
+    var horizon = Math.max(queryMs, baseMs, todayMs() + 60 * DAY_MS);
+    var ledger = buildLedger(horizon, overrides);
+    var stock = BASE_STOCK;
+    if (queryMs >= baseMs) {
+      for (var i = 0; i < ledger.length; i++) {
+        if (ledger[i].date >= baseMs && ledger[i].date <= queryMs) stock += ledger[i].delta;
+      }
+    } else {
+      for (var j = 0; j < ledger.length; j++) {
+        if (ledger[j].date > queryMs && ledger[j].date < baseMs) stock -= ledger[j].delta;
+      }
+    }
+    return stock;
+  }
+
+  // ---------- 전입전출 시뮬레이션 헬퍼 ----------
+  function aggregateRecordsForDay(dms) {
+    var agg = { in: 0, out_farm: 0, out_external: 0, out_farm_names: [], out_external_names: [] };
+    records.forEach(function (r) {
+      if (parseISO(r.date) !== dms) return;
+      if (r.type === 'in') { agg.in += Number(r.head) || 0; return; }
+      if (r.subtype === 'farm') {
+        agg.out_farm += Number(r.head) || 0;
+        if (r.farmName && agg.out_farm_names.indexOf(r.farmName) === -1) agg.out_farm_names.push(r.farmName);
+      } else {
+        agg.out_external += Number(r.head) || 0;
+        if (r.farmName && agg.out_external_names.indexOf(r.farmName) === -1) agg.out_external_names.push(r.farmName);
+      }
+    });
+    return agg;
+  }
+  function simDayValue(iso) {
+    var ov = simOverrides[iso];
+    if (ov) {
+      return {
+        in: Number(ov.in) || 0, out_farm: Number(ov.out_farm) || 0, out_external: Number(ov.out_external) || 0,
+        out_farm_names: ov.out_farm_name ? [ov.out_farm_name] : [],
+        out_external_names: ov.out_external_name ? [ov.out_external_name] : []
+      };
+    }
+    return aggregateRecordsForDay(parseISO(iso));
+  }
+  function simStockAsOf(queryMs) { return stockAsOf(queryMs, simOverrides); }
+  // 전출·외부판매 두수 입력 옆에 "가장 자주 쓰인 농장명"부터 나열해 선택할 수 있게 한다.
+  function farmNameFrequency(subtype) {
+    var counts = {};
+    records.forEach(function (r) {
+      if (r.type !== 'out' || r.subtype !== subtype || !r.farmName) return;
+      counts[r.farmName] = (counts[r.farmName] || 0) + 1;
+    });
+    return Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; });
+  }
+
+  function weekAggregate(idx) {
+    var wk = computeWeek(idx);
+    var inSum = 0, farmSum = 0, extSum = 0;
+    records.forEach(function (r) {
+      var d = parseISO(r.date);
+      if (d < wk.start || d > wk.end) return;
+      if (r.type === 'in') inSum += Number(r.head);
+      else if (r.subtype === 'farm') farmSum += Number(r.head);
+      else if (r.subtype === 'external') extSum += Number(r.head);
+    });
+    var wkStartISO = toISO(wk.start);
+    var death = deathForWeek(wkStartISO);
+    var startStock = stockAsOf(wk.start - DAY_MS);
+    var endStock = startStock + inSum - farmSum - extSum - death;
+    return {
+      wk: wk, inSum: inSum, farmSum: farmSum, extSum: extSum, death: death,
+      startStock: startStock, endStock: endStock
+    };
+  }
+
+  function displayWeekRange() {
+    var baseMs = parseISO(BASE_DATE_ISO);
+    var minMs = baseMs, maxMs = todayMs() + 8 * 7 * DAY_MS;
+    records.forEach(function (r) {
+      var d = parseISO(r.date);
+      if (d < minMs) minMs = d;
+      if (d > maxMs) maxMs = d;
+    });
+    return { from: weekIndexOf(minMs), to: weekIndexOf(maxMs) };
+  }
+
+  // ---------- rendering ----------
+  function render() {
+    // #view의 innerHTML을 통째로 갈아끼우면 스크롤 위치가 브라우저에 의해 초기화되므로
+    // (특히 모바일에서 팝업 안 삭제 버튼처럼 렌더를 두 번 연달아 부르는 동작에서 두드러짐),
+    // 페이지 스크롤과 모달 내부 스크롤을 기억했다가 다시 렌더링한 뒤 그대로 복원한다.
+    var modalPanelBefore = document.querySelector('.modal-panel');
+    var modalScrollTop = modalPanelBefore ? modalPanelBefore.scrollTop : null;
+    var pageScrollY = window.scrollY;
+
+    document.querySelectorAll('.tab-btn').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.tab === activeTab);
+    });
+    var view = document.getElementById('view');
+    if (activeTab === 'lukaStatus') view.innerHTML = renderLukaStatus();
+    else if (activeTab === 'feedCost') view.innerHTML = renderFeedCost();
+    else if (activeTab === 'calendar') view.innerHTML = renderCalendar();
+    else view.innerHTML = renderDash();
+    // 팝업이 열려 있는 동안은 뒷배경(body)이 스크롤되지 않도록 잠근다.
+    document.body.classList.toggle('modal-open', !!(openEditModal || calDayEditISO || simDayEditISO));
+
+    if (modalScrollTop !== null) {
+      var modalPanelAfter = document.querySelector('.modal-panel');
+      if (modalPanelAfter) modalPanelAfter.scrollTop = modalScrollTop;
+    }
+    window.scrollTo(0, pageScrollY);
+  }
+
+  var KIND_LABELS = { in: '전입', out_farm: '전출', out_external: '외부판매' };
+  var KIND_ORDER = ['in', 'out_farm', 'out_external'];
+  function recordKindOf(r) {
+    return r.type === 'in' ? 'in' : (r.subtype === 'farm' ? 'out_farm' : 'out_external');
+  }
+
+  // ---------- 후기자돈현황 / 재분양돈군현황 / 사육비산출 (editable status tables) ----------
+  var STATUS_TABLE_DEFS = {
+    lukaStatus: {
+      settingsKey: 'lukaStatusRows',
+      title: '1. 후기자돈 전입현황',
+      dateKey: 'date',
+      columns: [
+        { key: 'date', label: '날짜', type: 'date' },
+        { key: 'groupKey', label: '그룹명', type: 'text' },
+        { key: 'initIn', label: '최초 전입(두)', type: 'number', unit: 'head' },
+        { key: 'avgWeight', label: '전입평체(kg)', type: 'number', decimals: 1, unit: 'kg', weightBasis: 'netIn' },
+        { key: 'claim', label: '크레임(두)', type: 'number', unit: 'head' },
+        { key: 'directSale', label: '외부판매(두)', type: 'number', unit: 'head' },
+        { key: 'netIn', label: '실 전입(두)', type: 'number', unit: 'head' },
+        { key: 'death', label: '폐사(두)', type: 'number', unit: 'head' },
+        { key: 'shipped', label: '분양(두)', type: 'number', unit: 'head' },
+        { key: 'stock', label: '현재고(두)', type: 'number', unit: 'head' },
+        { key: 'survivalRate', label: '육성율', type: 'percent', survivalBasis: 'netIn' },
+        { key: 'note', label: '비고', type: 'text' },
+        { key: 'settled', label: '정산여부', type: 'checkbox', switchUi: true }
+      ]
+    },
+    reship: {
+      settingsKey: 'reshipRows',
+      title: '2. 재분양돈군 현황',
+      dateKey: 'date',
+      columns: [
+        { key: 'date', label: '날짜', type: 'date' },
+        { key: 'groupKey', label: '그룹명', type: 'text' },
+        { key: 'week', label: '전입주차', type: 'number', suffix: '주차', unit: 'week' },
+        { key: 'farm', label: '분양농장', type: 'text' },
+        { key: 'in', label: '전입(두)', type: 'number', unit: 'head' },
+        { key: 'avgWeight', label: '전입평체(kg)', type: 'number', decimals: 1, unit: 'kg', weightBasis: 'in' },
+        { key: 'claim', label: '크레임(두)', type: 'number', unit: 'head' },
+        { key: 'netIn', label: '실전입(두)', type: 'number', unit: 'head' },
+        { key: 'death', label: '폐사(두)', type: 'number', unit: 'head' },
+        { key: 'shipped', label: '출하(두)', type: 'number', unit: 'head' },
+        { key: 'stock', label: '현재고(두)', type: 'number', unit: 'head' },
+        { key: 'survivalRate', label: '육성율', type: 'percent', survivalBasis: 'in' },
+        { key: 'note', label: '비고', type: 'text' },
+        { key: 'settled', label: '정산여부', type: 'checkbox', switchUi: true }
+      ]
+    },
+    feedCost: {
+      settingsKey: 'feedCostRows',
+      title: '월대사육비',
+      dateKey: 'inDate',
+      columns: [
+        { key: 'batchNo', label: '그룹명', type: 'text' },
+        { key: 'inDate', label: '전입일자', type: 'date' },
+        { key: 'inHead', label: '전입두수', type: 'number', unit: 'head' },
+        { key: 'amount', label: '지급액(계)', type: 'number', unit: 'won' },
+        { key: 'settleHead', label: '정산예정두수', type: 'number', unit: 'head' },
+        { key: 'perHead', label: '두당금액', type: 'number', unit: 'won', weightBasis: 'inHead' },
+        { key: 'settleMonth', label: '정산예정월', type: 'text' },
+        { key: 'settled', label: '정산완료여부', type: 'checkbox' },
+        { key: 'note', label: '특이사항', type: 'text' }
+      ]
+    }
+  };
+
+  // 수정/추가 팝업에서 실수로 수치를 건드려 데이터가 틀어지지 않도록, 엑셀 업로드로 채워지는
+  // "사실" 값(날짜/그룹명/전입두수/평체 등)은 잠그고 이후 실제로 바뀌는 값만 편집 가능하게 한다.
+  // feedCost는 여기 없으면 기존처럼 전체 편집 가능.
+  var STATUS_EDITABLE_FIELDS = {
+    lukaStatus: ['directSale', 'death', 'shipped'],
+    reship: ['death', 'shipped']
+  };
+
+  function blankStatusRow(tabKey) {
+    var row = {};
+    STATUS_TABLE_DEFS[tabKey].columns.forEach(function (c) {
+      row[c.key] = (c.type === 'number' || c.type === 'percent') ? 0 : (c.type === 'checkbox' ? false : '');
+    });
+    return row;
+  }
+  function recomputeStatusRow(tabKey, row) {
+    if (tabKey === 'lukaStatus') {
+      var netIn = Number(row.netIn) || 0, death = Number(row.death) || 0, shipped = Number(row.shipped) || 0;
+      row.stock = Math.max(0, netIn - death - shipped);
+      row.survivalRate = netIn ? (netIn - death) / netIn : 0;
+    } else if (tabKey === 'reship') {
+      var inH = Number(row.in) || 0, claim = Number(row.claim) || 0, death2 = Number(row.death) || 0, shipped2 = Number(row.shipped) || 0;
+      row.stock = Math.max(0, (inH - claim) - death2 - shipped2);
+      row.survivalRate = inH ? (inH - death2) / inH : 0;
+    } else if (tabKey === 'feedCost') {
+      var amount = Number(row.amount) || 0, settleHead = Number(row.settleHead) || 0;
+      row.perHead = settleHead ? Math.round(amount / settleHead) : 0;
+    }
+    return row;
+  }
+  function statusRowsOf(tabKey) { return settings[STATUS_TABLE_DEFS[tabKey].settingsKey] || []; }
+  function saveStatusRows(tabKey, rows) {
+    var patch = {};
+    patch[STATUS_TABLE_DEFS[tabKey].settingsKey] = rows;
+    saveSettings(patch);
+  }
+  function statusCellDisplayValue(row, col) {
+    var v = row[col.key];
+    if (col.type === 'percent') return (v === undefined || v === null || v === '') ? '' : Math.round(Number(v) * 1000) / 10;
+    return (v === undefined || v === null) ? '' : v;
+  }
+  function formatNumberCell(v, decimals) {
+    var d = decimals || 0;
+    var n = Number(v) || 0;
+    var rounded = d > 0 ? Math.round(n * Math.pow(10, d)) / Math.pow(10, d) : Math.round(n);
+    return rounded.toLocaleString('ko-KR', { minimumFractionDigits: d, maximumFractionDigits: d });
+  }
+  function monthOptionsFromRows(rows, dateKey) {
+    var seen = {}, list = [];
+    rows.forEach(function (r) {
+      var mk = (r[dateKey] || '').slice(0, 7);
+      if (mk && !seen[mk]) { seen[mk] = true; list.push(mk); }
+    });
+    var curMonth = toISO(todayMs()).slice(0, 7);
+    if (!seen[curMonth]) list.push(curMonth);
+    list.sort();
+    return list;
+  }
+  function monthOptionsHtml(months, selected) {
+    return '<option value="">전체</option>' + months.map(function (mk) {
+      var parts = mk.split('-');
+      return '<option value="' + mk + '"' + (mk === selected ? ' selected' : '') + '>' + parts[0] + '년 ' + Number(parts[1]) + '월</option>';
+    }).join('');
+  }
+
+  // ---------- 읽기 전용 표 (본 화면) ----------
+  function weightedAverage(rows, valueKey, basisKey) {
+    var basisSum = rows.reduce(function (s, r) { return s + (Number(r[basisKey]) || 0); }, 0);
+    if (!basisSum) return 0;
+    var weightedSum = rows.reduce(function (s, r) { return s + (Number(r[valueKey]) || 0) * (Number(r[basisKey]) || 0); }, 0);
+    return weightedSum / basisSum;
+  }
+  function survivalRateTotal(rows, basisKey) {
+    var basisSum = rows.reduce(function (s, r) { return s + (Number(r[basisKey]) || 0); }, 0);
+    if (!basisSum) return 0;
+    var deathSum = rows.reduce(function (s, r) { return s + (Number(r.death) || 0); }, 0);
+    return (basisSum - deathSum) / basisSum;
+  }
+  function cellTone(colKey, colType, value, row) {
+    if (colKey === 'death') return (Number(value) || 0) > 0 ? 'tone-danger' : '';
+    if (colKey === 'shipped') return (Number(value) || 0) > 0 ? 'tone-success' : '';
+    if (colType === 'percent') {
+      var denomKey = row.netIn !== undefined ? 'netIn' : (row.in !== undefined ? 'in' : null);
+      var denom = denomKey ? Number(row[denomKey]) || 0 : 0;
+      if (!denom) return '';
+      return (Number(value) || 0) >= 0.9 ? 'tone-success' : 'tone-danger';
+    }
+    return '';
+  }
+  function renderStatusTable(tabKey, rows) {
+    var def = STATUS_TABLE_DEFS[tabKey];
+    var fullRows = statusRowsOf(tabKey);
+    var headHtml = def.columns.map(function (c) {
+      return '<th' + (c.type === 'text' || c.type === 'date' || c.type === 'checkbox' ? ' class="left"' : '') + '>' + c.label + '</th>';
+    }).join('');
+    var bodyRowsHtml = rows.map(function (row) {
+      var cells = def.columns.map(function (c) {
+        var v = row[c.key];
+        if (c.type === 'checkbox' && c.switchUi) {
+          var trueIdx = fullRows.indexOf(row);
+          return '<td class="left"><button type="button" class="toggle-sw' + (v ? ' on' : '') + '" data-action="toggleSwitchField" data-tab="' + tabKey + '" data-row="' + trueIdx + '" data-field="' + c.key + '" aria-label="' + c.label + '"></button></td>';
+        }
+        var display;
+        if (c.type === 'number') display = formatNumberCell(v, c.decimals) + (c.suffix || '');
+        else if (c.type === 'percent') display = formatNumberCell((Number(v) || 0) * 100, 1) + '%';
+        else if (c.type === 'checkbox') display = v ? '✓' : '';
+        else display = (v === undefined || v === null) ? '' : v;
+        var isLeft = (c.type === 'text' || c.type === 'date' || c.type === 'checkbox');
+        var tone = cellTone(c.key, c.type, v, row);
+        var cls = isLeft ? 'left' : 'mono';
+        if (tone) cls += ' ' + tone;
+        return '<td class="' + cls + '">' + display + '</td>';
+      }).join('');
+      return '<tr>' + cells + '</tr>';
+    }).join('');
+    var totalsHtml = '';
+    if (rows.length) {
+      var totalCells = def.columns.map(function (c, i) {
+        if (i === 0) return '<td class="left">합계</td>';
+        if (c.type === 'number') {
+          var val = c.weightBasis ? weightedAverage(rows, c.key, c.weightBasis) : rows.reduce(function (s, r) { return s + (Number(r[c.key]) || 0); }, 0);
+          return '<td class="mono">' + formatNumberCell(val, c.decimals) + '</td>';
+        }
+        if (c.type === 'percent' && c.survivalBasis) {
+          var rate = survivalRateTotal(rows, c.survivalBasis);
+          return '<td class="mono">' + formatNumberCell(rate * 100, 1) + '%</td>';
+        }
+        return '<td></td>';
+      }).join('');
+      totalsHtml = '<tr class="total-row">' + totalCells + '</tr>';
+    }
+    return '' +
+      '<div class="table-wrap"><table><thead><tr>' + headHtml + '</tr></thead><tbody>' +
+      (bodyRowsHtml || '<tr><td colspan="' + def.columns.length + '" class="empty">표시할 내역이 없습니다.</td></tr>') +
+      totalsHtml +
+      '</tbody></table></div>';
+  }
+
+  // ---------- 수정 가능한 표 (수정/추가 팝업) ----------
+  // feedCost처럼 STATUS_EDITABLE_FIELDS에 없는 탭은 기존처럼 모든 칸을 편집 가능한 표로 보여준다.
+  function renderEditableStatusTableLegacy(tabKey) {
+    var def = STATUS_TABLE_DEFS[tabKey];
+    var rows = statusRowsOf(tabKey);
+    var headHtml = def.columns.map(function (c) {
+      return '<th' + (c.type === 'text' || c.type === 'date' || c.type === 'checkbox' ? ' class="left"' : '') + '>' + c.label + '</th>';
+    }).join('') + '<th></th>';
+    var bodyRowsHtml = rows.map(function (row, idx) {
+      var cells = def.columns.map(function (c) {
+        if (c.type === 'checkbox') {
+          return '<td class="left"><input type="checkbox" data-action="setStatusCell" data-tab="' + tabKey + '" data-row="' + idx + '" data-field="' + c.key + '" data-type="checkbox"' + (row[c.key] ? ' checked' : '') + '></td>';
+        }
+        var val = statusCellDisplayValue(row, c);
+        var inputType = c.type === 'date' ? 'date' : (c.type === 'text' ? 'text' : 'number');
+        var isLeft = (c.type === 'text' || c.type === 'date');
+        return '<td' + (isLeft ? ' class="left"' : '') + '><input class="cell-input' + (isLeft ? ' left' : '') + '" type="' + inputType + '"' +
+          (c.type === 'percent' ? ' step="0.1"' : '') +
+          ' value="' + String(val).replace(/"/g, '&quot;') + '" data-action="setStatusCell" data-tab="' + tabKey + '" data-row="' + idx + '" data-field="' + c.key + '" data-type="' + c.type + '"></td>';
+      }).join('');
+      return '<tr>' + cells + '<td class="left"><button type="button" class="btn ghost small" data-action="deleteStatusRow" data-tab="' + tabKey + '" data-row="' + idx + '">삭제</button></td></tr>';
+    }).join('');
+    return '' +
+      '<div class="table-wrap"><table><thead><tr>' + headHtml + '</tr></thead><tbody>' +
+      (bodyRowsHtml || '<tr><td colspan="' + (def.columns.length + 1) + '" class="empty">등록된 내역이 없습니다. 엑셀을 업로드하거나 행을 추가하세요.</td></tr>') +
+      '</tbody></table></div>' +
+      '<div style="margin-top:10px"><button type="button" class="btn ghost small" data-action="addStatusRow" data-tab="' + tabKey + '">+ 행 추가</button></div>';
+  }
+  // lukaStatus/reship: 카드형 레이아웃 — 표를 가로로 늘어놓지 않아 스크롤 없이 한 화면에 들어오고,
+  // 외부판매·폐사·분양(또는 출하)만 입력칸으로 열어 실수로 다른 값을 건드리는 걸 막는다.
+  function renderEditableStatusTable(tabKey) {
+    var editableKeys = STATUS_EDITABLE_FIELDS[tabKey];
+    if (!editableKeys) return renderEditableStatusTableLegacy(tabKey);
+    var def = STATUS_TABLE_DEFS[tabKey];
+    var rows = statusRowsOf(tabKey);
+    var bulkMode = !!statusBulkMode[tabKey];
+    var checkedSet = statusBulkChecked[tabKey] || {};
+    var confirming = !!statusBulkConfirming[tabKey];
+    var checkedCount = Object.keys(checkedSet).filter(function (k) { return checkedSet[k]; }).length;
+
+    var cardsHtml = rows.map(function (row, idx) {
+      var fieldsHtml = def.columns.map(function (c) {
+        if (c.type === 'checkbox' && c.switchUi) {
+          return '<div class="ef-item"><span class="ef-label">' + c.label + '</span>' +
+            '<button type="button" class="toggle-sw' + (row[c.key] ? ' on' : '') + '" data-action="toggleSwitchField" data-tab="' + tabKey + '" data-row="' + idx + '" data-field="' + c.key + '" aria-label="' + c.label + '"></button></div>';
+        }
+        var editable = editableKeys.indexOf(c.key) !== -1;
+        if (editable) {
+          var val = statusCellDisplayValue(row, c);
+          return '<div class="ef-item"><span class="ef-label">' + c.label + '</span>' +
+            '<input class="cell-input" type="number" min="0"' + (c.type === 'percent' ? ' step="0.1"' : '') +
+            ' value="' + String(val).replace(/"/g, '&quot;') + '" data-action="setStatusCell" data-tab="' + tabKey + '" data-row="' + idx + '" data-field="' + c.key + '" data-type="' + c.type + '"></div>';
+        }
+        var display;
+        var v = row[c.key];
+        if (c.type === 'number') display = formatNumberCell(v, c.decimals) + (c.suffix || '');
+        else if (c.type === 'percent') display = formatNumberCell((Number(v) || 0) * 100, 1) + '%';
+        else if (c.type === 'checkbox') display = v ? '✓' : '-';
+        else display = (v === undefined || v === null || v === '') ? '-' : v;
+        return '<div class="ef-item locked"><span class="ef-label">' + c.label + '</span><span class="ef-value">' + display + '</span></div>';
+      }).join('');
+      var checked = !!checkedSet[idx];
+      return '<div class="edit-card">' +
+        (bulkMode ? '<label class="ef-check"><input type="checkbox" data-action="toggleBulkCheck" data-tab="' + tabKey + '" data-row="' + idx + '"' + (checked ? ' checked' : '') + '></label>' : '') +
+        '<div class="ef-grid">' + fieldsHtml + '</div>' +
+      '</div>';
+    }).join('');
+
+    var toolbarHtml;
+    if (!bulkMode) {
+      toolbarHtml = '<button type="button" class="btn ghost small" data-action="addStatusRow" data-tab="' + tabKey + '">+ 행 추가</button>' +
+        '<button type="button" class="btn ghost small" data-action="startBulkDelete" data-tab="' + tabKey + '">삭제</button>';
+    } else if (!confirming) {
+      toolbarHtml = '<button type="button" class="btn danger-outline" data-action="requestBulkDelete" data-tab="' + tabKey + '">선택 삭제 (' + fmtNum(checkedCount) + ')</button>' +
+        '<button type="button" class="btn ghost small" data-action="cancelBulkDelete" data-tab="' + tabKey + '">취소</button>';
+    } else {
+      toolbarHtml = '<span class="hint" style="margin:0">' + fmtNum(checkedCount) + '개 항목을 정말 삭제할까요?</span>' +
+        '<button type="button" class="btn danger-outline" data-action="confirmBulkDelete" data-tab="' + tabKey + '">확인 삭제</button>' +
+        '<button type="button" class="btn ghost small" data-action="cancelBulkDelete" data-tab="' + tabKey + '">취소</button>';
+    }
+    return '' +
+      '<p class="hint" style="margin:0 0 10px">엑셀로 채워진 값은 표시만 되고, ' + editableKeys.map(function (k) {
+        var col = def.columns.filter(function (c) { return c.key === k; })[0];
+        return col ? col.label : k;
+      }).join('·') + '만 직접 수정할 수 있습니다. 현재고·육성율은 자동으로 다시 계산됩니다.</p>' +
+      '<div class="edit-toolbar">' + toolbarHtml + '</div>' +
+      '<div class="edit-cards">' + (cardsHtml || '<p class="empty">등록된 내역이 없습니다. 엑셀을 업로드하거나 행을 추가하세요.</p>') + '</div>';
+  }
+
+  function renderStatusEditModal() {
+    if (!openEditModal) return '';
+    var def = STATUS_TABLE_DEFS[openEditModal];
+    return '' +
+      '<div class="modal-backdrop">' +
+        '<div class="modal-panel">' +
+          '<div class="panel-head"><h3>' + def.title + ' 수정</h3><button type="button" class="btn ghost small" data-action="closeEditModal">닫기</button></div>' +
+          renderEditableStatusTable(openEditModal) +
+        '</div>' +
+      '</div>';
+  }
+
+  function computeStatusStats(tabKey, rows) {
+    if (tabKey === 'lukaStatus') {
+      var sumNetIn = 0, sumDeath = 0, sumShipped = 0, sumStock = 0;
+      rows.forEach(function (r) { sumNetIn += Number(r.netIn) || 0; sumDeath += Number(r.death) || 0; sumShipped += Number(r.shipped) || 0; sumStock += Number(r.stock) || 0; });
+      var avgSurvival = sumNetIn ? (sumNetIn - sumDeath) / sumNetIn : 0;
+      return [
+        { label: '총 실전입(두)', value: formatNumberCell(sumNetIn) + '두', tone: 'accent' },
+        { label: '총 폐사(두)', value: formatNumberCell(sumDeath) + '두', tone: sumDeath > 0 ? 'danger' : '' },
+        { label: '총 분양(두)', value: formatNumberCell(sumShipped) + '두', tone: sumShipped > 0 ? 'success' : '' },
+        { label: '평균 육성율', value: formatNumberCell(avgSurvival * 100, 1) + '%', tone: sumNetIn ? (avgSurvival >= 0.9 ? 'success' : 'danger') : '' }
+      ];
+    }
+    if (tabKey === 'reship') {
+      var sumIn = 0, sumDeath2 = 0, sumShipped2 = 0;
+      rows.forEach(function (r) { sumIn += Number(r.in) || 0; sumDeath2 += Number(r.death) || 0; sumShipped2 += Number(r.shipped) || 0; });
+      var avgSurvival2 = sumIn ? (sumIn - sumDeath2) / sumIn : 0;
+      return [
+        { label: '총 전입(두)', value: formatNumberCell(sumIn) + '두', tone: 'accent' },
+        { label: '총 폐사(두)', value: formatNumberCell(sumDeath2) + '두', tone: sumDeath2 > 0 ? 'danger' : '' },
+        { label: '총 출하(두)', value: formatNumberCell(sumShipped2) + '두', tone: sumShipped2 > 0 ? 'success' : '' },
+        { label: '평균 육성율', value: formatNumberCell(avgSurvival2 * 100, 1) + '%', tone: sumIn ? (avgSurvival2 >= 0.9 ? 'success' : 'danger') : '' }
+      ];
+    }
+    if (tabKey === 'feedCost') {
+      var sumAmount = 0, sumHead = 0;
+      rows.forEach(function (r) { sumAmount += Number(r.amount) || 0; sumHead += Number(r.inHead) || 0; });
+      var perHeadAvg = sumHead ? Math.round(sumAmount / sumHead) : 0;
+      return [
+        { label: '총 지급액', value: formatNumberCell(sumAmount) + '원', tone: 'accent' },
+        { label: '총 전입두수', value: formatNumberCell(sumHead) + '두', tone: '' },
+        { label: '두당금액(평균)', value: formatNumberCell(perHeadAvg) + '원', tone: '' }
+      ];
+    }
+    return [];
+  }
+  function renderStatsCards(stats) {
+    return '<div class="stat-row">' + stats.map(function (s) {
+      return '<div class="card' + (s.tone ? ' tone-' + s.tone : '') + '"><span class="label">' + s.label + '</span><span class="value mono">' + s.value + '</span></div>';
+    }).join('') + '</div>';
+  }
+
+  function renderWorkbookImportBox() {
+    var counts = pendingWorkbookImport ? [
+      pendingWorkbookImport.lukaStatusRows ? ('후기자돈 전입현황 ' + fmtNum(pendingWorkbookImport.lukaStatusRows.length) + '건') : null,
+      pendingWorkbookImport.reshipRows ? ('재분양돈군현황 ' + fmtNum(pendingWorkbookImport.reshipRows.length) + '건') : null,
+      pendingWorkbookImport.feedCostRows ? ('사육비산출 ' + fmtNum(pendingWorkbookImport.feedCostRows.length) + '건') : null
+    ].filter(Boolean).join(' · ') : '';
+    return '' +
+      '<div class="import-box">' +
+        '<div class="row">' +
+          '<button type="button" class="btn ghost small" data-action="triggerWorkbookImport">엑셀 업로드</button>' +
+          '<input type="file" id="workbookFileInput" accept=".xlsx,.xls" multiple style="display:none">' +
+          '<span class="hint" style="margin:0">전체농장 전입현황 엑셀(‘농장전체전입현황’, ‘월대사육비’, ‘농장별 돈수불’ 시트 포함)을 그대로 올리면 자동으로 반영됩니다. 시트별로 파일이 나뉘어 있어도 여러 개를 한 번에 선택하면 합쳐서 읽습니다.</span>' +
+        '</div>' +
+        (workbookImportBusy ? '<p class="hint" style="margin:8px 0 0">읽는 중…</p>' : '') +
+        (workbookImportError ? '<p class="hint" style="margin:8px 0 0;color:var(--danger)">' + workbookImportError + '</p>' : '') +
+        (pendingWorkbookImport ? (
+          '<div style="margin-top:10px">' +
+            '<p class="hint" style="margin:0 0 6px;color:var(--text)">' + counts + '을(를) 읽었습니다. 확인을 누르면 해당 데이터를 전체 교체합니다.</p>' +
+            '<div class="row" style="margin-top:8px">' +
+              '<button type="button" class="btn" data-action="confirmWorkbookImport">이 내용으로 반영</button>' +
+              '<button type="button" class="btn ghost small" data-action="cancelWorkbookImport">취소</button>' +
+            '</div>' +
+          '</div>'
+        ) : '') +
+      '</div>';
+  }
+
+  function renderLukaStatus() {
+    var curMonth = toISO(todayMs()).slice(0, 7);
+
+    var allLuka = statusRowsOf('lukaStatus');
+    var lukaMonths = monthOptionsFromRows(allLuka, 'date');
+    var lukaFiltered = lukaStatusFilterMonth
+      ? allLuka.filter(function (r) { return (r.date || '').slice(0, 7) === lukaStatusFilterMonth; })
+      : allLuka;
+
+    var allReship = statusRowsOf('reship');
+    var reshipRowsForMonthOptions = reshipFilterFarm
+      ? allReship.filter(function (r) { return r.farm === reshipFilterFarm; })
+      : allReship;
+    var reshipMonths = monthOptionsFromRows(reshipRowsForMonthOptions, 'date');
+    var reshipRowsForFarmOptions = reshipFilterMonth
+      ? allReship.filter(function (r) { return (r.date || '').slice(0, 7) === reshipFilterMonth; })
+      : allReship;
+    var reshipFarmSeen = {}, reshipFarms = [];
+    reshipRowsForFarmOptions.forEach(function (r) { if (r.farm && !reshipFarmSeen[r.farm]) { reshipFarmSeen[r.farm] = true; reshipFarms.push(r.farm); } });
+    reshipFarms.sort();
+    var reshipFiltered = allReship.filter(function (r) {
+      if (reshipFilterMonth && (r.date || '').slice(0, 7) !== reshipFilterMonth) return false;
+      if (reshipFilterFarm && r.farm !== reshipFilterFarm) return false;
+      return true;
+    });
+    var reshipFarmOptionsHtml = '<option value="">전체 농장</option>' + reshipFarms.map(function (f) {
+      return '<option value="' + f + '"' + (f === reshipFilterFarm ? ' selected' : '') + '>' + f + '</option>';
+    }).join('');
+
+    return '' +
+      '<section class="panel">' +
+        '<div class="panel-head"><h2>후기자돈현황</h2></div>' +
+        renderWorkbookImportBox() +
+      '</section>' +
+
+      '<section class="panel">' +
+        '<div class="panel-head">' +
+          '<h2>' + STATUS_TABLE_DEFS.lukaStatus.title + '</h2>' +
+          '<button type="button" class="btn ghost small" data-action="openEditStatusModal" data-tab="lukaStatus">수정/추가</button>' +
+        '</div>' +
+        renderStatsCards(computeStatusStats('lukaStatus', lukaFiltered)) +
+        '<div class="field-row" style="margin-bottom:12px"><div class="field"><label>전입월</label><select data-action="setLukaStatusMonthFilter">' + monthOptionsHtml(lukaMonths, lukaStatusFilterMonth) + '</select></div></div>' +
+        renderStatusTable('lukaStatus', lukaFiltered) +
+      '</section>' +
+
+      '<section class="panel">' +
+        '<div class="panel-head">' +
+          '<h2>' + STATUS_TABLE_DEFS.reship.title + '</h2>' +
+          '<button type="button" class="btn ghost small" data-action="openEditStatusModal" data-tab="reship">수정/추가</button>' +
+        '</div>' +
+        renderStatsCards(computeStatusStats('reship', reshipFiltered)) +
+        '<div class="field-row" style="margin-bottom:12px">' +
+          '<div class="field"><label>전입월</label><select data-action="setReshipMonthFilter">' + monthOptionsHtml(reshipMonths, reshipFilterMonth) + '</select></div>' +
+          '<div class="field"><label>분양농장</label><select data-action="setReshipFarmFilter">' + reshipFarmOptionsHtml + '</select></div>' +
+        '</div>' +
+        renderStatusTable('reship', reshipFiltered) +
+      '</section>' +
+      renderStatusEditModal();
+  }
+
+  function renderFeedCost() {
+    var def = STATUS_TABLE_DEFS.feedCost;
+    var rows = statusRowsOf('feedCost');
+    return '' +
+      '<section class="panel">' +
+        '<div class="panel-head">' +
+          '<h2>' + def.title + '</h2>' +
+          '<button type="button" class="btn ghost small" data-action="openEditStatusModal" data-tab="feedCost">수정/추가</button>' +
+        '</div>' +
+        renderWorkbookImportBox() +
+        renderStatsCards(computeStatusStats('feedCost', rows)) +
+        renderStatusTable('feedCost', rows) +
+      '</section>' +
+      renderStatusEditModal();
+  }
+
+  function renderDash() {
+    var today = todayMs();
+    var curStock = stockAsOf(today);
+    var thisWeek = weekOf(today);
+    var thisWeekAgg = weekAggregate(thisWeek.idx);
+
+    var range = displayWeekRange();
+    var allWeekRows = [];
+    for (var i = range.from; i <= range.to; i++) allWeekRows.push(weekAggregate(i));
+
+    var weekMonthSeen = {};
+    var weekMonthOptions = [];
+    allWeekRows.forEach(function (w) {
+      var key = w.wk.year + '-' + String(w.wk.month).padStart(2, '0');
+      if (!weekMonthSeen[key]) {
+        weekMonthSeen[key] = true;
+        weekMonthOptions.push({ key: key, label: w.wk.year + '년 ' + w.wk.month + '월' });
+      }
+    });
+    var weekRows = weekFilterMonth
+      ? allWeekRows.filter(function (w) { return (w.wk.year + '-' + String(w.wk.month).padStart(2, '0')) === weekFilterMonth; })
+      : allWeekRows;
+
+    var sortedRecords = records.slice().sort(function (a, b) { return b.date < a.date ? -1 : (b.date > a.date ? 1 : 0); });
+
+    function recordMatchesFilters(r, skip) {
+      if (skip !== 'month' && recordFilterMonth && (r.date || '').slice(0, 7) !== recordFilterMonth) return false;
+      if (skip !== 'kind' && recordFilterKind && recordKindOf(r) !== recordFilterKind) return false;
+      if (skip !== 'farm' && recordFilterFarm && (r.farmName || '') !== recordFilterFarm) return false;
+      return true;
+    }
+
+    var recordMonthSeen = {}, recordMonthOptions = [];
+    records.forEach(function (r) {
+      if (!recordMatchesFilters(r, 'month')) return;
+      var mk = (r.date || '').slice(0, 7);
+      if (mk && !recordMonthSeen[mk]) { recordMonthSeen[mk] = true; recordMonthOptions.push(mk); }
+    });
+    var curMonthForRecords = toISO(todayMs()).slice(0, 7);
+    if (!recordMonthSeen[curMonthForRecords]) recordMonthOptions.push(curMonthForRecords);
+    recordMonthOptions.sort();
+
+    var recordKindSeen = {}, recordKindOptions = [];
+    records.forEach(function (r) {
+      if (!recordMatchesFilters(r, 'kind')) return;
+      var k = recordKindOf(r);
+      if (!recordKindSeen[k]) { recordKindSeen[k] = true; recordKindOptions.push(k); }
+    });
+    recordKindOptions.sort(function (a, b) { return KIND_ORDER.indexOf(a) - KIND_ORDER.indexOf(b); });
+
+    var recordFarmSeen = {}, recordFarmOptions = [];
+    records.forEach(function (r) {
+      if (!recordMatchesFilters(r, 'farm')) return;
+      var fn = r.farmName || '';
+      if (fn && !recordFarmSeen[fn]) { recordFarmSeen[fn] = true; recordFarmOptions.push(fn); }
+    });
+    recordFarmOptions.sort();
+
+    var filteredRecords = sortedRecords.filter(function (r) { return recordMatchesFilters(r, null); });
+
+    var recordRowsHtml = filteredRecords.map(function (r) {
+        var badge = r.type === 'in' ? '<span class="badge in">전입</span>'
+          : (r.subtype === 'farm' ? '<span class="badge farm">전출</span>' : '<span class="badge ext">외부판매</span>');
+        var stockAt = stockAsOf(parseISO(r.date));
+        var delRow = confirmingDeleteId === r.id
+          ? '<button type="button" class="btn danger-outline" data-action="confirmDelete" data-id="' + r.id + '">확인 삭제</button> <button type="button" class="btn ghost small" data-action="cancelDelete">취소</button>'
+          : '<button type="button" class="btn ghost small" data-action="askDelete" data-id="' + r.id + '">삭제</button>';
+        return '<tr><td class="left">' + fmtShort(parseISO(r.date)) + '</td><td class="left">' + weekOf(parseISO(r.date)).label + '</td><td class="left">' + badge + '</td>' +
+          '<td class="left">' + (r.type === 'in' ? IN_FARM_NAME : (r.farmName || '')) + '</td>' +
+          '<td class="mono">' + fmtNum(r.head) + '두</td>' +
+          '<td class="mono">' + fmtNum(stockAt) + '</td><td class="left">' + delRow + '</td></tr>';
+      }).join('');
+
+    var weekRowsHtml = weekRows.map(function (w) {
+      var hi = w.wk.idx === thisWeek.idx ? ' week-hi' : '';
+      var wkStartISO = toISO(w.wk.start);
+      var isPast = w.wk.end < today;
+      var deathTag = '<span style="font-size:10.5px;color:var(--text-faint);margin-left:4px">' + (isPast ? '실제' : '예상') + '</span>';
+      return '<tr class="' + hi.trim() + '"><td class="left">' + w.wk.label + '</td>' +
+        '<td class="left mono">' + fmtSlash(w.wk.start) + '~' + fmtSlash(w.wk.end) + '</td>' +
+        '<td class="mono">' + fmtNum(w.startStock) + '</td>' +
+        '<td class="mono">' + fmtNum(w.inSum) + '</td>' +
+        '<td><input class="inline-input" type="number" min="0" value="' + w.death + '" data-action="setDeath" data-week="' + wkStartISO + '">' + deathTag + '</td>' +
+        '<td class="mono">' + fmtNum(w.farmSum) + '</td>' +
+        '<td class="mono">' + fmtNum(w.extSum) + '</td>' +
+        '<td class="mono" style="font-weight:600">' + fmtNum(w.endStock) + '</td>' +
+        '</tr>';
+    }).join('');
+
+    var queryDate = document.getElementById('stockQueryDate');
+    var queryVal = queryDate ? queryDate.value : toISO(today);
+
+    var weekMonthOptionsHtml = '<option value="">전체 보기</option>' + weekMonthOptions.map(function (o) {
+      return '<option value="' + o.key + '"' + (o.key === weekFilterMonth ? ' selected' : '') + '>' + o.label + '</option>';
+    }).join('');
+    var recordMonthOptionsHtml = '<option value="">전체 월</option>' + recordMonthOptions.map(function (mk) {
+      var parts = mk.split('-');
+      return '<option value="' + mk + '"' + (mk === recordFilterMonth ? ' selected' : '') + '>' + parts[0] + '년 ' + Number(parts[1]) + '월</option>';
+    }).join('');
+    var recordFarmOptionsHtml = '<option value="">전체 농장</option>' + recordFarmOptions.map(function (fn) {
+      return '<option value="' + fn + '"' + (fn === recordFilterFarm ? ' selected' : '') + '>' + fn + '</option>';
+    }).join('');
+
+    return '' +
+      '<div class="cards">' +
+        '<div class="card"><span class="label">현재 재고두수 (오늘 기준)</span><span class="value mono">' + fmtNum(curStock) + '두</span><span class="sub">' + fmtShort(today) + '</span></div>' +
+        '<div class="card"><span class="label">이번주 전입 (' + thisWeek.label + ')</span><span class="value mono">' + fmtNum(thisWeekAgg.inSum) + '두</span><span class="sub">' + fmtShort(thisWeek.start) + '~' + fmtShort(thisWeek.end) + '</span></div>' +
+        '<div class="card"><span class="label">이번주 전출</span><span class="value mono">' + fmtNum(thisWeekAgg.farmSum + thisWeekAgg.extSum) + '두</span><span class="sub">농장 ' + fmtNum(thisWeekAgg.farmSum) + ' · 외판 ' + fmtNum(thisWeekAgg.extSum) + '</span></div>' +
+      '</div>' +
+
+      '<section class="panel">' +
+        '<h2>전입 · 전출 입력</h2>' +
+        '<p class="hint">건별로 날짜, 구분, 두수를 입력하세요. 전입은 항상 "' + IN_FARM_NAME + '"에서 들어오므로 농장명이 고정됩니다. 저장 즉시 접속 중인 모든 사람 화면에 반영됩니다.</p>' +
+        '<form class="field-row" id="recordForm">' +
+          '<div class="field date"><label>날짜</label><input type="date" name="date" required value="' + toISO(today) + '"></div>' +
+          '<div class="field"><label>구분</label><select name="kind" id="typeSelect"><option value="in">전입</option><option value="out_farm">전출</option><option value="out_external">외부판매</option></select></div>' +
+          '<div class="field grow" id="farmField"><label>농장명</label><input type="text" name="farmName" id="farmNameInput" value="' + IN_FARM_NAME + '" disabled></div>' +
+          '<div class="field num"><label>두수</label><input type="number" name="head" min="1" required placeholder="0"></div>' +
+          '<button type="submit" class="btn">추가</button>' +
+        '</form>' +
+        '<div class="import-box">' +
+          '<div class="row">' +
+            '<button type="button" class="btn ghost small" data-action="triggerImport">엑셀 불러오기 (.xlsx / .csv)</button>' +
+            '<input type="file" id="importFileInput" accept=".xlsx,.csv" style="display:none">' +
+            '<span class="hint" style="margin:0">양식 파일을 채운 뒤 올리면 현재 목록을 그 내용으로 통째로 교체합니다.</span>' +
+          '</div>' +
+          (importBusy ? '<p class="hint" style="margin:8px 0 0">읽는 중…</p>' : '') +
+          (importError ? '<p class="hint" style="margin:8px 0 0;color:var(--danger)">' + importError + '</p>' : '') +
+          (pendingImport ? renderImportPreview() : '') +
+        '</div>' +
+      '</section>' +
+
+      '<section class="panel">' +
+        '<h2>재고 조회</h2>' +
+        '<p class="hint">날짜를 선택하면 그 시점까지의 전입·전출·예상폐사를 반영한 재고두수를 계산합니다.</p>' +
+        '<div class="field-row">' +
+          '<div class="field date"><label>조회 날짜</label><input type="date" id="stockQueryDate" value="' + queryVal + '" data-action="queryStock"></div>' +
+          '<div class="card" style="min-width:180px"><span class="label">' + weekOf(parseISO(queryVal)).label + ' · ' + fmtShort(parseISO(queryVal)) + ' 기준</span><span class="value mono">' + fmtNum(stockAsOf(parseISO(queryVal))) + '두</span></div>' +
+        '</div>' +
+      '</section>' +
+
+      '<section class="panel">' +
+        '<h2>주차별 예상 물량</h2>' +
+        '<p class="hint">시작재고·종료재고는 자동 계산됩니다. 폐사두수는 지난 주차는 실제 값을, 앞으로 올 주차는 예상 값을 입력합니다.</p>' +
+        '<div class="field-row" style="margin-bottom:12px">' +
+          '<div class="field"><label>월별 보기</label><select data-action="setWeekMonthFilter">' + weekMonthOptionsHtml + '</select></div>' +
+        '</div>' +
+        '<div class="table-wrap"><table><thead><tr>' +
+          '<th class="left">주차</th><th class="left">기간</th><th>시작재고</th><th>전입</th><th>폐사두수</th><th>전출</th><th>외부판매</th><th>종료재고</th>' +
+        '</tr></thead><tbody>' + (weekRowsHtml || '<tr><td colspan="8" class="empty">표시할 주차가 없습니다.</td></tr>') + '</tbody></table></div>' +
+      '</section>' +
+
+      '<section class="panel">' +
+        '<div class="panel-head">' +
+          '<h2>입력 내역 <span class="count">(총 ' + fmtNum(records.length) + '건)</span></h2>' +
+          '<button type="button" class="btn ghost small" data-action="toggleRecords">' + (recordsExpanded ? '숨기기 ▲' : '펼쳐보기 ▾') + '</button>' +
+        '</div>' +
+        (recordsExpanded ? (
+          '<div class="field-row" style="margin:12px 0">' +
+            '<div class="field"><label>월</label><select data-action="setRecordMonthFilter">' + recordMonthOptionsHtml + '</select></div>' +
+            '<div class="field"><label>구분</label><select data-action="setRecordKindFilter">' +
+              '<option value="">전체</option>' +
+              recordKindOptions.map(function (k) {
+                return '<option value="' + k + '"' + (k === recordFilterKind ? ' selected' : '') + '>' + KIND_LABELS[k] + '</option>';
+              }).join('') +
+            '</select></div>' +
+            '<div class="field"><label>농장명</label><select data-action="setRecordFarmFilter">' + recordFarmOptionsHtml + '</select></div>' +
+          '</div>' +
+          '<div class="table-wrap"><table><thead><tr>' +
+            '<th class="left">날짜</th><th class="left">주차</th><th class="left">구분</th><th class="left">농장명</th><th>두수</th><th>당시 재고</th><th class="left"></th>' +
+          '</tr></thead><tbody>' + (recordRowsHtml || '<tr><td colspan="7" class="empty">조건에 맞는 내역이 없습니다.</td></tr>') + '</tbody></table></div>'
+        ) : '') +
+      '</section>';
+  }
+
+  function renderImportPreview() {
+    var p = pendingImport;
+    var warnHtml = p.warnings.length
+      ? '<ul class="warn-list">' + p.warnings.map(function (w) { return '<li>' + w + '</li>'; }).join('') + '</ul>'
+      : '';
+    return '<div style="margin-top:10px">' +
+      '<p class="hint" style="margin:0 0 6px;color:var(--text)"><strong>' + p.fileName + '</strong>에서 ' + fmtNum(p.records.length) + '건을 읽었습니다' +
+      (p.warnings.length ? ' (건너뜀 ' + fmtNum(p.warnings.length) + '건)' : '') + '. 확인을 누르면 현재 저장된 전체 전입·전출 내역이 이 파일 내용으로 교체됩니다.</p>' +
+      warnHtml +
+      '<div class="row" style="margin-top:8px">' +
+        '<button type="button" class="btn" data-action="confirmImport">이 내용으로 전체 교체</button>' +
+        '<button type="button" class="btn ghost small" data-action="cancelImport">취소</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function renderCalendar() {
+    var y = calMonthCursor.y, m = calMonthCursor.m;
+    var firstOfMonth = Date.UTC(y, m, 1);
+    var lastOfMonth = Date.UTC(y, m + 1, 0);
+    var gridStartIdx = weekIndexOf(firstOfMonth);
+    var gridEndIdx = weekIndexOf(lastOfMonth);
+
+    var byDay = {};
+    records.forEach(function (r) {
+      var d = parseISO(r.date);
+      if (!byDay[d]) byDay[d] = [];
+      byDay[d].push(r);
+    });
+    var MAX_CHIPS = 4;
+
+    var todayStamp = todayMs();
+    var rows = '';
+    for (var idx = gridStartIdx; idx <= gridEndIdx; idx++) {
+      var wk = computeWeek(idx);
+      for (var i = 0; i < 7; i++) {
+        var dms = wk.start + i * DAY_MS;
+        var iso = toISO(dms);
+        var dDate = new Date(dms);
+        var outside = dDate.getUTCMonth() !== m;
+        var cls = 'cal-day' + (outside ? ' outside' : '') + (dms === todayStamp ? ' today' : '');
+        var dayRecs = byDay[dms] || [];
+        var chips = dayRecs.slice(0, MAX_CHIPS).map(function (r) {
+          if (r.type === 'in') return '<span class="cal-chip in">전입 +' + fmtNum(r.head) + '</span>';
+          var cls2 = r.subtype === 'farm' ? 'farm' : 'ext';
+          var label = r.subtype === 'farm' ? '전출' : '외부판매';
+          var fname = r.farmName ? '<span class="fname"> · ' + r.farmName + '</span>' : '';
+          return '<span class="cal-chip ' + cls2 + '">' + label + ' -' + fmtNum(r.head) + fname + '</span>';
+        }).join('');
+        if (dayRecs.length > MAX_CHIPS) chips += '<span class="cal-chip more">+' + fmtNum(dayRecs.length - MAX_CHIPS) + '건 더</span>';
+        var stockLine = dayRecs.length ? '<span class="cal-stock">재고 ' + fmtNum(stockAsOf(dms)) + '두</span>' : '';
+        rows += '<div class="' + cls + '" data-action="openCalDayEdit" data-date="' + iso + '"><span class="cal-daynum">' + dDate.getUTCDate() + '</span>' + chips + stockLine + '</div>';
+      }
+    }
+    var dowHtml = WEEKDAY_KR.map(function (w) { return '<div class="cal-dow">' + w + '</div>'; }).join('');
+
+    return '' +
+      '<section class="panel">' +
+        '<div class="cal-toolbar">' +
+          '<button type="button" class="btn ghost small" data-action="calPrev">◀</button>' +
+          '<span class="month-label">' + y + '년 ' + (m + 1) + '월</span>' +
+          '<button type="button" class="btn ghost small" data-action="calNext">▶</button>' +
+          '<button type="button" class="btn ghost small" data-action="calToday">오늘</button>' +
+          '<button type="button" class="btn ghost small" data-action="copyCalendar">' + (calendarCopyState === 'copied' ? '✓ 이미지 복사됨' : (calendarCopyState === 'saved' ? '💾 저장됨' : '📷 이미지로 복사')) + '</button>' +
+        '</div>' +
+        '<p class="hint">날짜를 누르면 그날의 전입·전출 내역을 확인하고 수정할 수 있습니다.</p>' +
+        '<div class="cal-scroll"><div class="cal-grid">' + dowHtml + rows + '</div></div>' +
+        '<div class="legend">' +
+          '<span class="sw"><span class="dot2" style="background:var(--in)"></span>전입</span>' +
+          '<span class="sw"><span class="dot2" style="background:var(--out-farm)"></span>전출</span>' +
+          '<span class="sw"><span class="dot2" style="background:var(--out-ext)"></span>외부판매</span>' +
+        '</div>' +
+      '</section>' +
+      renderCalDayEditModal() +
+      renderSimCalendar();
+  }
+
+  function renderCalDayEditModal() {
+    if (!calDayEditISO) return '';
+    var iso = calDayEditISO;
+    var dms = parseISO(iso);
+    var dayRecs = records.filter(function (r) { return r.date === iso; });
+    var rowsHtml = dayRecs.map(function (r) {
+      var badge = r.type === 'in' ? '<span class="badge in">전입</span>' : (r.subtype === 'farm' ? '<span class="badge farm">전출</span>' : '<span class="badge ext">외부판매</span>');
+      var delCell = confirmingDeleteId === r.id
+        ? '<button type="button" class="btn danger-outline" data-action="confirmDelete" data-id="' + r.id + '">확인 삭제</button> <button type="button" class="btn ghost small" data-action="cancelDelete">취소</button>'
+        : '<button type="button" class="btn ghost small" data-action="askDelete" data-id="' + r.id + '">삭제</button>';
+      var headCell = '<input class="cell-input" type="number" min="1" value="' + r.head + '" style="width:76px;text-align:right" data-action="setRecordHead" data-id="' + r.id + '">';
+      return '<tr><td class="left">' + badge + '</td><td class="left">' + (r.type === 'in' ? IN_FARM_NAME : (r.farmName || '')) + '</td><td class="mono">' + headCell + '두</td><td class="left">' + delCell + '</td></tr>';
+    }).join('');
+    return '' +
+      '<div class="modal-backdrop">' +
+        '<div class="modal-panel" style="max-width:560px">' +
+          '<div class="panel-head"><h3>' + fmtShort(dms) + ' 전입 · 전출</h3><button type="button" class="btn ghost small" data-action="closeCalDayEdit">닫기</button></div>' +
+          '<div class="table-wrap"><table><thead><tr><th class="left">구분</th><th class="left">농장명</th><th>두수</th><th class="left"></th></tr></thead><tbody>' +
+          (rowsHtml || '<tr><td colspan="4" class="empty">이 날짜에 등록된 내역이 없습니다.</td></tr>') +
+          '</tbody></table></div>' +
+          '<form class="field-row" id="calDayAddForm" style="margin-top:14px">' +
+            '<div class="field"><label>구분</label><select name="kind" id="calTypeSelect"><option value="in">전입</option><option value="out_farm">전출</option><option value="out_external">외부판매</option></select></div>' +
+            '<div class="field grow" id="calFarmField"><label>농장명</label><input type="text" name="farmName" id="calFarmNameInput" value="' + IN_FARM_NAME + '" disabled></div>' +
+            '<div class="field num"><label>두수</label><input type="number" name="head" min="1" required placeholder="0"></div>' +
+            '<button type="submit" class="btn">추가</button>' +
+          '</form>' +
+        '</div>' +
+      '</div>';
+  }
+
+  // ---------- 전입전출 시뮬레이션 캘린더 ----------
+  function renderSimCalendar() {
+    var y = simMonthCursor.y, m = simMonthCursor.m;
+    var firstOfMonth = Date.UTC(y, m, 1);
+    var lastOfMonth = Date.UTC(y, m + 1, 0);
+    var gridStartIdx = weekIndexOf(firstOfMonth);
+    var gridEndIdx = weekIndexOf(lastOfMonth);
+    var todayStamp = todayMs();
+    var rows = '';
+    for (var idx = gridStartIdx; idx <= gridEndIdx; idx++) {
+      var wk = computeWeek(idx);
+      for (var i = 0; i < 7; i++) {
+        var dms = wk.start + i * DAY_MS;
+        var iso = toISO(dms);
+        var dDate = new Date(dms);
+        var outside = dDate.getUTCMonth() !== m;
+        var v = simDayValue(iso);
+        var edited = !!simOverrides[iso];
+        var cls = 'cal-day' + (outside ? ' outside' : '') + (dms === todayStamp ? ' today' : '') + (edited ? ' sim-edited' : '');
+        var farmNamesTxt = v.out_farm_names && v.out_farm_names.length ? '<span class="fname"> · ' + v.out_farm_names.join(', ') + '</span>' : '';
+        var extNamesTxt = v.out_external_names && v.out_external_names.length ? '<span class="fname"> · ' + v.out_external_names.join(', ') + '</span>' : '';
+        var chips = '';
+        if (v.in) chips += '<span class="cal-chip in">전입 +' + fmtNum(v.in) + '</span>';
+        if (v.out_farm) chips += '<span class="cal-chip farm">전출 -' + fmtNum(v.out_farm) + farmNamesTxt + '</span>';
+        if (v.out_external) chips += '<span class="cal-chip ext">외부판매 -' + fmtNum(v.out_external) + extNamesTxt + '</span>';
+        var hasAny = v.in || v.out_farm || v.out_external;
+        var stockLine = hasAny ? '<span class="cal-stock">재고 ' + fmtNum(simStockAsOf(dms)) + '두</span>' : '';
+        rows += '<div class="' + cls + '" data-action="openSimDayEdit" data-date="' + iso + '"><span class="cal-daynum">' + dDate.getUTCDate() + '</span>' + chips + stockLine + '</div>';
+      }
+    }
+    var dowHtml = WEEKDAY_KR.map(function (w) { return '<div class="cal-dow">' + w + '</div>'; }).join('');
+
+    var scenarios = settings.simScenarios || [];
+    var scenarioChips = scenarios.map(function (s) {
+      return '<span class="sim-chip' + (s.id === simActiveScenarioId ? ' active' : '') + '">' +
+        '<button type="button" class="sim-chip-name" data-action="loadSimScenario" data-id="' + s.id + '">' + s.name + '</button>' +
+        '<button type="button" class="sim-chip-del" data-action="deleteSimScenario" data-id="' + s.id + '">×</button>' +
+      '</span>';
+    }).join('');
+    var canSave = scenarios.length < 3 || simActiveScenarioId;
+
+    return '' +
+      '<section class="panel">' +
+        '<div class="panel-head"><h2>전입전출 시뮬레이션</h2></div>' +
+        '<p class="hint">위 전입전출 계획표를 기준으로, 날짜를 눌러 전입·전출 두수를 바꿔가며 재고 변화를 미리 확인할 수 있습니다. 가안으로 이름을 붙여 최대 3개까지 저장할 수 있고, 저장하지 않으면 화면을 벗어날 때 사라집니다.</p>' +
+        '<div class="sim-toolbar">' +
+          (scenarioChips ? '<div class="sim-chip-row">' + scenarioChips + '</div>' : '') +
+          '<div class="field-row">' +
+            '<div class="field grow"><label>가안 이름</label><input type="text" maxlength="20" placeholder="예: 8월 3주 조정안" value="' + simSaveNameDraft + '" data-action="setSimSaveName"></div>' +
+            '<button type="button" class="btn ghost small" data-action="saveSimScenario"' + (!canSave ? ' disabled' : '') + '>' + (simActiveScenarioId ? '덮어쓰기 저장' : '저장') + '</button>' +
+            '<button type="button" class="btn ghost small" data-action="resetSim">초기화</button>' +
+          '</div>' +
+          (!canSave ? '<p class="hint" style="margin:6px 0 0">가안은 최대 3개까지 저장할 수 있습니다. 기존 가안을 삭제한 뒤 저장해주세요.</p>' : '') +
+        '</div>' +
+        '<div class="cal-toolbar">' +
+          '<button type="button" class="btn ghost small" data-action="simPrev">◀</button>' +
+          '<span class="month-label">' + y + '년 ' + (m + 1) + '월</span>' +
+          '<button type="button" class="btn ghost small" data-action="simNext">▶</button>' +
+          '<button type="button" class="btn ghost small" data-action="simToday">오늘</button>' +
+        '</div>' +
+        '<div class="cal-scroll"><div class="cal-grid">' + dowHtml + rows + '</div></div>' +
+      '</section>' +
+      renderSimDayEditModal();
+  }
+
+  function renderSimDayEditModal() {
+    if (!simDayEditISO) return '';
+    var iso = simDayEditISO;
+    var dms = parseISO(iso);
+    var v = simDayValue(iso);
+    var hasOverride = !!simOverrides[iso];
+    var farmPrefill = (v.out_farm_names && v.out_farm_names.length === 1) ? v.out_farm_names[0] : '';
+    var extPrefill = (v.out_external_names && v.out_external_names.length === 1) ? v.out_external_names[0] : '';
+    var farmOptions = farmNameFrequency('farm').map(function (n) { return '<option value="' + n + '">'; }).join('');
+    var extOptions = farmNameFrequency('external').map(function (n) { return '<option value="' + n + '">'; }).join('');
+    return '' +
+      '<div class="modal-backdrop">' +
+        '<div class="modal-panel" style="max-width:440px">' +
+          '<div class="panel-head"><h3>' + fmtShort(dms) + ' 시뮬레이션</h3><button type="button" class="btn ghost small" data-action="closeSimDayEdit">닫기</button></div>' +
+          '<div class="field-row">' +
+            '<div class="field num"><label>전입두수</label><input type="number" min="0" id="simEditIn" value="' + v.in + '"></div>' +
+          '</div>' +
+          '<div class="field-row" style="margin-top:10px">' +
+            '<div class="field num"><label>전출(농장)두수</label><input type="number" min="0" id="simEditOutFarm" value="' + v.out_farm + '"></div>' +
+            '<div class="field grow"><label>전출 농장명</label><input type="text" id="simEditOutFarmName" list="simFarmNameList" value="' + farmPrefill + '" placeholder="목록에서 선택하거나 직접 입력"></div>' +
+          '</div>' +
+          '<div class="field-row" style="margin-top:10px">' +
+            '<div class="field num"><label>외부판매두수</label><input type="number" min="0" id="simEditOutExt" value="' + v.out_external + '"></div>' +
+            '<div class="field grow"><label>판매처명</label><input type="text" id="simEditOutExtName" list="simExtNameList" value="' + extPrefill + '" placeholder="목록에서 선택하거나 직접 입력"></div>' +
+          '</div>' +
+          '<datalist id="simFarmNameList">' + farmOptions + '</datalist>' +
+          '<datalist id="simExtNameList">' + extOptions + '</datalist>' +
+          '<div class="row" style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">' +
+            '<button type="button" class="btn" data-action="applySimDayEdit" data-date="' + iso + '">적용</button>' +
+            (hasOverride ? '<button type="button" class="btn ghost small" data-action="clearSimDayOverride" data-date="' + iso + '">실제값으로 되돌리기</button>' : '') +
+          '</div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  function roundRectPath(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function truncateToWidth(ctx, text, maxWidth) {
+    if (ctx.measureText(text).width <= maxWidth) return text;
+    var t = text;
+    while (t.length > 1 && ctx.measureText(t + '…').width > maxWidth) t = t.slice(0, -1);
+    return t + '…';
+  }
+
+  // solid-color pill so each entry stays legible even when the copied image is
+  // shrunk down in a chat bubble
+  function drawBadge(ctx, x, y, text, bg, maxWidth) {
+    var boxH = 19;
+    ctx.font = '700 12px "IBM Plex Sans KR", sans-serif';
+    var label = truncateToWidth(ctx, text, maxWidth - 10);
+    var boxW = Math.min(maxWidth, ctx.measureText(label).width + 10);
+    ctx.fillStyle = bg;
+    roundRectPath(ctx, x, y, boxW, boxH, 3);
+    ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, x + 5, y + boxH / 2 + 0.5);
+    ctx.textBaseline = 'alphabetic';
+    return boxH;
+  }
+
+  function drawCalendarCanvas() {
+    var y = calMonthCursor.y, m = calMonthCursor.m;
+    var firstOfMonth = Date.UTC(y, m, 1);
+    var lastOfMonth = Date.UTC(y, m + 1, 0);
+    var gridStartIdx = weekIndexOf(firstOfMonth);
+    var gridEndIdx = weekIndexOf(lastOfMonth);
+    var weeksCount = gridEndIdx - gridStartIdx + 1;
+
+    var byDay = {};
+    records.forEach(function (r) {
+      var d = parseISO(r.date);
+      if (!byDay[d]) byDay[d] = [];
+      byDay[d].push(r);
+    });
+
+    var scale = 2;
+    var pad = 18, headerH = 68, dowH = 26, cellW = 156, cellH = 122;
+    var gridW = cellW * 7;
+    var gridH = dowH + cellH * weeksCount;
+    var canvasW = gridW + pad * 2;
+    var canvasH = headerH + gridH + pad * 2;
+
+    var canvas = document.createElement('canvas');
+    canvas.width = Math.round(canvasW * scale);
+    canvas.height = Math.round(canvasH * scale);
+    var ctx = canvas.getContext('2d');
+    ctx.scale(scale, scale);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvasW, canvasH);
+    ctx.textBaseline = 'alphabetic';
+
+    ctx.fillStyle = '#707070';
+    ctx.font = '600 13px "IBM Plex Sans KR", sans-serif';
+    ctx.fillText('후기자돈사 운영현황(루카) · 전입출 현황', pad, pad + 15);
+    ctx.fillStyle = '#141414';
+    ctx.font = '700 26px "IBM Plex Sans KR", sans-serif';
+    ctx.fillText(y + '년 ' + (m + 1) + '월', pad, pad + 48);
+
+    var gridLeft = pad, gridTop = headerH + pad;
+
+    ctx.fillStyle = '#E8EBE3';
+    ctx.fillRect(gridLeft, gridTop, gridW, dowH);
+    ctx.fillStyle = '#5C665E';
+    ctx.font = '600 11.5px "IBM Plex Sans KR", sans-serif';
+    ctx.textAlign = 'center';
+    WEEKDAY_KR.forEach(function (w, i) {
+      ctx.fillText(w, gridLeft + i * cellW + cellW / 2, gridTop + dowH / 2 + 4);
+    });
+    ctx.textAlign = 'left';
+
+    var todayStamp = todayMs();
+    var rowIdx = 0;
+    for (var idx = gridStartIdx; idx <= gridEndIdx; idx++, rowIdx++) {
+      var wk = computeWeek(idx);
+      for (var i = 0; i < 7; i++) {
+        var dms = wk.start + i * DAY_MS;
+        var cx = gridLeft + i * cellW;
+        var cy = gridTop + dowH + rowIdx * cellH;
+        var outside = new Date(dms).getUTCMonth() !== m;
+
+        ctx.fillStyle = outside ? '#F2F4F0' : '#FFFFFF';
+        ctx.fillRect(cx, cy, cellW, cellH);
+        ctx.strokeStyle = '#D8DCD1';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(cx + 0.5, cy + 0.5, cellW - 1, cellH - 1);
+
+        if (dms === todayStamp) {
+          ctx.strokeStyle = '#3F6659';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(cx + 1.5, cy + 1.5, cellW - 3, cellH - 3);
+        }
+
+        var dDate = new Date(dms);
+        ctx.fillStyle = outside ? '#ADADAD' : '#141414';
+        ctx.font = '700 14px "IBM Plex Mono", monospace';
+        ctx.fillText(String(dDate.getUTCDate()), cx + 7, cy + 18);
+
+        var dayRecs = byDay[dms] || [];
+        var maxLines = 3;
+        var ty = cy + 33;
+        var badgeMaxW = cellW - 14;
+        dayRecs.slice(0, maxLines).forEach(function (r) {
+          var text, color;
+          if (r.type === 'in') { text = '전입 +' + fmtNum(r.head) + '두'; color = '#0B5FCC'; }
+          else if (r.subtype === 'farm') { text = '전출 -' + fmtNum(r.head) + '두' + (r.farmName ? ' · ' + r.farmName : ''); color = '#A15B12'; }
+          else { text = '외부 -' + fmtNum(r.head) + '두' + (r.farmName ? ' · ' + r.farmName : ''); color = '#6A4E8C'; }
+          var h = drawBadge(ctx, cx + 7, ty, text, color, badgeMaxW);
+          ty += h + 4;
+        });
+        if (dayRecs.length > maxLines) {
+          ctx.fillStyle = '#707070';
+          ctx.font = '600 11px "IBM Plex Sans KR", sans-serif';
+          ctx.fillText('+' + fmtNum(dayRecs.length - maxLines) + '건 더', cx + 7, ty + 9);
+        }
+
+        if (dayRecs.length) {
+          ctx.fillStyle = '#141414';
+          ctx.font = '700 11.5px "IBM Plex Sans KR", sans-serif';
+          ctx.fillText('재고 ' + fmtNum(stockAsOf(dms)) + '두', cx + 7, cy + cellH - 8);
+        }
+      }
+    }
+
+    return canvas;
+  }
+
+  function calendarImageBlobPromise() {
+    var fontsReady = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
+    return fontsReady.then(function () {
+      var canvas = drawCalendarCanvas();
+      return new Promise(function (resolve) { canvas.toBlob(function (blob) { resolve(blob); }, 'image/png'); });
+    });
+  }
+
+  async function saveGeneratedFile(blob, filename) {
+    // inside the Claude Artifact viewer, only the downloads capability can hand the
+    // viewer a file — a plain <a download> link is inert there.
+    var claudeDownloads = null;
+    try {
+      claudeDownloads = (window.claude && typeof window.claude.use === 'function') ? await window.claude.use('downloads') : null;
+    } catch (e) { claudeDownloads = null; }
+    if (claudeDownloads) {
+      try { await claudeDownloads.save({ filename: filename, data: blob }); return; }
+      catch (e) { /* fall through to share/download below */ }
+    }
+
+    // A direct <a download> click is the most reliable path across browsers — Web Share
+    // was tried here before, but navigator.share() can lose the click's user-activation
+    // after the awaits above and then reject with no visible fallback, so the button
+    // would look completely unresponsive. Always fall back to a plain download instead.
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  }
+
+  async function saveCalendarImage(blob) {
+    var filename = '루카_전입출현황_' + calMonthCursor.y + String(calMonthCursor.m + 1).padStart(2, '0') + '.png';
+    await saveGeneratedFile(blob, filename);
+  }
+
+  // ---------- xlsx export (pure browser APIs, no external libraries) ----------
+  var CRC32_TABLE = null;
+  function crc32(bytes) {
+    if (!CRC32_TABLE) {
+      CRC32_TABLE = new Uint32Array(256);
+      for (var n = 0; n < 256; n++) {
+        var c = n;
+        for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+        CRC32_TABLE[n] = c >>> 0;
+      }
+    }
+    var crc = 0xFFFFFFFF;
+    for (var i = 0; i < bytes.length; i++) crc = CRC32_TABLE[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  // minimal stored-mode (uncompressed) ZIP writer — enough to produce a valid .xlsx
+  function buildZip(files) {
+    var encoder = new TextEncoder();
+    var localParts = [], centralParts = [];
+    var offset = 0;
+    files.forEach(function (f) {
+      var nameBytes = encoder.encode(f.name);
+      var data = f.data;
+      var crc = crc32(data);
+
+      var localHeader = new Uint8Array(30 + nameBytes.length);
+      var dv = new DataView(localHeader.buffer);
+      dv.setUint32(0, 0x04034b50, true);
+      dv.setUint16(4, 20, true);
+      dv.setUint16(6, 0, true);
+      dv.setUint16(8, 0, true);
+      dv.setUint16(10, 0, true);
+      dv.setUint16(12, 0, true);
+      dv.setUint32(14, crc, true);
+      dv.setUint32(18, data.length, true);
+      dv.setUint32(22, data.length, true);
+      dv.setUint16(26, nameBytes.length, true);
+      dv.setUint16(28, 0, true);
+      localHeader.set(nameBytes, 30);
+      localParts.push(localHeader, data);
+
+      var centralHeader = new Uint8Array(46 + nameBytes.length);
+      var cdv = new DataView(centralHeader.buffer);
+      cdv.setUint32(0, 0x02014b50, true);
+      cdv.setUint16(4, 20, true);
+      cdv.setUint16(6, 20, true);
+      cdv.setUint16(8, 0, true);
+      cdv.setUint16(10, 0, true);
+      cdv.setUint16(12, 0, true);
+      cdv.setUint16(14, 0, true);
+      cdv.setUint32(16, crc, true);
+      cdv.setUint32(20, data.length, true);
+      cdv.setUint32(24, data.length, true);
+      cdv.setUint16(28, nameBytes.length, true);
+      cdv.setUint16(30, 0, true);
+      cdv.setUint16(32, 0, true);
+      cdv.setUint16(34, 0, true);
+      cdv.setUint16(36, 0, true);
+      cdv.setUint32(38, 0, true);
+      cdv.setUint32(42, offset, true);
+      centralHeader.set(nameBytes, 46);
+      centralParts.push(centralHeader);
+
+      offset += localHeader.length + data.length;
+    });
+
+    var centralStart = offset;
+    var centralSize = centralParts.reduce(function (s, p) { return s + p.length; }, 0);
+
+    var eocd = new Uint8Array(22);
+    var edv = new DataView(eocd.buffer);
+    edv.setUint32(0, 0x06054b50, true);
+    edv.setUint16(4, 0, true);
+    edv.setUint16(6, 0, true);
+    edv.setUint16(8, files.length, true);
+    edv.setUint16(10, files.length, true);
+    edv.setUint32(12, centralSize, true);
+    edv.setUint32(16, centralStart, true);
+    edv.setUint16(20, 0, true);
+
+    var allParts = localParts.concat(centralParts, [eocd]);
+    var totalLen = allParts.reduce(function (s, p) { return s + p.length; }, 0);
+    var out = new Uint8Array(totalLen);
+    var pos = 0;
+    allParts.forEach(function (p) { out.set(p, pos); pos += p.length; });
+    return out;
+  }
+
+  function xmlEscape(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function colIndexToLetter(idx) {
+    var s = '', n = idx + 1;
+    while (n > 0) {
+      var rem = (n - 1) % 26;
+      s = String.fromCharCode(65 + rem) + s;
+      n = Math.floor((n - 1) / 26);
+    }
+    return s;
+  }
+  function quoteSheetName(name) {
+    return "'" + String(name).replace(/'/g, "''") + "'";
+  }
+
+  // ---------- xlsx style registry ----------
+  var XLSX_STYLE = (function () {
+    var fonts = [{ name: 'Inter', sz: 10, color: 'FF181A20' }];
+    var fills = [{ patternType: 'none' }, { patternType: 'gray125' }];
+    var borders = [{}];
+    var numFmts = [];
+    var xfs = [{ fontId: 0, fillId: 0, borderId: 0, numFmtId: 0, align: null }];
+    return {
+      fonts: fonts, fills: fills, borders: borders, numFmts: numFmts, xfs: xfs,
+      addFont: function (f) { fonts.push(f); return fonts.length - 1; },
+      addFill: function (f) { fills.push(f); return fills.length - 1; },
+      addBorder: function (b) { borders.push(b); return borders.length - 1; },
+      addNumFmt: function (code) { var id = 164 + numFmts.length; numFmts.push({ id: id, code: code }); return id; },
+      addXf: function (xf) { xfs.push(xf); return xfs.length - 1; }
+    };
+  })();
+
+  var FMT_HEAD = XLSX_STYLE.addNumFmt('#,##0"두"');
+  var FMT_WON = XLSX_STYLE.addNumFmt('#,##0"원"');
+  var FMT_KG = XLSX_STYLE.addNumFmt('#,##0.0"kg"');
+  var FMT_WEEK = XLSX_STYLE.addNumFmt('#,##0"주차"');
+  var FMT_PCT = XLSX_STYLE.addNumFmt('0.0%');
+
+  var FONT_NORMAL = 0;
+  var FONT_BOLD = XLSX_STYLE.addFont({ name: 'Inter', sz: 10, bold: true, color: 'FF181A20' });
+  var FONT_TITLE = XLSX_STYLE.addFont({ name: 'Inter', sz: 16, bold: true, color: 'FF181A20' });
+  var FONT_SUBTITLE = XLSX_STYLE.addFont({ name: 'Inter', sz: 11, bold: true, color: 'FF8A6900' });
+  var FONT_MUTED = XLSX_STYLE.addFont({ name: 'Inter', sz: 9, color: 'FF707A8A' });
+  var FONT_MONO = XLSX_STYLE.addFont({ name: 'Consolas', sz: 10, color: 'FF181A20' });
+  var FONT_MONO_BOLD = XLSX_STYLE.addFont({ name: 'Consolas', sz: 10, bold: true, color: 'FF181A20' });
+  var FONT_DANGER = XLSX_STYLE.addFont({ name: 'Consolas', sz: 10, bold: true, color: 'FFD6304A' });
+  var FONT_SUCCESS = XLSX_STYLE.addFont({ name: 'Consolas', sz: 10, bold: true, color: 'FF0A9F68' });
+  var FONT_ACCENT_TEXT = XLSX_STYLE.addFont({ name: 'Consolas', sz: 10, bold: true, color: 'FF8A6900' });
+
+  var FILL_HEADER = XLSX_STYLE.addFill({ patternType: 'solid', fgColor: 'FFFCD535' });
+  var FILL_TOTAL = XLSX_STYLE.addFill({ patternType: 'solid', fgColor: 'FFF5F5F5' });
+  var FILL_SUBTLE = XLSX_STYLE.addFill({ patternType: 'solid', fgColor: 'FFFDF6DD' });
+
+  var BORDER_THIN = XLSX_STYLE.addBorder({ bottom: { style: 'thin', color: 'FFE3E5E8' } });
+  var BORDER_BOX = XLSX_STYLE.addBorder({
+    top: { style: 'thin', color: 'FFD8D8D8' }, bottom: { style: 'thin', color: 'FFD8D8D8' },
+    left: { style: 'thin', color: 'FFD8D8D8' }, right: { style: 'thin', color: 'FFD8D8D8' }
+  });
+
+  var XF_TITLE = XLSX_STYLE.addXf({ fontId: FONT_TITLE, fillId: 0, borderId: 0, numFmtId: 0, align: 'left' });
+  var XF_MUTED = XLSX_STYLE.addXf({ fontId: FONT_MUTED, fillId: 0, borderId: 0, numFmtId: 0, align: 'left' });
+  var XF_SUBTITLE = XLSX_STYLE.addXf({ fontId: FONT_SUBTITLE, fillId: FILL_SUBTLE, borderId: 0, numFmtId: 0, align: 'left' });
+  var XF_HEADER = XLSX_STYLE.addXf({ fontId: FONT_BOLD, fillId: FILL_HEADER, borderId: BORDER_BOX, numFmtId: 0, align: 'center' });
+  var XF_MONTH_HEADER = XLSX_STYLE.addXf({ fontId: FONT_BOLD, fillId: FILL_TOTAL, borderId: BORDER_BOX, numFmtId: 0, align: 'center' });
+  var XF_TEXT = XLSX_STYLE.addXf({ fontId: FONT_NORMAL, fillId: 0, borderId: BORDER_THIN, numFmtId: 0, align: 'left' });
+  var XF_LABEL = XLSX_STYLE.addXf({ fontId: FONT_BOLD, fillId: 0, borderId: BORDER_THIN, numFmtId: 0, align: 'left' });
+  var XF_STATVAL = XLSX_STYLE.addXf({ fontId: FONT_MONO_BOLD, fillId: 0, borderId: BORDER_THIN, numFmtId: 0, align: 'right' });
+  var XF_NUM = XLSX_STYLE.addXf({ fontId: FONT_MONO, fillId: 0, borderId: BORDER_THIN, numFmtId: 3, align: 'right' });
+  var XF_HEAD = XLSX_STYLE.addXf({ fontId: FONT_MONO, fillId: 0, borderId: BORDER_THIN, numFmtId: FMT_HEAD, align: 'right' });
+  var XF_WON = XLSX_STYLE.addXf({ fontId: FONT_MONO, fillId: 0, borderId: BORDER_THIN, numFmtId: FMT_WON, align: 'right' });
+  var XF_KG = XLSX_STYLE.addXf({ fontId: FONT_MONO, fillId: 0, borderId: BORDER_THIN, numFmtId: FMT_KG, align: 'right' });
+  var XF_WEEK = XLSX_STYLE.addXf({ fontId: FONT_MONO, fillId: 0, borderId: BORDER_THIN, numFmtId: FMT_WEEK, align: 'right' });
+  var XF_PCT = XLSX_STYLE.addXf({ fontId: FONT_MONO, fillId: 0, borderId: BORDER_THIN, numFmtId: FMT_PCT, align: 'right' });
+  var XF_PCT_GOOD = XLSX_STYLE.addXf({ fontId: FONT_SUCCESS, fillId: 0, borderId: BORDER_THIN, numFmtId: FMT_PCT, align: 'right' });
+  var XF_PCT_BAD = XLSX_STYLE.addXf({ fontId: FONT_DANGER, fillId: 0, borderId: BORDER_THIN, numFmtId: FMT_PCT, align: 'right' });
+  var XF_HEAD_GOOD = XLSX_STYLE.addXf({ fontId: FONT_SUCCESS, fillId: 0, borderId: BORDER_THIN, numFmtId: FMT_HEAD, align: 'right' });
+  var XF_HEAD_BAD = XLSX_STYLE.addXf({ fontId: FONT_DANGER, fillId: 0, borderId: BORDER_THIN, numFmtId: FMT_HEAD, align: 'right' });
+  var XF_HEAD_ACCENT = XLSX_STYLE.addXf({ fontId: FONT_ACCENT_TEXT, fillId: 0, borderId: BORDER_THIN, numFmtId: FMT_HEAD, align: 'right' });
+  var XF_WON_ACCENT = XLSX_STYLE.addXf({ fontId: FONT_ACCENT_TEXT, fillId: 0, borderId: BORDER_THIN, numFmtId: FMT_WON, align: 'right' });
+  var XF_TOTAL_LABEL = XLSX_STYLE.addXf({ fontId: FONT_BOLD, fillId: FILL_TOTAL, borderId: BORDER_THIN, numFmtId: 0, align: 'left' });
+  var XF_TOTAL_NUM = XLSX_STYLE.addXf({ fontId: FONT_MONO_BOLD, fillId: FILL_TOTAL, borderId: BORDER_THIN, numFmtId: 3, align: 'right' });
+  var XF_TOTAL_HEAD = XLSX_STYLE.addXf({ fontId: FONT_MONO_BOLD, fillId: FILL_TOTAL, borderId: BORDER_THIN, numFmtId: FMT_HEAD, align: 'right' });
+  var XF_TOTAL_WON = XLSX_STYLE.addXf({ fontId: FONT_MONO_BOLD, fillId: FILL_TOTAL, borderId: BORDER_THIN, numFmtId: FMT_WON, align: 'right' });
+  var XF_TOTAL_KG = XLSX_STYLE.addXf({ fontId: FONT_MONO_BOLD, fillId: FILL_TOTAL, borderId: BORDER_THIN, numFmtId: FMT_KG, align: 'right' });
+  var XF_TOTAL_WEEK = XLSX_STYLE.addXf({ fontId: FONT_MONO_BOLD, fillId: FILL_TOTAL, borderId: BORDER_THIN, numFmtId: FMT_WEEK, align: 'right' });
+  var XF_TOTAL_PCT = XLSX_STYLE.addXf({ fontId: FONT_MONO_BOLD, fillId: FILL_TOTAL, borderId: BORDER_THIN, numFmtId: FMT_PCT, align: 'right' });
+
+  function buildStylesXml() {
+    var fontsXml = XLSX_STYLE.fonts.map(function (f) {
+      return '<font>' +
+        '<sz val="' + (f.sz || 10) + '"/>' +
+        (f.bold ? '<b/>' : '') +
+        '<color rgb="' + (f.color || 'FF181A20') + '"/>' +
+        '<name val="' + xmlEscape(f.name || 'Calibri') + '"/>' +
+        '</font>';
+    }).join('');
+    var fillsXml = XLSX_STYLE.fills.map(function (f) {
+      if (f.patternType === 'solid') {
+        return '<fill><patternFill patternType="solid"><fgColor rgb="' + f.fgColor + '"/><bgColor indexed="64"/></patternFill></fill>';
+      }
+      return '<fill><patternFill patternType="' + (f.patternType || 'none') + '"/></fill>';
+    }).join('');
+    var bordersXml = XLSX_STYLE.borders.map(function (b) {
+      var parts = ['left', 'right', 'top', 'bottom'].map(function (side) {
+        var e = b[side];
+        return e ? '<' + side + ' style="' + e.style + '"><color rgb="' + e.color + '"/></' + side + '>' : '<' + side + '/>';
+      }).join('');
+      return '<border>' + parts + '<diagonal/></border>';
+    }).join('');
+    var numFmtsXml = XLSX_STYLE.numFmts.length
+      ? '<numFmts count="' + XLSX_STYLE.numFmts.length + '">' + XLSX_STYLE.numFmts.map(function (n) {
+          return '<numFmt numFmtId="' + n.id + '" formatCode="' + xmlEscape(n.code) + '"/>';
+        }).join('') + '</numFmts>'
+      : '';
+    var xfsXml = XLSX_STYLE.xfs.map(function (xf) {
+      var alignXml = xf.align ? '<alignment horizontal="' + xf.align + '" vertical="center"/>' : '<alignment vertical="center"/>';
+      return '<xf numFmtId="' + (xf.numFmtId || 0) + '" fontId="' + xf.fontId + '" fillId="' + xf.fillId + '" borderId="' + xf.borderId + '" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyNumberFormat="1" applyAlignment="1">' + alignXml + '</xf>';
+    }).join('');
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      numFmtsXml +
+      '<fonts count="' + XLSX_STYLE.fonts.length + '">' + fontsXml + '</fonts>' +
+      '<fills count="' + XLSX_STYLE.fills.length + '">' + fillsXml + '</fills>' +
+      '<borders count="' + XLSX_STYLE.borders.length + '">' + bordersXml + '</borders>' +
+      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+      '<cellXfs count="' + XLSX_STYLE.xfs.length + '">' + xfsXml + '</cellXfs>' +
+      '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
+      '</styleSheet>';
+  }
+
+  // ---------- sparse sheet builder ----------
+  function makeSheetBuilder(tabColor) {
+    var rows = {};
+    var merges = [];
+    var colWidths = {};
+    return {
+      rows: rows, merges: merges, colWidths: colWidths, tabColor: tabColor,
+      set: function (r, c, v, s) { if (!rows[r]) rows[r] = {}; rows[r][c] = { v: v, s: s || 0 }; },
+      merge: function (r1, c1, r2, c2) { merges.push([r1, c1, r2, c2]); },
+      setColWidth: function (c, w) { colWidths[c] = w; }
+    };
+  }
+  function buildSheetXmlFromBuilder(b, drawingRid) {
+    var rowNums = Object.keys(b.rows).map(Number).sort(function (a, c) { return a - c; });
+    var rowsXml = rowNums.map(function (r) {
+      var rowMap = b.rows[r];
+      var colIdxs = Object.keys(rowMap).map(Number).sort(function (a, c) { return a - c; });
+      var cellsXml = colIdxs.map(function (c) {
+        var cell = rowMap[c];
+        var ref = colIndexToLetter(c) + r;
+        var sAttr = (cell.s !== undefined && cell.s !== 0) ? ' s="' + cell.s + '"' : '';
+        var val = cell.v;
+        if (val === null || val === undefined || val === '') {
+          return sAttr ? '<c r="' + ref + '"' + sAttr + '/>' : '';
+        }
+        if (typeof val === 'number' && isFinite(val)) return '<c r="' + ref + '"' + sAttr + '><v>' + val + '</v></c>';
+        return '<c r="' + ref + '"' + sAttr + ' t="inlineStr"><is><t xml:space="preserve">' + xmlEscape(val) + '</t></is></c>';
+      }).join('');
+      return '<row r="' + r + '">' + cellsXml + '</row>';
+    }).join('');
+
+    var colIdxsAll = Object.keys(b.colWidths).map(Number);
+    var colsXml = colIdxsAll.length
+      ? '<cols>' + colIdxsAll.map(function (c) {
+          return '<col min="' + (c + 1) + '" max="' + (c + 1) + '" width="' + b.colWidths[c] + '" customWidth="1"/>';
+        }).join('') + '</cols>'
+      : '';
+
+    var mergeXml = b.merges.length
+      ? '<mergeCells count="' + b.merges.length + '">' + b.merges.map(function (m) {
+          return '<mergeCell ref="' + colIndexToLetter(m[1]) + m[0] + ':' + colIndexToLetter(m[3]) + m[2] + '"/>';
+        }).join('') + '</mergeCells>'
+      : '';
+
+    var tabColorXml = b.tabColor ? '<sheetPr><tabColor rgb="' + b.tabColor + '"/></sheetPr>' : '';
+    var drawingXml = drawingRid ? '<drawing r:id="' + drawingRid + '"/>' : '';
+
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+      tabColorXml + colsXml +
+      '<sheetData>' + rowsXml + '</sheetData>' +
+      mergeXml + drawingXml +
+      '</worksheet>';
+  }
+
+  function buildWorkbookXml(sheetNames) {
+    var sheetsXml = sheetNames.map(function (name, i) {
+      return '<sheet name="' + xmlEscape(name) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>';
+    }).join('');
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+      '<sheets>' + sheetsXml + '</sheets>' +
+      '</workbook>';
+  }
+  function buildWorkbookRelsXml(sheetNames) {
+    var relsXml = sheetNames.map(function (name, i) {
+      return '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>';
+    }).join('');
+    relsXml += '<Relationship Id="rId' + (sheetNames.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>';
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + relsXml + '</Relationships>';
+  }
+  function buildContentTypesXml(sheetCount, drawingCount, chartCount) {
+    var overrides = '';
+    for (var i = 1; i <= sheetCount; i++) {
+      overrides += '<Override PartName="/xl/worksheets/sheet' + i + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
+    }
+    for (var d = 1; d <= drawingCount; d++) {
+      overrides += '<Override PartName="/xl/drawings/drawing' + d + '.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>';
+    }
+    for (var c = 1; c <= chartCount; c++) {
+      overrides += '<Override PartName="/xl/charts/chart' + c + '.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>';
+    }
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+      '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+      overrides +
+      '</Types>';
+  }
+  function buildRootRelsXml() {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
+      '</Relationships>';
+  }
+  function buildRelsXmlGeneric(entries) {
+    var relsXml = entries.map(function (e) {
+      return '<Relationship Id="' + e.id + '" Type="' + e.type + '" Target="' + e.target + '"/>';
+    }).join('');
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + relsXml + '</Relationships>';
+  }
+
+  // ---------- charts ----------
+  function buildBarChartXml(spec) {
+    var catRef = spec.sheetName + '!$' + spec.catCol + '$' + spec.catRowStart + ':$' + spec.catCol + '$' + spec.catRowEnd;
+    var numCacheXml = spec.valueNumFmt ? '<c:numCache><c:formatCode>' + xmlEscape(spec.valueNumFmt) + '</c:formatCode></c:numCache>' : '';
+    var seriesXml = spec.series.map(function (s, i) {
+      var valRef = spec.sheetName + '!$' + s.col + '$' + spec.catRowStart + ':$' + s.col + '$' + spec.catRowEnd;
+      return '' +
+        '<c:ser>' +
+        '<c:idx val="' + i + '"/>' +
+        '<c:order val="' + i + '"/>' +
+        '<c:tx><c:v>' + xmlEscape(s.name) + '</c:v></c:tx>' +
+        (s.color ? '<c:spPr><a:solidFill><a:srgbClr val="' + s.color + '"/></a:solidFill></c:spPr>' : '') +
+        '<c:cat><c:strRef><c:f>' + xmlEscape(catRef) + '</c:f></c:strRef></c:cat>' +
+        '<c:val><c:numRef><c:f>' + xmlEscape(valRef) + '</c:f>' + numCacheXml + '</c:numRef></c:val>' +
+        '</c:ser>';
+    }).join('');
+    var valAxNumFmt = spec.valueNumFmt ? '<c:numFmt formatCode="' + xmlEscape(spec.valueNumFmt) + '" sourceLinked="0"/>' : '';
+    var titleXml = spec.title
+      ? '<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1100" b="1"/></a:pPr><a:r><a:rPr lang="ko-KR" sz="1100" b="1"/><a:t>' + xmlEscape(spec.title) + '</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>'
+      : '<c:autoTitleDeleted val="1"/>';
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+      '<c:chart>' +
+      titleXml +
+      '<c:plotArea>' +
+      '<c:layout/>' +
+      '<c:barChart>' +
+      '<c:barDir val="col"/>' +
+      '<c:grouping val="clustered"/>' +
+      '<c:varyColors val="0"/>' +
+      seriesXml +
+      '<c:axId val="111111111"/>' +
+      '<c:axId val="222222222"/>' +
+      '</c:barChart>' +
+      '<c:catAx><c:axId val="111111111"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:txPr><a:bodyPr rot="-2700000" vert="horz"/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="800"/></a:pPr><a:endParaRPr lang="ko-KR"/></a:p></c:txPr><c:crossAx val="222222222"/></c:catAx>' +
+      '<c:valAx><c:axId val="222222222"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/>' + valAxNumFmt + '<c:crossAx val="111111111"/></c:valAx>' +
+      '</c:plotArea>' +
+      '<c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend>' +
+      '<c:plotVisOnly val="1"/>' +
+      '</c:chart>' +
+      '</c:chartSpace>';
+  }
+  function buildDrawingXml(anchors) {
+    var anchorsXml = anchors.map(function (a, i) {
+      return '' +
+        '<xdr:twoCellAnchor>' +
+        '<xdr:from><xdr:col>' + a.fromCol + '</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>' + a.fromRow + '</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>' +
+        '<xdr:to><xdr:col>' + a.toCol + '</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>' + a.toRow + '</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>' +
+        '<xdr:graphicFrame macro="">' +
+        '<xdr:nvGraphicFramePr>' +
+        '<xdr:cNvPr id="' + (i + 2) + '" name="' + xmlEscape(a.name) + '"/>' +
+        '<xdr:cNvGraphicFramePr/>' +
+        '</xdr:nvGraphicFramePr>' +
+        '<xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm>' +
+        '<a:graphic>' +
+        '<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart">' +
+        '<c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="' + a.rId + '"/>' +
+        '</a:graphicData>' +
+        '</a:graphic>' +
+        '</xdr:graphicFrame>' +
+        '<xdr:clientData/>' +
+        '</xdr:twoCellAnchor>';
+    }).join('');
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">' +
+      anchorsXml +
+      '</xdr:wsDr>';
+  }
+  function makeChartRegistry() {
+    var chartFiles = [];
+    var drawingFiles = [];
+    return {
+      chartFiles: chartFiles, drawingFiles: drawingFiles,
+      addChartsForSheet: function (chartSpecs) {
+        if (!chartSpecs || !chartSpecs.length) return null;
+        var drawingIdx = drawingFiles.length + 1;
+        var anchors = [];
+        var relEntries = [];
+        chartSpecs.forEach(function (spec, i) {
+          var chartIdx = chartFiles.length + 1;
+          chartFiles.push({ filename: 'chart' + chartIdx + '.xml', xml: buildBarChartXml(spec) });
+          var localRid = 'rId' + (i + 1);
+          relEntries.push({ id: localRid, type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart', target: '../charts/chart' + chartIdx + '.xml' });
+          anchors.push({ fromCol: spec.fromCol, fromRow: spec.fromRow, toCol: spec.toCol, toRow: spec.toRow, name: 'Chart' + chartIdx, rId: localRid });
+        });
+        drawingFiles.push({ filename: 'drawing' + drawingIdx + '.xml', xml: buildDrawingXml(anchors), relsXml: buildRelsXmlGeneric(relEntries) });
+        return drawingIdx;
+      }
+    };
+  }
+
+  // ---------- monthly aggregates ----------
+  function lukaStatusMonthlyAggregate(rows) {
+    var byMonth = {};
+    rows.forEach(function (r) {
+      var mk = (r.date || '').slice(0, 7);
+      if (!mk) return;
+      if (!byMonth[mk]) byMonth[mk] = { month: mk, netIn: 0, death: 0, shipped: 0 };
+      byMonth[mk].netIn += Number(r.netIn) || 0;
+      byMonth[mk].death += Number(r.death) || 0;
+      byMonth[mk].shipped += Number(r.shipped) || 0;
+    });
+    return Object.keys(byMonth).sort().map(function (mk) {
+      var g = byMonth[mk];
+      g.survivalRate = g.netIn ? (g.netIn - g.death) / g.netIn : 0;
+      return g;
+    });
+  }
+  function reshipMonthlyAggregate(rows) {
+    var byMonth = {};
+    rows.forEach(function (r) {
+      var mk = (r.date || '').slice(0, 7);
+      if (!mk) return;
+      if (!byMonth[mk]) byMonth[mk] = { month: mk, in: 0, death: 0, shipped: 0 };
+      byMonth[mk].in += Number(r.in) || 0;
+      byMonth[mk].death += Number(r.death) || 0;
+      byMonth[mk].shipped += Number(r.shipped) || 0;
+    });
+    return Object.keys(byMonth).sort().map(function (mk) {
+      var g = byMonth[mk];
+      g.survivalRate = g.in ? (g.in - g.death) / g.in : 0;
+      return g;
+    });
+  }
+  function feedCostMonthlyAggregate(rows) {
+    var byMonth = {};
+    rows.forEach(function (r) {
+      var mk = (r.settleMonth || '').trim();
+      if (!mk) return;
+      if (!byMonth[mk]) byMonth[mk] = { month: mk, amount: 0, head: 0 };
+      byMonth[mk].amount += Number(r.amount) || 0;
+      byMonth[mk].head += Number(r.inHead) || 0;
+    });
+    return Object.keys(byMonth).sort().map(function (mk) {
+      var g = byMonth[mk];
+      g.perHead = g.head ? Math.round(g.amount / g.head) : 0;
+      return g;
+    });
+  }
+
+  // ---------- sheet-content writers ----------
+  function statValueXf(unit, tone) {
+    if (tone === 'success') return unit === 'percent' ? XF_PCT_GOOD : XF_HEAD_GOOD;
+    if (tone === 'danger') return unit === 'percent' ? XF_PCT_BAD : XF_HEAD_BAD;
+    if (tone === 'accent') return unit === 'won' ? XF_WON_ACCENT : XF_HEAD_ACCENT;
+    if (unit === 'percent') return XF_PCT;
+    if (unit === 'won') return XF_WON;
+    return XF_HEAD;
+  }
+  function writeStatsBlock(b, row, col, title, statsRaw) {
+    b.set(row, col, title, XF_SUBTITLE);
+    b.merge(row, col, row, col + 1);
+    row++;
+    statsRaw.forEach(function (s) {
+      b.set(row, col, s.label, XF_LABEL);
+      b.set(row, col + 1, s.value, statValueXf(s.unit, s.tone));
+      row++;
+    });
+    return row + 1;
+  }
+  function writeMonthlyTable(b, row, col, title, monthlyRows, cols) {
+    b.set(row, col, title, XF_SUBTITLE);
+    b.merge(row, col, row, col + cols.length - 1);
+    row++;
+    cols.forEach(function (c, i) { b.set(row, col + i, c.label, XF_MONTH_HEADER); });
+    row++;
+    var firstDataRow = row;
+    if (!monthlyRows.length) {
+      b.set(row, col, '데이터 없음', XF_TEXT);
+      row++;
+      return { nextRow: row + 1, headerRow: firstDataRow - 1, firstDataRow: -1, lastDataRow: -1 };
+    }
+    monthlyRows.forEach(function (g) {
+      cols.forEach(function (c, i) {
+        var v = g[c.key];
+        if (i === 0) { b.set(row, col + i, v, XF_TEXT); return; }
+        var xf = c.unit === 'percent' ? XF_PCT : c.unit === 'won' ? XF_WON : XF_HEAD;
+        b.set(row, col + i, v, xf);
+      });
+      row++;
+    });
+    var lastDataRow = row - 1;
+    return { nextRow: row + 1, headerRow: firstDataRow - 1, firstDataRow: firstDataRow, lastDataRow: lastDataRow };
+  }
+  function buildMonthlySectionChartSpec(tableInfo, title, col, cols, seriesKeys, seriesColors, sheetNameForRefs) {
+    if (!tableInfo || tableInfo.lastDataRow < 0) return null;
+    var catCol = colIndexToLetter(col);
+    var series = seriesKeys.map(function (key, i) {
+      var idxInCols = cols.findIndex(function (c) { return c.key === key; });
+      return { name: cols[idxInCols].label, col: colIndexToLetter(col + idxInCols), color: seriesColors[i], unit: cols[idxInCols].unit };
+    });
+    var valueNumFmt = series.length && series.every(function (s) { return s.unit === 'percent'; }) ? '0.0%' : null;
+    var chartFromRow = tableInfo.nextRow - 1;
+    return {
+      spec: {
+        title: title, sheetName: sheetNameForRefs, catCol: catCol,
+        catRowStart: tableInfo.firstDataRow, catRowEnd: tableInfo.lastDataRow,
+        series: series, fromCol: col, fromRow: chartFromRow, toCol: col + 6, toRow: chartFromRow + 15,
+        valueNumFmt: valueNumFmt
+      },
+      nextRow: chartFromRow + 17
+    };
+  }
+  function writeDataTable(b, row, col, tabKey, rows) {
+    var def = STATUS_TABLE_DEFS[tabKey];
+    b.set(row, col, def.title, XF_TITLE);
+    b.merge(row, col, row, col + def.columns.length - 1);
+    row += 2;
+    def.columns.forEach(function (c, i) { b.set(row, col + i, c.label, XF_HEADER); });
+    row++;
+    rows.forEach(function (r) {
+      def.columns.forEach(function (c, i) {
+        var v = r[c.key];
+        var tone = cellTone(c.key, c.type, v, r);
+        var xf, outVal = (v === undefined || v === null) ? '' : v;
+        if (c.type === 'text' || c.type === 'date') xf = XF_TEXT;
+        else if (c.type === 'checkbox') { xf = XF_TEXT; outVal = v ? '완료' : ''; }
+        else if (c.type === 'percent') xf = tone === 'tone-success' ? XF_PCT_GOOD : tone === 'tone-danger' ? XF_PCT_BAD : XF_PCT;
+        else if (c.unit === 'won') xf = XF_WON;
+        else if (c.unit === 'kg') xf = XF_KG;
+        else if (c.unit === 'week') xf = XF_WEEK;
+        else if (c.unit === 'head') xf = tone === 'tone-success' ? XF_HEAD_GOOD : tone === 'tone-danger' ? XF_HEAD_BAD : XF_HEAD;
+        else xf = XF_NUM;
+        b.set(row, col + i, outVal, xf);
+      });
+      row++;
+    });
+    if (rows.length) {
+      def.columns.forEach(function (c, i) {
+        if (i === 0) { b.set(row, col + i, '합계', XF_TOTAL_LABEL); return; }
+        if (c.type === 'number') {
+          var val = c.weightBasis ? weightedAverage(rows, c.key, c.weightBasis) : rows.reduce(function (s2, r2) { return s2 + (Number(r2[c.key]) || 0); }, 0);
+          var xf = c.unit === 'won' ? XF_TOTAL_WON : c.unit === 'kg' ? XF_TOTAL_KG : c.unit === 'week' ? XF_TOTAL_WEEK : XF_TOTAL_HEAD;
+          b.set(row, col + i, val, xf);
+        } else if (c.type === 'percent' && c.survivalBasis) {
+          b.set(row, col + i, survivalRateTotal(rows, c.survivalBasis), XF_TOTAL_PCT);
+        } else {
+          b.set(row, col + i, '', XF_TOTAL_LABEL);
+        }
+      });
+      row++;
+    }
+    def.columns.forEach(function (c, i) {
+      var w = c.type === 'text' ? (c.key === 'note' ? 18 : 12) : c.type === 'date' ? 11 : 10;
+      b.setColWidth(col + i, w);
+    });
+    return row + 1;
+  }
+
+  function computeStatusStatsRaw(tabKey, rows) {
+    if (tabKey === 'lukaStatus') {
+      var sumNetIn = 0, sumDeath = 0, sumShipped = 0;
+      rows.forEach(function (r) { sumNetIn += Number(r.netIn) || 0; sumDeath += Number(r.death) || 0; sumShipped += Number(r.shipped) || 0; });
+      var rate = sumNetIn ? (sumNetIn - sumDeath) / sumNetIn : 0;
+      return [
+        { label: '총 실전입', value: sumNetIn, unit: 'head', tone: 'accent' },
+        { label: '총 폐사', value: sumDeath, unit: 'head', tone: sumDeath > 0 ? 'danger' : '' },
+        { label: '총 분양', value: sumShipped, unit: 'head', tone: sumShipped > 0 ? 'success' : '' },
+        { label: '평균 육성율', value: rate, unit: 'percent', tone: sumNetIn ? (rate >= 0.9 ? 'success' : 'danger') : '' }
+      ];
+    }
+    if (tabKey === 'reship') {
+      var sumIn = 0, sumDeath2 = 0, sumShipped2 = 0;
+      rows.forEach(function (r) { sumIn += Number(r.in) || 0; sumDeath2 += Number(r.death) || 0; sumShipped2 += Number(r.shipped) || 0; });
+      var rate2 = sumIn ? (sumIn - sumDeath2) / sumIn : 0;
+      return [
+        { label: '총 전입', value: sumIn, unit: 'head', tone: 'accent' },
+        { label: '총 폐사', value: sumDeath2, unit: 'head', tone: sumDeath2 > 0 ? 'danger' : '' },
+        { label: '총 출하', value: sumShipped2, unit: 'head', tone: sumShipped2 > 0 ? 'success' : '' },
+        { label: '평균 육성율', value: rate2, unit: 'percent', tone: sumIn ? (rate2 >= 0.9 ? 'success' : 'danger') : '' }
+      ];
+    }
+    if (tabKey === 'feedCost') {
+      var sumAmount = 0, sumHead = 0;
+      rows.forEach(function (r) { sumAmount += Number(r.amount) || 0; sumHead += Number(r.inHead) || 0; });
+      var perHeadAvg = sumHead ? Math.round(sumAmount / sumHead) : 0;
+      return [
+        { label: '총 지급액', value: sumAmount, unit: 'won', tone: 'accent' },
+        { label: '총 전입두수', value: sumHead, unit: 'head', tone: '' },
+        { label: '두당금액(평균)', value: perHeadAvg, unit: 'won', tone: '' }
+      ];
+    }
+    return [];
+  }
+
+  function buildExportWorkbookBlob() {
+    var encoder = new TextEncoder();
+    var today = toISO(todayMs());
+
+    var SUMMARY_SHEET_NAME = '종합성적';
+    var LUKA_SHEET_NAME = '후기자돈사 전입현황';
+    var RESHIP_SHEET_NAME = '재분양돈군 현황';
+    var FEED_SHEET_NAME = '사육비산출';
+    var TAB_COLOR = 'FFFCD535';
+
+    var lukaRows = statusRowsOf('lukaStatus');
+    var reshipRows = statusRowsOf('reship');
+    var feedRows = statusRowsOf('feedCost');
+
+    var lukaRaw = computeStatusStatsRaw('lukaStatus', lukaRows);
+    var reshipRaw = computeStatusStatsRaw('reship', reshipRows);
+    var feedRaw = computeStatusStatsRaw('feedCost', feedRows);
+
+    var lukaMonthly = lukaStatusMonthlyAggregate(lukaRows);
+    var reshipMonthly = reshipMonthlyAggregate(reshipRows);
+    var feedMonthly = feedCostMonthlyAggregate(feedRows);
+
+    var lukaMonthlyCols = [
+      { label: '월', key: 'month' },
+      { label: '실전입', key: 'netIn', unit: 'head' },
+      { label: '폐사', key: 'death', unit: 'head' },
+      { label: '분양', key: 'shipped', unit: 'head' },
+      { label: '육성율', key: 'survivalRate', unit: 'percent' }
+    ];
+    var reshipMonthlyCols = [
+      { label: '월', key: 'month' },
+      { label: '전입', key: 'in', unit: 'head' },
+      { label: '폐사', key: 'death', unit: 'head' },
+      { label: '출하', key: 'shipped', unit: 'head' },
+      { label: '육성율', key: 'survivalRate', unit: 'percent' }
+    ];
+    var feedMonthlyCols = [
+      { label: '정산예정월', key: 'month' },
+      { label: '총지급액', key: 'amount', unit: 'won' },
+      { label: '총전입두수', key: 'head', unit: 'head' },
+      { label: '두당금액', key: 'perHead', unit: 'won' }
+    ];
+
+    // ---- Sheet: 후기자돈사 전입현황 ----
+    var b2 = makeSheetBuilder(TAB_COLOR);
+    writeDataTable(b2, 1, 0, 'lukaStatus', lukaRows);
+    var rightCol2 = STATUS_TABLE_DEFS.lukaStatus.columns.length + 1;
+    var r2 = writeStatsBlock(b2, 1, rightCol2, '전체 성적', lukaRaw);
+    var mTable2 = writeMonthlyTable(b2, r2, rightCol2, '월별 성적 비교', lukaMonthly, lukaMonthlyCols);
+    var chartSpecs2 = [];
+    var cr2 = buildMonthlySectionChartSpec(mTable2, '월별 성적 비교(육성율)', rightCol2, lukaMonthlyCols, ['survivalRate'], ['0ECB81'], quoteSheetName(LUKA_SHEET_NAME));
+    if (cr2) chartSpecs2.push(cr2.spec);
+    for (var wi2 = 0; wi2 < 6; wi2++) b2.setColWidth(rightCol2 + wi2, wi2 === 0 ? 14 : 12);
+
+    // ---- Sheet: 재분양돈군 현황 ----
+    var b3 = makeSheetBuilder(TAB_COLOR);
+    writeDataTable(b3, 1, 0, 'reship', reshipRows);
+    var rightCol3 = STATUS_TABLE_DEFS.reship.columns.length + 1;
+    var r3 = writeStatsBlock(b3, 1, rightCol3, '전체 성적', reshipRaw);
+    var mTable3 = writeMonthlyTable(b3, r3, rightCol3, '월별 성적 비교', reshipMonthly, reshipMonthlyCols);
+    var chartSpecs3 = [];
+    var cr3 = buildMonthlySectionChartSpec(mTable3, '월별 성적 비교(육성율)', rightCol3, reshipMonthlyCols, ['survivalRate'], ['0ECB81'], quoteSheetName(RESHIP_SHEET_NAME));
+    if (cr3) chartSpecs3.push(cr3.spec);
+    for (var wi3 = 0; wi3 < 6; wi3++) b3.setColWidth(rightCol3 + wi3, wi3 === 0 ? 14 : 12);
+
+    // ---- Sheet: 사육비산출 ----
+    var b4 = makeSheetBuilder(TAB_COLOR);
+    writeDataTable(b4, 1, 0, 'feedCost', feedRows);
+    var rightCol4 = STATUS_TABLE_DEFS.feedCost.columns.length + 1;
+    var r4 = writeStatsBlock(b4, 1, rightCol4, '전체 성적', feedRaw);
+    var mTable4 = writeMonthlyTable(b4, r4, rightCol4, '정산예정월별 사육비 비교', feedMonthly, feedMonthlyCols);
+    var chartSpecs4 = [];
+    var cr4 = buildMonthlySectionChartSpec(mTable4, '정산예정월별 사육비 비교(두당금액)', rightCol4, feedMonthlyCols, ['perHead'], ['FCD535'], quoteSheetName(FEED_SHEET_NAME));
+    if (cr4) chartSpecs4.push(cr4.spec);
+    for (var wi4 = 0; wi4 < 6; wi4++) b4.setColWidth(rightCol4 + wi4, wi4 === 0 ? 14 : 12);
+
+    // ---- Sheet: 종합성적 (summary, first) ----
+    var b1 = makeSheetBuilder(TAB_COLOR);
+    var row1 = 1;
+    b1.set(row1, 0, '후기자돈사 운영현황 — 종합성적', XF_TITLE);
+    b1.merge(row1, 0, row1, 6);
+    row1++;
+    b1.set(row1, 0, '기준일: ' + today, XF_MUTED);
+    row1 += 2;
+
+    row1 = writeStatsBlock(b1, row1, 0, '1. 후기자돈 전입현황 — 전체 성적', lukaRaw);
+    var mTable1a = writeMonthlyTable(b1, row1, 0, '월별 성적 비교', lukaMonthly, lukaMonthlyCols);
+    var chartSpecs1 = [];
+    var cr1a = buildMonthlySectionChartSpec(mTable1a, '후기자돈 전입현황 — 월별 성적 비교(육성율)', 0, lukaMonthlyCols, ['survivalRate'], ['0ECB81'], quoteSheetName(SUMMARY_SHEET_NAME));
+    row1 = cr1a ? cr1a.nextRow : mTable1a.nextRow;
+    if (cr1a) chartSpecs1.push(cr1a.spec);
+
+    row1 = writeStatsBlock(b1, row1, 0, '2. 재분양돈군 현황 — 전체 성적', reshipRaw);
+    var mTable1b = writeMonthlyTable(b1, row1, 0, '월별 성적 비교', reshipMonthly, reshipMonthlyCols);
+    var cr1b = buildMonthlySectionChartSpec(mTable1b, '재분양돈군 현황 — 월별 성적 비교(육성율)', 0, reshipMonthlyCols, ['survivalRate'], ['0ECB81'], quoteSheetName(SUMMARY_SHEET_NAME));
+    row1 = cr1b ? cr1b.nextRow : mTable1b.nextRow;
+    if (cr1b) chartSpecs1.push(cr1b.spec);
+
+    row1 = writeStatsBlock(b1, row1, 0, '3. 월대사육비 — 전체 성적', feedRaw);
+    var mTable1c = writeMonthlyTable(b1, row1, 0, '정산예정월별 사육비 비교', feedMonthly, feedMonthlyCols);
+    var cr1c = buildMonthlySectionChartSpec(mTable1c, '정산예정월별 사육비 비교(두당금액)', 0, feedMonthlyCols, ['perHead'], ['FCD535'], quoteSheetName(SUMMARY_SHEET_NAME));
+    row1 = cr1c ? cr1c.nextRow : mTable1c.nextRow;
+    if (cr1c) chartSpecs1.push(cr1c.spec);
+
+    b1.setColWidth(0, 16);
+    for (var wi1 = 1; wi1 <= 6; wi1++) b1.setColWidth(wi1, 12);
+
+    var sheetBuilders = [b1, b2, b3, b4];
+    var sheetNames = [SUMMARY_SHEET_NAME, LUKA_SHEET_NAME, RESHIP_SHEET_NAME, FEED_SHEET_NAME];
+    var chartSpecsPerSheet = [chartSpecs1, chartSpecs2, chartSpecs3, chartSpecs4];
+
+    var chartReg = makeChartRegistry();
+    var drawingIdxPerSheet = chartSpecsPerSheet.map(function (specs) { return chartReg.addChartsForSheet(specs); });
+
+    var files = [];
+    files.push({ name: '_rels/.rels', data: encoder.encode(buildRootRelsXml()) });
+    files.push({ name: 'xl/workbook.xml', data: encoder.encode(buildWorkbookXml(sheetNames)) });
+    files.push({ name: 'xl/_rels/workbook.xml.rels', data: encoder.encode(buildWorkbookRelsXml(sheetNames)) });
+    files.push({ name: 'xl/styles.xml', data: encoder.encode(buildStylesXml()) });
+
+    sheetBuilders.forEach(function (b, i) {
+      var drawingIdx = drawingIdxPerSheet[i];
+      var drawingRid = drawingIdx ? 'rId1' : null;
+      files.push({ name: 'xl/worksheets/sheet' + (i + 1) + '.xml', data: encoder.encode(buildSheetXmlFromBuilder(b, drawingRid)) });
+      if (drawingIdx) {
+        files.push({
+          name: 'xl/worksheets/_rels/sheet' + (i + 1) + '.xml.rels',
+          data: encoder.encode(buildRelsXmlGeneric([{ id: 'rId1', type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing', target: '../drawings/drawing' + drawingIdx + '.xml' }]))
+        });
+      }
+    });
+
+    chartReg.drawingFiles.forEach(function (d) {
+      files.push({ name: 'xl/drawings/' + d.filename, data: encoder.encode(d.xml) });
+      files.push({ name: 'xl/drawings/_rels/' + d.filename + '.rels', data: encoder.encode(d.relsXml) });
+    });
+    chartReg.chartFiles.forEach(function (c) {
+      files.push({ name: 'xl/charts/' + c.filename, data: encoder.encode(c.xml) });
+    });
+
+    files.unshift({ name: '[Content_Types].xml', data: encoder.encode(buildContentTypesXml(sheetNames.length, chartReg.drawingFiles.length, chartReg.chartFiles.length)) });
+
+    var zipBytes = buildZip(files);
+    return new Blob([zipBytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  }
+
+  async function exportStatusWorkbook() {
+    try {
+      var blob = buildExportWorkbookBlob();
+      var filename = '후기자돈사_운영현황_' + toISO(todayMs()) + '.xlsx';
+      await saveGeneratedFile(blob, filename);
+    } catch (e) {
+      alert('엑셀 다운로드에 실패했습니다: ' + (e && e.message ? e.message : e));
+    }
+  }
+
+  // ---------- excel/csv import (pure browser APIs, no external libraries) ----------
+  var TYPE_MAP = { '전입': 'in', '전출': 'out' };
+  var SUBTYPE_MAP = { '농장전출': 'farm', '외부판매': 'external' };
+
+  function buildRecordsFromRows(rows) {
+    // rows: array of [일자, 구분, 세부구분, 농장명, 두수] starting at index 1 = header
+    var out = [], warnings = [];
+    for (var r = 2; r < rows.length; r++) {
+      var row = rows[r];
+      if (!row || row.every(function (v) { return v === undefined || v === null || String(v).trim() === ''; })) continue;
+      var date = (row[0] == null ? '' : String(row[0])).trim();
+      var typeKr = (row[1] == null ? '' : String(row[1])).trim();
+      var subtypeKr = (row[2] == null ? '' : String(row[2])).trim();
+      var farmName = (row[3] == null ? '' : String(row[3])).trim();
+      var head = Number(row[4]);
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { warnings.push((r) + '행: 일자 형식이 YYYY-MM-DD가 아니어서 건너뜀 ("' + date + '")'); continue; }
+      if (!TYPE_MAP[typeKr]) { warnings.push(r + '행: 구분이 "전입"/"전출"이 아니어서 건너뜀 ("' + typeKr + '")'); continue; }
+      if (!head || head <= 0) { warnings.push(r + '행: 두수가 없어 건너뜀'); continue; }
+
+      var rec = { date: date, type: TYPE_MAP[typeKr], head: head };
+      if (rec.type === 'out') {
+        if (!SUBTYPE_MAP[subtypeKr]) { warnings.push(r + '행: 세부구분이 "농장전출"/"외부판매"가 아니어서 건너뜀 ("' + subtypeKr + '")'); continue; }
+        rec.subtype = SUBTYPE_MAP[subtypeKr];
+        rec.farmName = farmName;
+      } else {
+        rec.subtype = null;
+        rec.farmName = IN_FARM_NAME;
+      }
+      out.push(rec);
+    }
+    return { records: out, warnings: warnings };
+  }
+
+  function parseCsvText(text) {
+    var lines = text.replace(/^﻿/, '').replace(/\r/g, '').split('\n').filter(function (l) { return l.length > 0; });
+    // index 0 left empty so rows[1] = header, rows[2] = first data row —
+    // matches the 1-based spreadsheet-row indexing buildRecordsFromRows expects for xlsx.
+    var rows = [undefined];
+    lines.forEach(function (line) {
+      var result = [], cur = '', inQuotes = false;
+      for (var i = 0; i < line.length; i++) {
+        var ch = line[i];
+        if (inQuotes) {
+          if (ch === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else inQuotes = false; }
+          else cur += ch;
+        } else if (ch === '"') inQuotes = true;
+        else if (ch === ',') { result.push(cur); cur = ''; }
+        else cur += ch;
+      }
+      result.push(cur);
+      rows.push(result);
+    });
+    return rows;
+  }
+
+  async function inflateRawBrowser(bytes) {
+    if (typeof DecompressionStream === 'undefined') {
+      throw new Error('이 브라우저는 xlsx 압축 해제를 지원하지 않습니다. 최신 Chrome/Edge를 사용하거나 CSV로 저장해 올려주세요.');
+    }
+    var ds = new DecompressionStream('deflate-raw');
+    var writer = ds.writable.getWriter();
+    writer.write(bytes);
+    writer.close();
+    var reader = ds.readable.getReader();
+    var chunks = [], total = 0;
+    for (;;) {
+      var res = await reader.read();
+      if (res.done) break;
+      chunks.push(res.value); total += res.value.length;
+    }
+    var out = new Uint8Array(total), off = 0;
+    chunks.forEach(function (c) { out.set(c, off); off += c.length; });
+    return out;
+  }
+
+  function findEOCD(bytes) {
+    var dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    var maxBack = Math.min(bytes.length, 65557);
+    for (var i = bytes.length - 22; i >= bytes.length - maxBack && i >= 0; i--) {
+      if (dv.getUint32(i, true) === 0x06054b50) return i;
+    }
+    throw new Error('올바른 xlsx(zip) 파일이 아닙니다.');
+  }
+
+  function parseZipEntries(bytes) {
+    var dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    var eocdOff = findEOCD(bytes);
+    var cdOffset = dv.getUint32(eocdOff + 16, true);
+    var cdSize = dv.getUint32(eocdOff + 12, true);
+    var entries = {}, p = cdOffset, end = cdOffset + cdSize;
+    var decoder = new TextDecoder('utf-8');
+    while (p < end) {
+      if (dv.getUint32(p, true) !== 0x02014b50) break;
+      var compMethod = dv.getUint16(p + 10, true);
+      var compSize = dv.getUint32(p + 20, true);
+      var nameLen = dv.getUint16(p + 28, true);
+      var extraLen = dv.getUint16(p + 30, true);
+      var commentLen = dv.getUint16(p + 32, true);
+      var localHeaderOffset = dv.getUint32(p + 42, true);
+      var name = decoder.decode(bytes.subarray(p + 46, p + 46 + nameLen));
+      entries[name] = { compMethod: compMethod, compSize: compSize, localHeaderOffset: localHeaderOffset };
+      p += 46 + nameLen + extraLen + commentLen;
+    }
+    return entries;
+  }
+
+  async function extractZipEntry(bytes, entry) {
+    var dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    var lp = entry.localHeaderOffset;
+    if (dv.getUint32(lp, true) !== 0x04034b50) throw new Error('xlsx 파일 구조가 손상되었습니다.');
+    var nameLen = dv.getUint16(lp + 26, true);
+    var extraLen = dv.getUint16(lp + 28, true);
+    var dataStart = lp + 30 + nameLen + extraLen;
+    var raw = bytes.subarray(dataStart, dataStart + entry.compSize);
+    if (entry.compMethod === 0) return raw;
+    if (entry.compMethod === 8) return await inflateRawBrowser(raw);
+    throw new Error('지원하지 않는 압축 방식입니다.');
+  }
+
+  function colLetterToIndex(ref) {
+    var letters = ref.match(/^[A-Z]+/)[0];
+    var idx = 0;
+    for (var i = 0; i < letters.length; i++) idx = idx * 26 + (letters.charCodeAt(i) - 64);
+    return idx;
+  }
+
+  function parseSharedStrings(xmlText) {
+    var doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+    var siList = doc.getElementsByTagName('si');
+    var arr = [];
+    for (var i = 0; i < siList.length; i++) {
+      var tNodes = siList[i].getElementsByTagName('t');
+      var text = '';
+      for (var j = 0; j < tNodes.length; j++) text += tNodes[j].textContent;
+      arr.push(text);
+    }
+    return arr;
+  }
+
+  function parseSheetRows(xmlText, sharedStrings) {
+    var doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+    var rowNodes = doc.getElementsByTagName('row');
+    var rows = [];
+    for (var i = 0; i < rowNodes.length; i++) {
+      var rn = rowNodes[i];
+      var rowNum = parseInt(rn.getAttribute('r'), 10);
+      var cells = rn.getElementsByTagName('c');
+      var rowArr = [];
+      for (var j = 0; j < cells.length; j++) {
+        var c = cells[j];
+        var ref = c.getAttribute('r');
+        if (!ref) continue;
+        var colIdx = colLetterToIndex(ref);
+        var type = c.getAttribute('t');
+        var value = '';
+        if (type === 'inlineStr') {
+          var isNode = c.getElementsByTagName('is')[0];
+          value = isNode ? isNode.textContent : '';
+        } else {
+          var vNode = c.getElementsByTagName('v')[0];
+          if (vNode) {
+            var raw = vNode.textContent;
+            value = (type === 's') ? (sharedStrings[parseInt(raw, 10)] || '') : raw;
+          }
+        }
+        rowArr[colIdx - 1] = value;
+      }
+      rows[rowNum] = rowArr;
+    }
+    return rows;
+  }
+
+  async function resolveSheetPath(buf, entries, sheetName) {
+    try {
+      var wbBytes = await extractZipEntry(buf, entries['xl/workbook.xml']);
+      var wbDoc = new DOMParser().parseFromString(new TextDecoder('utf-8').decode(wbBytes), 'application/xml');
+      var sheetNodes = wbDoc.getElementsByTagName('sheet');
+      var targetRid = null;
+      for (var i = 0; i < sheetNodes.length; i++) {
+        if (sheetNodes[i].getAttribute('name') === sheetName) {
+          targetRid = sheetNodes[i].getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id')
+            || sheetNodes[i].getAttribute('r:id');
+          break;
+        }
+      }
+      if (!targetRid) return null;
+      var relsBytes = await extractZipEntry(buf, entries['xl/_rels/workbook.xml.rels']);
+      var relsDoc = new DOMParser().parseFromString(new TextDecoder('utf-8').decode(relsBytes), 'application/xml');
+      var relNodes = relsDoc.getElementsByTagName('Relationship');
+      for (var k = 0; k < relNodes.length; k++) {
+        if (relNodes[k].getAttribute('Id') === targetRid) {
+          var target = relNodes[k].getAttribute('Target').replace(/^\/?xl\//, '').replace(/^\.?\//, '');
+          return 'xl/' + target;
+        }
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  async function importXlsxFile(file) {
+    var buf = new Uint8Array(await file.arrayBuffer());
+    var entries = parseZipEntries(buf);
+    var sheetPath = await resolveSheetPath(buf, entries, '전입전출입력');
+    if (!sheetPath || !entries[sheetPath]) sheetPath = 'xl/worksheets/sheet1.xml';
+    if (!entries[sheetPath]) throw new Error('시트를 찾을 수 없습니다. 제공된 양식 파일이 맞는지 확인해 주세요.');
+
+    var sharedStrings = [];
+    if (entries['xl/sharedStrings.xml']) {
+      var ssBytes = await extractZipEntry(buf, entries['xl/sharedStrings.xml']);
+      sharedStrings = parseSharedStrings(new TextDecoder('utf-8').decode(ssBytes));
+    }
+    var sheetBytes = await extractZipEntry(buf, entries[sheetPath]);
+    var rows = parseSheetRows(new TextDecoder('utf-8').decode(sheetBytes), sharedStrings);
+    return buildRecordsFromRows(rows);
+  }
+
+  function importCsvFile(text) {
+    var rows = parseCsvText(text);
+    return buildRecordsFromRows(rows);
+  }
+
+  async function handleImportFile(file) {
+    if (!file) return;
+    importError = null;
+    importBusy = true;
+    pendingImport = null;
+    render();
+    try {
+      var result;
+      if (/\.csv$/i.test(file.name)) {
+        result = importCsvFile(await file.text());
+      } else {
+        result = await importXlsxFile(file);
+      }
+      importBusy = false;
+      if (!result.records.length) {
+        importError = '가져올 수 있는 행이 없습니다. 예시 행을 지우고 실제 데이터를 입력했는지 확인해 주세요.';
+      } else {
+        pendingImport = { records: result.records, warnings: result.warnings, fileName: file.name };
+      }
+    } catch (err) {
+      importBusy = false;
+      importError = (err && err.message) ? err.message : '파일을 읽는 중 오류가 발생했습니다.';
+    }
+    render();
+  }
+
+  // ---------- 농장전체전입현황 / 월대사육비 워크북 가져오기 ----------
+  // 그룹명(차수)의 괄호 숫자가 (1)을 초과하는 행들은 같은 돈군이므로 합산한다.
+  function groupBaseName(code) {
+    var m = String(code || '').match(/^(.*)\(\d+\)$/);
+    return m ? m[1] : String(code || '');
+  }
+  function excelSerialToMs(serial) {
+    var n = Number(serial);
+    if (!n) return todayMs();
+    return Math.round((n - 25569) * DAY_MS);
+  }
+  function excelSerialToISO(serial) { return toISO(excelSerialToMs(serial)); }
+
+  // 일부 사내 시스템은 ".xls" 확장자로 내보내지만 실제로는 HTML 표(<table>)를 담고 있다.
+  // 진짜 xlsx(zip)인지 여부는 파일 시그니처("PK")로 판별한다.
+  function isZipBuffer(buf) {
+    return buf.length >= 2 && buf[0] === 0x50 && buf[1] === 0x4B;
+  }
+  // HTML로 내보낸 "농장별 돈수불" 같은 표를, 첫 <th> 행을 헤더로 삼아 {헤더명: 값} 객체 배열로 변환한다.
+  function parseHtmlTableSheet(text) {
+    var doc = new DOMParser().parseFromString(text, 'text/html');
+    var table = doc.querySelector('table');
+    if (!table) return null;
+    var trs = table.querySelectorAll('tr');
+    var headers = null, headerIdx = -1;
+    for (var i = 0; i < trs.length; i++) {
+      var ths = trs[i].querySelectorAll('th');
+      if (ths.length) {
+        headers = Array.prototype.map.call(ths, function (th) { return th.textContent.trim(); });
+        headerIdx = i;
+        break;
+      }
+    }
+    if (headerIdx === -1) return null;
+    var rows = [];
+    for (var j = headerIdx + 1; j < trs.length; j++) {
+      var tds = trs[j].querySelectorAll('td');
+      if (!tds.length) continue;
+      var obj = {};
+      for (var k = 0; k < headers.length && k < tds.length; k++) {
+        if (headers[k]) obj[headers[k]] = tds[k].textContent.trim();
+      }
+      rows.push(obj);
+    }
+    return { headers: headers, rows: rows };
+  }
+  // 실제 xlsx 시트(행 배열)에서 requiredHeaders를 모두 포함하는 헤더 행을 찾아,
+  // 이후 행들을 {헤더명: 값} 객체 배열로 변환한다. 헤더가 정확히 몇 번째 줄인지 몰라도 동작한다.
+  function rowsToObjectsByHeader(rows, requiredHeaders) {
+    var headerRowIdx = -1, headers = null;
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      if (!row) continue;
+      var found = requiredHeaders.every(function (h) {
+        return row.some(function (cell) { return String(cell || '').trim() === h; });
+      });
+      if (found) { headerRowIdx = i; headers = row; break; }
+    }
+    if (headerRowIdx === -1) return null;
+    var out = [];
+    for (var r = headerRowIdx + 1; r < rows.length; r++) {
+      var dataRow = rows[r];
+      if (!dataRow) continue;
+      var obj = {}, any = false;
+      for (var h = 0; h < headers.length; h++) {
+        var key = String(headers[h] || '').trim();
+        if (!key) continue;
+        var v = dataRow[h];
+        obj[key] = (v === undefined || v === null) ? '' : v;
+        if (obj[key] !== '') any = true;
+      }
+      if (any) out.push(obj);
+    }
+    return out;
+  }
+  // "농장별 돈수불" 표에서 자돈_루카의 그룹별 판매두수(외부판매)를 합산한다.
+  // 그룹명은 "농장명-그룹명(차수)" 형태로 두 번 반복되어 있어, 앞의 "농장명-" 접두사를 제거해야
+  // 농장전체전입현황의 그룹명(차수) 기준(groupBaseName)과 동일한 키로 매칭된다.
+  function parseDonsubulRows(rowObjects) {
+    var out = {};
+    (rowObjects || []).forEach(function (r) {
+      var farmName = String(r['농장명'] || '').trim();
+      if (farmName !== '자돈_루카') return;
+      var rawGroup = String(r['그룹명'] || '').trim();
+      var prefix = farmName + '-';
+      var groupKey = rawGroup.indexOf(prefix) === 0 ? rawGroup.slice(prefix.length) : rawGroup;
+      if (!groupKey) return;
+      var sold = Number(String(r['판매두수'] || '').replace(/,/g, '')) || 0;
+      out[groupKey] = (out[groupKey] || 0) + sold;
+    });
+    return out;
+  }
+
+  function parseFarmwideSheetRows(rows) {
+    // 농장전체전입현황: 헤더 4행, 데이터는 5행부터. D=농장명, G=그룹명(차수), H=분양농장(상대 농장),
+    // I=전입일, J=실두수, K=총체중, N=클레임두수, P=폐사(당기간), R=전출,판매(당기간)
+    var out = [];
+    for (var r = 5; r < rows.length; r++) {
+      var row = rows[r];
+      if (!row) continue;
+      var farmName = row[3];
+      if (!farmName) continue;
+      out.push({
+        farmName: String(farmName).trim(),
+        groupCode: row[6] != null ? String(row[6]).trim() : '',
+        counterpartFarm: row[7] != null ? String(row[7]).trim() : '',
+        inDateSerial: row[8],
+        headIn: Number(row[9]) || 0,
+        totalWeight: Number(row[10]) || 0,
+        claimHead: Number(row[13]) || 0,
+        deathPeriod: Number(row[15]) || 0,
+        shipPeriod: Number(row[17]) || 0
+      });
+    }
+    return out;
+  }
+
+  function buildLukaStatusFromFarmwide(parsed, donsubulMap) {
+    var groups = {}, order = [];
+    parsed.filter(function (r) { return r.farmName === '자돈_루카'; }).forEach(function (r) {
+      var base = groupBaseName(r.groupCode);
+      if (!base) return;
+      if (!groups[base]) { groups[base] = { inDateSerial: r.inDateSerial, headIn: 0, totalWeight: 0, claimHead: 0, deathPeriod: 0, shipPeriod: 0 }; order.push(base); }
+      var g = groups[base];
+      g.headIn += r.headIn; g.totalWeight += r.totalWeight; g.claimHead += r.claimHead; g.deathPeriod += r.deathPeriod; g.shipPeriod += r.shipPeriod;
+    });
+    return order.map(function (base) {
+      var g = groups[base];
+      return {
+        groupKey: base,
+        date: excelSerialToISO(g.inDateSerial),
+        initIn: g.headIn + g.claimHead,
+        avgWeight: g.headIn ? Math.round((g.totalWeight / g.headIn) * 10) / 10 : 0,
+        claim: g.claimHead,
+        directSale: (donsubulMap && donsubulMap[base]) || 0,
+        netIn: g.headIn,
+        death: g.deathPeriod,
+        shipped: g.shipPeriod,
+        stock: Math.max(0, g.headIn - g.deathPeriod - g.shipPeriod),
+        survivalRate: g.headIn ? ((g.headIn - g.deathPeriod) / g.headIn) : 0,
+        note: ''
+      };
+    });
+  }
+
+  function buildReshipFromFarmwide(parsed) {
+    var groups = {}, order = [];
+    parsed.filter(function (r) { return r.counterpartFarm === '인티-루카농장(이미숙)'; }).forEach(function (r) {
+      var base = groupBaseName(r.groupCode);
+      if (!base) return;
+      if (!groups[base]) { groups[base] = { farmName: r.farmName, inDateSerial: r.inDateSerial, headIn: 0, totalWeight: 0, claimHead: 0, deathPeriod: 0, shipPeriod: 0 }; order.push(base); }
+      var g = groups[base];
+      g.headIn += r.headIn; g.totalWeight += r.totalWeight; g.claimHead += r.claimHead; g.deathPeriod += r.deathPeriod; g.shipPeriod += r.shipPeriod;
+    });
+    var todayStamp = todayMs();
+    return order.map(function (base) {
+      var g = groups[base];
+      var inMs = excelSerialToMs(g.inDateSerial);
+      return {
+        groupKey: base,
+        date: excelSerialToISO(g.inDateSerial),
+        week: Math.round((todayStamp - inMs) / (7 * DAY_MS)),
+        farm: g.farmName,
+        in: g.headIn,
+        avgWeight: g.headIn ? Math.round((g.totalWeight / g.headIn) * 10) / 10 : 0,
+        claim: g.claimHead,
+        netIn: g.headIn - g.claimHead,
+        death: g.deathPeriod,
+        shipped: g.shipPeriod,
+        stock: Math.max(0, g.headIn - g.claimHead - g.deathPeriod - g.shipPeriod),
+        survivalRate: g.headIn ? ((g.headIn - g.deathPeriod) / g.headIn) : 0,
+        note: ''
+      };
+    });
+  }
+
+  function parseFeedCostSheetRows(rows) {
+    // 월대사육비: 헤더 4행, 데이터는 5행부터. B=농장명, D=배치번호(그룹명), E=전입일자, F=전입두수,
+    // AE=계, AF=정산예정두수, AG=두당금액, AH=정산예정월, AI=정산완료여부, AJ=특이사항
+    var out = [];
+    for (var r = 5; r < rows.length; r++) {
+      var row = rows[r];
+      if (!row) continue;
+      var farmName = row[1], batchNo = row[3];
+      if (!farmName || !batchNo) continue;
+      if (String(farmName).trim() !== '자돈_루카') continue;
+      out.push({
+        batchNo: groupBaseName(String(batchNo).trim()),
+        inDate: row[4] ? excelSerialToISO(row[4]) : '',
+        inHead: Number(row[5]) || 0,
+        amount: Number(row[30]) || 0,
+        settleHead: Number(row[31]) || 0,
+        perHead: Math.round(Number(row[32]) || 0),
+        settleMonth: row[33] != null ? String(row[33]).trim() : '',
+        settled: !!(row[34] != null && String(row[34]).trim()),
+        note: row[35] != null ? String(row[35]).trim() : ''
+      });
+    }
+    return out;
+  }
+
+  var DONSUBUL_HEADERS = ['농장명', '그룹명', '판매두수'];
+
+  // 파일 하나에서 찾을 수 있는 시트를 최대한 읽어온다. 진짜 xlsx(zip)면 알려진 시트 이름들을
+  // 각각 찾아보고, HTML로 내보낸 표(.xls 확장자를 쓰는 "농장별 돈수불" 등)면 표를 그대로 읽는다.
+  async function readFarmwideFile(file) {
+    var buf = new Uint8Array(await file.arrayBuffer());
+    var out = { farmwideRows: null, feedCostSheetRows: null, donsubulObjects: null };
+    if (isZipBuffer(buf)) {
+      var entries = parseZipEntries(buf);
+      var sharedStrings = [];
+      if (entries['xl/sharedStrings.xml']) {
+        var ssBytes = await extractZipEntry(buf, entries['xl/sharedStrings.xml']);
+        sharedStrings = parseSharedStrings(new TextDecoder('utf-8').decode(ssBytes));
+      }
+      var readSheet = async function (name) {
+        var path = await resolveSheetPath(buf, entries, name);
+        if (!path || !entries[path]) return null;
+        var bytes = await extractZipEntry(buf, entries[path]);
+        return parseSheetRows(new TextDecoder('utf-8').decode(bytes), sharedStrings);
+      };
+      out.farmwideRows = await readSheet('농장전체전입현황');
+      out.feedCostSheetRows = await readSheet('월대사육비');
+      var donsubulSheetRows = await readSheet('농장별 돈수불');
+      if (donsubulSheetRows) out.donsubulObjects = rowsToObjectsByHeader(donsubulSheetRows, DONSUBUL_HEADERS);
+    } else {
+      var text = new TextDecoder('utf-8').decode(buf);
+      var htmlParsed = parseHtmlTableSheet(text);
+      if (htmlParsed && DONSUBUL_HEADERS.every(function (h) { return htmlParsed.headers.indexOf(h) !== -1; })) {
+        out.donsubulObjects = htmlParsed.rows;
+      }
+    }
+    return out;
+  }
+
+  // 엑셀을 다시 올려도 웹사이트에서 직접 체크해 둔 정산여부는 지워지지 않도록, key가 같은
+  // 기존 행의 settled 값을 새로 만든 행에 그대로 옮겨온다.
+  function preserveSettledByKey(newRows, oldRows, keyField) {
+    if (!oldRows || !oldRows.length) return newRows;
+    var byKey = {};
+    oldRows.forEach(function (r) { if (r[keyField]) byKey[r[keyField]] = r; });
+    return newRows.map(function (r) {
+      var old = r[keyField] && byKey[r[keyField]];
+      return old ? Object.assign({}, r, { settled: !!old.settled }) : r;
+    });
+  }
+
+  // 여러 파일을 한 번에 올려도(농장전체전입현황/월대사육비/농장별 돈수불이 각각 다른 파일이어도)
+  // 파일마다 찾은 시트를 합쳐서 하나의 결과로 만든다.
+  async function importFarmwideFiles(files) {
+    var farmwideRows = null, feedCostSheetRows = null, donsubulObjects = null;
+    for (var i = 0; i < files.length; i++) {
+      var found = await readFarmwideFile(files[i]);
+      if (found.farmwideRows) farmwideRows = found.farmwideRows;
+      if (found.feedCostSheetRows) feedCostSheetRows = found.feedCostSheetRows;
+      if (found.donsubulObjects) donsubulObjects = found.donsubulObjects;
+    }
+    if (!farmwideRows && !feedCostSheetRows && !donsubulObjects) {
+      throw new Error('업로드한 파일에서 "농장전체전입현황", "월대사육비", "농장별 돈수불" 시트를 찾을 수 없습니다.');
+    }
+    var donsubulMap = donsubulObjects ? parseDonsubulRows(donsubulObjects) : null;
+    var result = {};
+    if (farmwideRows) {
+      var parsed = parseFarmwideSheetRows(farmwideRows);
+      result.lukaStatusRows = preserveSettledByKey(buildLukaStatusFromFarmwide(parsed, donsubulMap), statusRowsOf('lukaStatus'), 'groupKey');
+      result.reshipRows = preserveSettledByKey(buildReshipFromFarmwide(parsed), statusRowsOf('reship'), 'groupKey');
+    } else if (donsubulMap) {
+      // 농장전체전입현황 없이 돈수불 파일만 올린 경우, 이미 저장된 후기자돈현황 행에
+      // (이전에 인식해 둔) 그룹키가 있으면 그 행의 외부판매 두수만 갱신한다.
+      var existingLuka = statusRowsOf('lukaStatus');
+      if (existingLuka.length) {
+        result.lukaStatusRows = existingLuka.map(function (r) {
+          if (r.groupKey && donsubulMap[r.groupKey] !== undefined) {
+            return Object.assign({}, r, { directSale: donsubulMap[r.groupKey] });
+          }
+          return r;
+        });
+      }
+    }
+    if (feedCostSheetRows) {
+      result.feedCostRows = preserveSettledByKey(parseFeedCostSheetRows(feedCostSheetRows), statusRowsOf('feedCost'), 'batchNo');
+    }
+    return result;
+  }
+
+  async function handleWorkbookImportFile(files) {
+    if (!files || !files.length) return;
+    workbookImportError = null;
+    workbookImportBusy = true;
+    pendingWorkbookImport = null;
+    render();
+    try {
+      pendingWorkbookImport = await importFarmwideFiles(files);
+      workbookImportBusy = false;
+    } catch (err) {
+      workbookImportBusy = false;
+      workbookImportError = (err && err.message) ? err.message : '파일을 읽는 중 오류가 발생했습니다.';
+    }
+    render();
+  }
+
+  settings = Object.assign(defaultSettings(), __S || {}); records = (__R || []).slice();
+  return { importFarmwideFiles, importCsvFile, importXlsxFile, buildExportWorkbookBlob, drawCalendarCanvas, setCalCursor: function (y, m) { calMonthCursor = { y: y, m: m }; }, STATUS_TABLE_DEFS, STATUS_EDITABLE_FIELDS, blankStatusRow, recomputeStatusRow, stockAsOf, aggregateRecordsForDay, farmNameFrequency };
+}

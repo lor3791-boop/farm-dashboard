@@ -1,4 +1,6 @@
 // 폐사관리 — 폐사현황(일자별) / 폐사입력 / 폐사입력현황(미등록·등록완료 목록, 수정·삭제)
+import { SUBS } from '@/app/menu';
+import type { UiState } from '@/lib/ui';
 import { DropCard } from '@/components/Drop';
 import { useState } from 'react';
 import { useHerd } from '@/lib/ui';
@@ -21,7 +23,7 @@ export function DeathPage() {
   const { s, set } = useHerd();
   return (
     <>
-      <Tabs opts={[['status', '폐사현황'], ['input', '폐사입력'], ['list', '폐사입력현황']]} value={s.deathTab} onPick={(k) => set({ deathTab: k })} />
+      <Tabs opts={SUBS.death as [UiState['deathTab'], string][]} value={s.deathTab} onPick={(k) => set({ deathTab: k })} />
       {s.deathTab === 'status' && <DeathDaily />}
       {s.deathTab === 'input' && <DeathEntry />}
       {s.deathTab === 'list' && <DeathRecords />}
