@@ -16,3 +16,13 @@ export function vaxOf(g: G, done: Record<string, boolean>, today: string): Vax {
   };
   return { fmd: one(4, '구제역 백신'), dew: one(5, '구충제 · 사료 2호 변경') };
 }
+
+export const VAX_JOB = { fmd: '구제역 백신', dew: '구충제 · 사료 2호 변경' } as const;
+// 사육현황에서 누르면 그 그룹의 해당 작업(차수 전부)을 완료 ↔ 미완료로 바꾼 done 값을 돌려준다
+export function toggleVax(g: G, done: Record<string, boolean>, kind: 'fmd' | 'dew'): Record<string, boolean> {
+  const idx = kind === 'fmd' ? 4 : 5, job = VAX_JOB[kind];
+  const keys = [...new Set(g.lots.map((l) => String(l[idx])))].filter(Boolean).map((d) => g.who + '|' + job + '|' + d);
+  const all = keys.length > 0 && keys.every((k) => done[k]);
+  const o = { ...done }; keys.forEach((k) => { if (all) delete o[k]; else o[k] = true; });
+  return o;
+}

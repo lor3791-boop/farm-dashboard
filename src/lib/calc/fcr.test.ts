@@ -17,6 +17,10 @@ describe('정밀성장조견표 FCR', () => {
     const all = (tableFeed(tableAge(115)) - tableFeed(t0)) / 85;
     expect(o.exp).toBeCloseTo(all, 2);
     expect(o.exp!).toBeGreaterThan(o.now!);
+    // 사료는 10월까지인데 오늘이 11/22여도 같은 값 (증체를 사료 마지막 날에 맞춤)
+    const o2 = groupFcr({ farm: 'A', group: '26-1', date: '2026-09-01', avgw: 30, stock: n, sold: 0 }, feed, 0, { endKg: 115, today: '2026-11-22', feedAt: '2026-11-03' })!;
+    expect(o2.now).toBeCloseTo(o.now!, 2);
+    expect(o2.exp).toBeCloseTo(all, 2);
   });
 });
 

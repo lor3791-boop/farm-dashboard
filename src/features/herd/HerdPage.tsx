@@ -1,6 +1,8 @@
 // 돈군 — 표(농장 소계 + 그룹) / 주차 히트맵 / 오른쪽 그룹 상세 (목업 v5)
+import { GroupAdd } from './GroupAdd';
+import type { ManualGroup } from '@/lib/calc/herd';
 import { VaxTags } from '@/components/VaxTags';
-import { vaxOf } from '@/lib/vax';
+import { toggleVax, vaxOf } from '@/lib/vax';
 import { SUBS } from '@/app/menu';
 import type { UiState } from '@/lib/ui';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -8,7 +10,7 @@ import { todayKST } from '@/lib/util';
 import { useData } from '@/lib/data';
 import { useSettle } from '@/lib/useSettle';
 import { useCol } from '@/lib/useCol';
-import { mergeFeed, type FeedMid, type FeedUpload } from '@/lib/feedSheet';
+import { feedAtOf, mergeFeed, type FeedMid, type FeedUpload } from '@/lib/feedSheet';
 import { groupFcr } from '@/lib/calc/fcr';
 
 import { useHerd, useUi } from '@/lib/ui';
@@ -73,7 +75,7 @@ function HerdTable() {
 
   const cellOf = (r: Group, k: string): ReactNode => {
     switch (k) {
-      case 'who': return <Lnk v={<>{r.group}<VaxTags v={vaxOf(r, saved.done, TODAY)} /></>} sub={r.farm} />;
+      case 'who': return <Lnk v={<>{r.group}<VaxTags v={vaxOf(r, saved.done, TODAY)} onToggle={(k) => save({ done: toggleVax(r, saved.done, k) })} /></>} sub={r.farm} />;
       case 'dong': return <span className="small">{r.dong === '—' ? '그룹만' : r.dong}</span>;
       case 'date': return md(r.date);
       case 'week': return <Num v={r.week + '주'} />;
@@ -268,7 +270,8 @@ function Heatmap({ farms, rows, mode, setMode, det, onOpen }: { farms: string[];
 
 function Detail({ who, order, onDeath }: { who: string; order: string[]; onDeath: (g: Group) => void }) {
   const { full: all, set, isPlanned, togglePlan, T, saved, save, ships, imports, liveShips } = useHerd();
-  const { data } = useData();
+  const { data, groups: mGroups } = useData();
+  const [gEdit, setGEdit] = useState<(ManualGroup & { id: string }) | null>(null);
   // 다른 화면(홈 등)에서 그룹을 눌러 들어오면 상세가 화면에 보이게
   const box = useRef<HTMLElement>(null);
   useEffect(() => { const el = box.current; if (!el) return; const r = el.getBoundingClientRect(); if (r.top < 0 || r.top > window.innerHeight * 0.6) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, [who]);
@@ -294,12 +297,12 @@ function Detail({ who, order, onDeath }: { who: string; order: string[]; onDeath
   const saveDong = (L: string[]) => { const m = { ...(saved.groupDong ?? {}) }; m[d.who] = L.length ? [...L].sort((a, b) => a.localeCompare(b, 'ko', { numeric: true })).join('·') + '동' : '—'; save({ groupDong: m }); setDongEdit(null); };
   // FCR: 출하 생체 = 출하실적종합(그룹 배정) + 이후 등판서·직접 입력·피그온 출하
   const midKg = mids.filter((m) => m.farm === d.farm && m.group === d.group).reduce((a, m) => a + m.kg, 0);
-  const fc = groupFcr(d, feed, st.shipLiveOf(d), { endKg: T.fcrEndKg, today: TODAY, settled: saved.settled[d.who] ? { ...st.settledShipOf(d), mid: midKg } : undefined });
+  const fc = groupFcr(d, feed, st.shipLiveOf(d), { endKg: T.fcrEndKg, today: TODAY, feedAt: feedAtOf(ups), settled: saved.settled[d.who] ? { ...st.settledShipOf(d), mid: midKg } : undefined });
   const ftone = (v: number | null) => (v === null ? {} : v < 2.4 ? { background: '#E3EFE7', color: '#1F4E3D' } : v < 2.7 ? { background: '#FBEFD5', color: '#7A4F00' } : { background: '#F8E1D8', color: '#9A3216' });
   return (
     <aside ref={box} className="card" style={{ scrollMarginTop: 12, flex: '1 1 340px', maxWidth: 460, minWidth: 0, boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 8 }}>
-        <div><div style={{ fontSize: 20, fontWeight: 700 }}>{d.farm} {d.group}<VaxTags v={vaxOf(d, saved.done, TODAY)} /></div><div className="muted small">{(d.dong === '—' ? '동 없이 관리' : d.dong) + ' · 전입 ' + md(d.date) + ' · ' + d.week + '주차 · ' + d.age + '일령'}</div></div>
+        <div><div style={{ fontSize: 20, fontWeight: 700 }}>{d.farm} {d.group}<VaxTags v={vaxOf(d, saved.done, TODAY)} onToggle={(k) => save({ done: toggleVax(d, saved.done, k) })} /></div><div className="muted small">{(d.dong === '—' ? '동 없이 관리' : d.dong) + ' · 전입 ' + md(d.date) + ' · ' + d.week + '주차 · ' + d.age + '일령'}</div></div>
         <button className="btn sm ghost" onClick={() => set({ det: null })} aria-label="상세 닫기">닫기</button>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 }}>
@@ -364,6 +367,8 @@ function Detail({ who, order, onDeath }: { who: string; order: string[]; onDeath
           </div>
           {fx !== undefined && <div className="muted small" style={{ marginTop: 4 }}>직접 지정 {fx}두 (비우면 자동 계산)</div>}
         </div>); })()}
+      {mGroups.filter((g) => g.farm === d.farm && g.group === d.group).map((g) => <button key={g.id} className="btn sm ghost" style={{ marginTop: 10, marginRight: 6 }} onClick={() => setGEdit(g)}>전입 정보 수정{mGroups.filter((x) => x.farm === d.farm && x.group === d.group).length > 1 ? ' (' + md(g.date) + ')' : ''}</button>)}
+      {gEdit && <GroupAdd edit={gEdit} onClose={() => setGEdit(null)} />}
       <div className="b" style={{ margin: '16px 0 6px' }}>출하 배정</div>
       {(() => { const L = liveShips.filter((x) => x.farm === d.farm && x.group === d.group).sort((a, b) => (a.date < b.date ? -1 : 1)); return (<>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, padding: '5px 0', borderBottom: '1px solid #EFEBE3' }}><span className="muted">피그온 출하 ({md(REF)}까지)</span><b>{fmt(d.sold - d.liveSold)}두</b></div>

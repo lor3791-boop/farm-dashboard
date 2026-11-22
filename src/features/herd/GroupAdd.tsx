@@ -9,7 +9,8 @@ import { REF, type ManualGroup } from '@/lib/calc/herd';
 
 const BASE_SOW = ['익산', '그린피그팜', '장수GGP'];
 
-export function GroupAdd({ onClose }: { onClose: () => void }) {
+// edit: 이미 등록한 그룹을 고칠 때 (같은 문서를 덮어씀)
+export function GroupAdd({ onClose, edit }: { onClose: () => void; edit?: ManualGroup & { id: string } }) {
   const { all, full, farms: gFarms, saved, save: saveUi } = useHerd();
   const { data, groups } = useData();
   // 그룹이 아직 없는 농장(설정에서 새로 넣은 담당농장)도 고를 수 있게 — 후기자돈사 제외
@@ -18,7 +19,9 @@ export function GroupAdd({ onClose }: { onClose: () => void }) {
   const farmOf = (n: string) => data?.farms.find((f) => f.name === n);
   const nextGroup = (n: string) => { const L = all.filter((r) => r.farm === n).map((r) => r.group).filter((g) => /^\d{2}-\d+$/.test(g)); const yy = todayKST().slice(2, 4); const max = Math.max(0, ...L.filter((g) => g.startsWith(yy + '-')).map((g) => Number(g.split('-')[1]))); return `${yy}-${max + 1}`; };
   const first = farms[0] ?? '';
-  const [f, setF] = useState({ farm: first, group: nextGroup(first), dongs: [] as string[], date: todayKST(), inn: '', total: '', claim: '0', age: '', source: '', memo: '' });
+  const [f, setF] = useState(edit
+    ? { farm: edit.farm, group: edit.group, dongs: [...(edit.dongs ?? [])], date: edit.date, inn: String(edit.inn), total: String(edit.totalKg ?? Math.round(edit.inn * edit.avgw)), claim: String(edit.claim ?? 0), age: String(edit.age), source: edit.source ?? '', memo: edit.memo ?? '' }
+    : { farm: first, group: nextGroup(first), dongs: [] as string[], date: todayKST(), inn: '', total: '', claim: '0', age: '', source: '', memo: '' });
   const [newSrc, setNewSrc] = useState<string | null>(null);
   const sources = [...BASE_SOW, ...saved.sowFarms.filter((x) => !BASE_SOW.includes(x))];
   const avgw = Number(f.inn) > 0 && Number(f.total) > 0 ? Math.round((Number(f.total) / Number(f.inn)) * 10) / 10 : null;
@@ -27,7 +30,7 @@ export function GroupAdd({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const fm = farmOf(f.farm);
   // 같은 그룹 다시 등록 = 그 그룹의 전입 차수 추가 (피그온에서 전입을 한 그룹으로 합치는 경우)
-  const same = full.find((r) => r.farm === f.farm && r.group === f.group.trim());
+  const same = edit ? undefined : full.find((r) => r.farm === f.farm && r.group === f.group.trim());
   const snapOld = !!same && !groups.some((g) => g.farm === f.farm && g.group === f.group.trim()) && f.date <= REF;
   const dongOpts = (fm?.dongs ?? []).map((d) => d.replace('동', ''));
   const noDong = !!fm?.noDong || dongOpts.length === 0;
@@ -46,7 +49,8 @@ export function GroupAdd({ onClose }: { onClose: () => void }) {
     setBusy(true);
     try {
       const g: ManualGroup = { farm: f.farm, group: f.group.trim(), dongs: noDong ? [] : [...f.dongs].sort(), date: f.date, inn, claim, avgw, age, totalKg: total, source: f.source, memo: f.memo.trim() };
-      await repo!.add('groups', g as any, email);
+      if (edit) { const { id, ...old } = edit; await repo!.put('groups', id, { ...old, ...g, editedBy: email, editedAt: new Date().toISOString() } as any); }
+      else await repo!.add('groups', g as any, email);
       onClose();
     } catch (e) { setErr('저장하지 못했습니다: ' + String(e)); } finally { setBusy(false); }
   };
@@ -57,7 +61,7 @@ export function GroupAdd({ onClose }: { onClose: () => void }) {
       <button aria-label="닫기" onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(20,30,25,.4)', border: 0 }} />
       <div role="dialog" aria-modal="true" aria-label="그룹 직접 등록" className="card" style={{ position: 'relative', width: '100%', maxWidth: 520, maxHeight: '92vh', overflowY: 'auto', padding: '20px 22px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h2 className="h2" style={{ fontSize: 19 }}>그룹 직접 등록</h2>
+          <h2 className="h2" style={{ fontSize: 19 }}>{edit ? '그룹 정보 수정' : '그룹 직접 등록'}</h2>
           <button className="btn sm ghost" onClick={onClose} aria-label="닫기">✕</button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -80,7 +84,7 @@ export function GroupAdd({ onClose }: { onClose: () => void }) {
         {err && <div style={{ marginTop: 10 }}><span className="chip bad" style={{ whiteSpace: 'normal' }}>{err}</span></div>}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 16 }}>
           <button className="btn ghost" onClick={onClose}>취소</button>
-          <button className="btn pri" disabled={busy} onClick={save}>{busy ? '저장 중…' : '등록'}</button>
+          <button className="btn pri" disabled={busy} onClick={save}>{busy ? '저장 중…' : edit ? '저장' : '등록'}</button>
         </div>
       </div>
     </div>
@@ -92,6 +96,7 @@ export function ManualGroupList() {
   const { groups } = useData();
   const { repo } = useAuth();
   const [del, setDel] = useState<string | null>(null);
+  const [ed, setEd] = useState<(ManualGroup & { id: string }) | null>(null);
   if (!groups.length) return null;
   return (
     <div className="card" style={{ marginTop: 16 }}>
@@ -100,9 +105,10 @@ export function ManualGroupList() {
         <thead><tr><th>농장 · 그룹</th><th>동</th><th>전입일</th><th className="r">최초두수</th><th className="r">크레임</th><th className="r">평체</th><th className="r">일령</th><th>자돈농장</th><th>메모</th><th /></tr></thead>
         <tbody>{[...groups].sort((a, b) => (a.date < b.date ? 1 : -1)).map((g) => (
           <tr key={g.id}><td><b>{g.farm}</b> {g.group}</td><td>{g.dongs.length ? g.dongs.join('·') + '동' : '그룹만'}</td><td>{md(g.date)}</td><td className="r">{fmt(g.inn)}</td><td className="r">{g.claim}</td><td className="r">{g.avgw}kg</td><td className="r">{g.age}</td><td>{g.source ?? ''}</td><td className="small">{g.memo}</td>
-            <td className="r">{del === g.id ? <button className="btn sm" style={{ borderColor: '#9A3216', color: '#9A3216' }} onClick={async () => { await repo!.remove('groups', g.id); setDel(null); }}>정말 삭제</button> : <button className="btn sm ghost" onClick={() => setDel(g.id)}>삭제</button>}</td></tr>
+            <td className="r">{del === g.id ? <button className="btn sm" style={{ borderColor: '#9A3216', color: '#9A3216' }} onClick={async () => { await repo!.remove('groups', g.id); setDel(null); }}>정말 삭제</button> : <><button className="btn sm ghost" onClick={() => setEd(g)}>수정</button> <button className="btn sm ghost" onClick={() => setDel(g.id)}>삭제</button></>}</td></tr>
         ))}</tbody>
       </table></div>
+      {ed && <GroupAdd edit={ed} onClose={() => setEd(null)} />}
     </div>
   );
 }

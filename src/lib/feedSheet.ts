@@ -69,3 +69,6 @@ export function mergeFeed(ups: FeedUpload[]): FeedRow[] {
   });
   return [...m.values()].flat();
 }
+
+// 마지막으로 올린 사료 파일 날짜(한국 날짜) — FCR 계산 기준일
+export const feedAtOf = (ups: FeedUpload[]) => { const a = ups.map((u) => u.at ?? '').filter(Boolean).sort().pop(); return a ? new Date(Date.parse(a) + 9 * 3600e3).toISOString().slice(0, 10) : undefined; };

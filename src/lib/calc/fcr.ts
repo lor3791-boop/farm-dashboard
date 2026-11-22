@@ -46,26 +46,29 @@ export function settledFcr(g: { avgw: number }, rows: FeedRow[], s: SettledShip)
 const monthEnd = (m: string) => { const [y, mo] = m.split('-').map(Number); return new Date(Date.UTC(y, mo, 0)).toISOString().slice(0, 10); };
 const r2 = (x: number) => Math.round(x * 100) / 100;
 
-export function groupFcr(g: { farm: string; group: string; date: string; avgw: number; stock: number; sold: number }, feed: FeedRow[], shipLive: number, opt: { endKg: number; today: string; settled?: SettledShip }): FcrOut | null {
+export function groupFcr(g: { farm: string; group: string; date: string; avgw: number; stock: number; sold: number }, feed: FeedRow[], shipLive: number, opt: { endKg: number; today: string; settled?: SettledShip; feedAt?: string }): FcrOut | null {
   const rows = feed.filter((r) => r[0] === g.farm && r[1] === g.group);
   if (!rows.length) return null;
   const ms = [...new Set(rows.map((r) => r[2]))].sort();
   const t0 = tableAge(g.avgw), tEnd = tableAge(opt.endKg);
+  const lastM = ms[ms.length - 1];
   const wAt = (d: string) => Math.min(opt.endKg, tableW(t0 + Math.max(0, days(g.date, d))));
   const live = shipLive > 0 ? shipLive : g.sold * opt.endKg; // 출하 생체를 모르면 종료체중으로
   const gainAt = (d: string, alive: number, sold: number, sLive: number) => alive * Math.max(0, wAt(d) - g.avgw) + sLive - sold * g.avgw;
   let cum = 0;
   const months = ms.map((m) => {
     cum += rows.filter((r) => r[2] === m).reduce((a, r) => a + r[4], 0);
-    const end = monthEnd(m) < opt.today ? monthEnd(m) : opt.today;
+    const end = [monthEnd(m), opt.today, ...(opt.feedAt ? [opt.feedAt] : [])].sort()[0];
     // 월말 시점: 지난달은 출하 전 두수 전체로, 이번 달은 지금 값으로 근사
-    const past = end < opt.today;
+    const past = m < lastM; // 지난달은 출하 전 두수 전체, 마지막 달은 지금 값
     const gain = days(g.date, end) > 14 ? gainAt(end, g.stock + (past ? g.sold : 0), past ? 0 : g.sold, past ? 0 : live) : 0;
     return { m, fcr: gain > 0 ? r2(cum / gain) : null };
   });
-  const dNow = Math.max(0, days(g.date, opt.today));
-  const wNow = wAt(opt.today);
-  const gainNow = gainAt(opt.today, g.stock, g.sold, live);
+  // 사료는 올린 파일의 마지막 날까지만 있다 → 증체·추세도 그 날 기준으로 맞춘다 (오늘 기준으로 하면 증체만 늘어 FCR이 낮게 나옴)
+  const feedEnd = [opt.today, monthEnd(lastM), ...(opt.feedAt ? [opt.feedAt] : [])].sort()[0];
+  const dNow = Math.max(0, days(g.date, feedEnd));
+  const wNow = wAt(feedEnd);
+  const gainNow = gainAt(feedEnd, g.stock, g.sold, live);
   const now = gainNow > 0 ? r2(cum / gainNow) : null;
   // 추세 계수: 같은 두수가 조견표대로 먹었을 사료 대비 실제 사료
   const tNow = Math.min(t0 + dNow, tEnd);
@@ -76,7 +79,7 @@ export function groupFcr(g: { farm: string; group: string; date: string; avgw: n
   const restFeed = g.stock * Math.max(0, tableFeed(tEnd) - tableFeed(tNow)) * k;
   const exp = gainNow + restGain > 0 ? r2((cum + restFeed) / (gainNow + restGain)) : null;
   const n = g.stock + g.sold;
-  const dLast = Math.max(1, days(g.date, monthEnd(ms[ms.length - 1]) < opt.today ? monthEnd(ms[ms.length - 1]) : opt.today));
+  const dLast = Math.max(1, dNow);
   const out: FcrOut = { feed: cum, now, exp, months, wNow: Math.round(wNow * 10) / 10, k: r2(k), perHead: n ? cum / n : 0, daily: n ? cum / n / dLast : 0 };
   if (opt.settled) {
     const s = settledFcr(g, rows, opt.settled);

@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useHerd } from '@/lib/ui';
 import { useCol } from '@/lib/useCol';
 import { useSettle } from '@/lib/useSettle';
-import { mergeFeed, type FeedMid, type FeedUpload } from '@/lib/feedSheet';
+import { feedAtOf, mergeFeed, type FeedMid, type FeedUpload } from '@/lib/feedSheet';
 import { groupFcr } from '@/lib/calc/fcr';
 import { TODAY } from '@/lib/calc/herd';
 import { fmt, md, r1 } from '@/lib/calc/dates';
@@ -25,7 +25,7 @@ export function FcrTab({ onOpen }: { onOpen: (who: string) => void }) {
   const F = farm || withFeed[0] || '';
   if (!T) return null;
   const endKg = T.fcrEndKg;
-  const G = all.filter((g) => g.farm === F).map((g) => ({ g, fc: groupFcr(g, feed, st.shipLiveOf(g), { endKg, today: TODAY, settled: saved.settled[g.who] ? { ...st.settledShipOf(g), mid: midOf(g) } : undefined }) })).filter((x) => x.fc && x.fc.feed > 0) as { g: (typeof all)[number]; fc: NonNullable<ReturnType<typeof groupFcr>> }[];
+  const G = all.filter((g) => g.farm === F).map((g) => ({ g, fc: groupFcr(g, feed, st.shipLiveOf(g), { endKg, today: TODAY, feedAt: feedAtOf(ups), settled: saved.settled[g.who] ? { ...st.settledShipOf(g), mid: midOf(g) } : undefined }) })).filter((x) => x.fc && x.fc.feed > 0) as { g: (typeof all)[number]; fc: NonNullable<ReturnType<typeof groupFcr>> }[];
   const months = [...new Set(G.flatMap((x) => x.fc.months.map((b) => b.m)))].sort();
   const grid = 'minmax(90px,1fr) 64px 92px 84px 84px 66px 70px ' + months.map(() => '58px').join(' ');
   const mC = 8; // 월 열 시작
