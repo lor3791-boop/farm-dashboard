@@ -31,6 +31,16 @@ async function post(body: Record<string, unknown>) {
   return j;
 }
 
+// 시트가 '3-1' 같은 동 번호를 날짜(3월 1일)로 바꿔 저장한 경우 되돌린다 — 서버가 'Sun Mar 01 2026 …' 또는 ISO 날짜로 내려줌
+export function fixDong(v: unknown): string {
+  const s = String(v ?? '').trim();
+  if (!s || /^[\d\s·,~-]+동?$/.test(s) || !/(GMT|\d{4}-\d{2}-\d{2}T)/.test(s)) return s;
+  const t = Date.parse(s.replace(/\s*\(.*\)$/, ''));
+  if (isNaN(t)) return s;
+  const k = new Date(t + 9 * 3600e3); // 한국시간 기준 월·일
+  return `${k.getUTCMonth() + 1}-${k.getUTCDate()}`;
+}
+
 export interface SheetRow { row: number; date: string; farm: string; dong: string; count: number; group: string; done: boolean; heat: boolean; photos: number; photoUrls?: string[] }
 export async function loadSheet(days: number, farms: string[]): Promise<DeathRow[]> {
   if (!KEY) return [];
@@ -38,7 +48,7 @@ export async function loadSheet(days: number, farms: string[]): Promise<DeathRow
   const j = await get({ action: 'list', days: String(days) });
   return (j.rows as SheetRow[]).map((r) => ({
     id: 'sheet:' + r.row, path: 'sheet:' + r.row, sheetRow: r.row, sheetFarm: r.farm,
-    date: r.date, farm: toDash(r.farm, farms), dong: r.dong, group: r.group, count: r.count,
+    date: r.date, farm: toDash(r.farm, farms), dong: fixDong(r.dong), group: r.group, count: r.count,
     src: 'app' as const, checked: r.done, key: '', at: r.date + 'T' + String(r.row).padStart(6, '0'), heat: r.heat, photoUrls: r.photoUrls ?? []
   }));
 }

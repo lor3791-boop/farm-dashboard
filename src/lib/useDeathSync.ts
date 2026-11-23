@@ -12,7 +12,8 @@ import type { DeathRow } from './repo';
 
 const FROM = '2026-10-01'; // 이보다 오래된 미등록은 건드리지 않음
 // 11/21 처음 돌렸을 때 크레임으로 체크한 줄 (기록 장치가 생기기 전) — 날짜|농장|그룹|두수
-const SEED: Record<string, string> = Object.fromEntries(['2026-11-19|민서|26-10|4', '2026-11-19|민서|26-9|1', '2026-11-21|민서|26-11|1', '2026-11-17|아멘|26-9|1', '2026-11-16|재성|26-9|2', '2026-11-19|재성|26-9|2', '2026-11-15|정축산|26-4|1'].map((k) => [k, '2026-11-21']));
+// (정축산 26-4 11/15는 크레임 잔여 0 지정으로 이미 체크를 풀었고 피그온에 등록됨 → 뺌)
+const SEED: Record<string, string> = Object.fromEntries(['2026-11-19|민서|26-10|4', '2026-11-19|민서|26-9|1', '2026-11-21|민서|26-11|1', '2026-11-17|아멘|26-9|1', '2026-11-16|재성|26-9|2', '2026-11-19|재성|26-9|2'].map((k) => [k, '2026-11-21']));
 export function useDeathSync() {
   const { deaths, loading } = useData();
   const { split, saved, save } = useHerd();
@@ -51,7 +52,8 @@ export function useDeathSync() {
         } else if (un) {
           tried.current.add('u' + un.id);
           await markSheet([Number(un.sheetRow)], false);
-          const o = { ...MK }; delete o[ck(un)]; save({ claimMarked: o });
+          // 키를 지우지 않고 빈 값으로 남김 — 지우면 SEED가 다시 살아나 사용자가 [등록]을 눌러도 계속 풀림
+          save({ claimMarked: { ...MK, [ck(un)]: '' } });
         }
       } catch (e) { console.warn('[폐사정리]', e); }
       finally { busy.current = false; }
