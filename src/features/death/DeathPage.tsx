@@ -13,7 +13,7 @@ import { survOf } from '@/share/applyDeaths';
 import { DeathRecords } from './Deaths';
 import { DeathDaily } from './DeathDaily';
 import { useRef } from 'react';
-import { shrinkImage } from '@/lib/image';
+import { shrinkImage, fitPhotos } from '@/lib/image';
 import { pyesaOn, saveToSheet } from '@/lib/pyesa';
 import { takeInbox } from '@/lib/inbox';
 import { Stepper } from '@/components/Sheet';
@@ -45,8 +45,8 @@ function DeathEntry() {
   const [queue, setQueue] = useState<{ dong: string; group: string; count: number }[]>([]);
   const pref = useRef<HTMLInputElement>(null);
   const addPhotos = async (L: FileList) => {
-    const room = 3 - photos.length; const out: string[] = [];
-    try { for (const f of [...L].slice(0, room)) out.push(await shrinkImage(f, pyesaOn() ? 1500 * 1024 : 220 * 1024, pyesaOn() ? [[1600, 0.85], [1280, 0.75]] : [[1280, 0.7], [1024, 0.6], [800, 0.55]])); setSaved(L.length > room ? '사진은 한 건에 3장까지 붙습니다' : ''); setSavedOk(true); }
+    const out: string[] = [];
+    try { for (const f of [...L]) out.push(await shrinkImage(f, pyesaOn() ? 1500 * 1024 : 220 * 1024, pyesaOn() ? [[1600, 0.85], [1280, 0.75]] : [[1280, 0.7], [1024, 0.6], [800, 0.55]])); setSaved(''); setSavedOk(true); }
     catch (e) { setSavedOk(false); setSaved((e as Error).message); }
     setPhotos([...photos, ...out]);
   };
@@ -79,7 +79,7 @@ function DeathEntry() {
         const rec = { date, farm: s.dFarm, dong: L.dong, group: L.group, count: L.count, ...(i === 0 && photos.length ? { photos } : {}) };
         // 폐사입력 서버 연결 시: 구글시트 기록 + 드라이브 사진 + 카톡 알림. 중복이면 30초 안에 한 번 더 누르면 저장
         if (pyesaOn()) { const j = await saveToSheet(rec, Date.now() < forceUntil); spike = spike || j.spike; }
-        else await repo!.addDeath(rec, email, ui.shareLinks[s.dFarm] ?? '');
+        else await repo!.addDeath(rec.photos ? { ...rec, photos: await fitPhotos(rec.photos) } : rec, email, ui.shareLinks[s.dFarm] ?? '');
         done.push(`${L.dong ? L.dong + '동 ' : ''}${L.group} ${L.count}두`);
         if (i === 0) setPhotos([]);
       }
@@ -101,10 +101,10 @@ function DeathEntry() {
     <DropCard style={{ maxWidth: 560 }} accept="image/*" onFiles={(F) => { const dt = new DataTransfer(); F.forEach((f) => dt.items.add(f)); addPhotos(dt.files); }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
         <h2 className="h2">폐사 입력</h2>
-        <span><input ref={pref} type="file" accept="image/*,.heic,.heif" multiple hidden onChange={(e) => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = ''; }} /><button className="btn" disabled={photos.length >= 3} onClick={() => pref.current?.click()}>사진 등록{photos.length ? ` (${photos.length}/3)` : ''}</button></span>
+        <span><input ref={pref} type="file" accept="image/*,.heic,.heif" multiple hidden onChange={(e) => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = ''; }} /><button className="btn" onClick={() => pref.current?.click()}>사진 등록{photos.length ? ` (${photos.length})` : ''}</button></span>
       </div>
       {photos.length > 0 && (
-        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
           {photos.map((p, i) => <div key={i} style={{ position: 'relative' }}><img src={p} alt={'폐사 사진 ' + (i + 1)} style={{ width: 84, height: 84, objectFit: 'cover', borderRadius: 8 }} /><button aria-label="사진 빼기" onClick={() => setPhotos(photos.filter((_, j) => j !== i))} style={{ position: 'absolute', top: 2, right: 2, width: 26, height: 26, borderRadius: 13, background: 'rgba(0,0,0,.55)', color: '#fff' }}>✕</button></div>)}
         </div>
       )}

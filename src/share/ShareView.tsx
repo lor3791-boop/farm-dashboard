@@ -1,7 +1,7 @@
 // 농장 공유 화면 본체 — 사장님·직원이 함께 보는 한 농장 화면. 한국어/네팔어.
 // 대시보드 미리보기와 공유 사이트가 같은 화면을 쓴다. (이 파일은 대시보드 코드를 가져오지 않는다)
 import { useRef, useState } from 'react';
-import { shrinkImage } from '@/lib/image';
+import { shrinkImage, fitPhotos } from '@/lib/image';
 import type { SharePayload, ShareGroup } from './payload';
 import { applyDeaths, survOf } from './applyDeaths';
 import { byDong } from '@/lib/dongSort';
@@ -41,14 +41,14 @@ export function ShareView({ p, deaths = [], onSaveDeath, onEditDeath }: { p: Sha
   const [cnt, setCnt] = useState(1);
   const [saved, setSaved] = useState<{ ok: boolean; t: string } | null>(null);
   const [busy, setBusy] = useState(false);
-  // 폐사 사진 — 줄여서(장당 200KB 이하) 폐사 기록에 같이 저장, 3장까지
+  // 폐사 사진 — 줄여서(장당 200KB 이하) 폐사 기록에 같이 저장, 장수 제한 없음(저장할 때 합계 900KB 안으로 맞춤)
   const [photos, setPhotos] = useState<string[]>([]);
   const pref = useRef<HTMLInputElement>(null);
   const addPhotos = async (L: FileList) => {
     const out: string[] = [];
-    try { for (const f of [...L].slice(0, 3 - photos.length)) out.push(await shrinkImage(f, 200 * 1024, [[1280, 0.7], [1024, 0.6], [800, 0.55], [640, 0.5]])); }
+    try { for (const f of [...L]) out.push(await shrinkImage(f, 200 * 1024, [[1280, 0.7], [1024, 0.6], [800, 0.55], [640, 0.5]])); }
     catch (e) { setSaved({ ok: false, t: (e as Error).message }); }
-    setPhotos((x) => [...x, ...out].slice(0, 3));
+    setPhotos((x) => [...x, ...out]);
   };
   const [recent, setRecent] = useState<{ date: string; dong: string; group: string; n: number }[]>([]);
   const [day, setDay] = useState(p.today);
@@ -100,7 +100,7 @@ export function ShareView({ p, deaths = [], onSaveDeath, onEditDeath }: { p: Sha
     if (!chosen || busy) return;
     setBusy(true);
     try {
-      await onSaveDeath({ date: day, dong: dong ?? '', group: chosen, count: cnt, ...(photos.length ? { photos } : {}) });
+      await onSaveDeath({ date: day, dong: dong ?? '', group: chosen, count: cnt, ...(photos.length ? { photos: await fitPhotos(photos) } : {}) });
       setPhotos([]);
       setSaved({ ok: true, t: t.saved + ' · ' + (dong ? dong + '동 ' : '') + '(' + chosen + ') · ' + cnt + ' ' + t.unit });
       setRecent([{ date: md(day), dong: dong ? dong + '동' : '—', group: chosen, n: cnt }, ...recent].slice(0, 5)); setCnt(1);
@@ -240,10 +240,10 @@ export function ShareView({ p, deaths = [], onSaveDeath, onEditDeath }: { p: Sha
           {dTab === 'in' && (
           <div className="card" style={{ marginTop: 12 }}>
             <div style={{ fontWeight: 700 }}>{t.photo}</div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
               <input ref={pref} type="file" accept="image/*,.heic,.heif" multiple hidden onChange={(e) => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = ''; }} />
               {photos.map((s, i) => <div key={i} style={{ position: 'relative' }}><img src={s} alt={t.photo + ' ' + (i + 1)} style={{ width: 84, height: 84, objectFit: 'cover', borderRadius: 10, display: 'block' }} /><button aria-label="✕" onClick={() => setPhotos(photos.filter((_, j) => j !== i))} style={{ position: 'absolute', top: 2, right: 2, width: 28, height: 28, borderRadius: 14, border: 0, background: 'rgba(0,0,0,.55)', color: '#fff', cursor: 'pointer' }}>✕</button></div>)}
-              {photos.length < 3 && <button onClick={() => pref.current?.click()} style={{ font: 'inherit', width: 84, height: 84, borderRadius: 10, border: '2px dashed #B9B3A6', background: '#fff', color: '#3E4B45', cursor: 'pointer', fontSize: 13 }}>+ {t.addPhoto}</button>}
+              <button onClick={() => pref.current?.click()} style={{ font: 'inherit', width: 84, height: 84, borderRadius: 10, border: '2px dashed #B9B3A6', background: '#fff', color: '#3E4B45', cursor: 'pointer', fontSize: 13 }}>+ {t.addPhoto}</button>
             </div>
             {!noDong && (
               <>

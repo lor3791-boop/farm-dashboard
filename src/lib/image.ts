@@ -23,3 +23,15 @@ export async function shrinkImage(f: File, maxBytes = 700 * 1024, steps: [number
   }
   throw new Error('사진이 너무 큽니다');
 }
+
+// 사진 여러 장을 한 기록(Firestore 문서 1MB)에 담을 때 — 합계가 넘으면 장수만큼 나눠 다시 줄인다 (장수 제한 없음)
+const sizeOf = (u: string) => Math.round((u.length - u.indexOf(',') - 1) * 0.75);
+export async function fitPhotos(urls: string[], total = 900 * 1024): Promise<string[]> {
+  if (urls.reduce((a, u) => a + sizeOf(u), 0) <= total) return urls;
+  const per = Math.floor(total / urls.length);
+  return Promise.all(urls.map(async (u) => {
+    if (sizeOf(u) <= per) return u;
+    const b = await (await fetch(u)).blob();
+    return shrinkImage(new File([b], 'p.jpg', { type: 'image/jpeg' }), per, [[1280, 0.7], [1024, 0.6], [800, 0.55], [640, 0.5], [480, 0.45], [360, 0.4]]);
+  }));
+}
