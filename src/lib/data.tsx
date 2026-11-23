@@ -16,7 +16,7 @@ export interface MonthlyDoc { file: string; at: string; rows: string; bins: stri
 export interface Uploaded { total: { doc: TotalDoc | null; rows: TotRow[] }; loans: { doc: LoanDoc | null; rows: Loan[] }; monthly: { doc: MonthlyDoc | null; rows: Monthly[]; bins: FeedBin[] }; fcBase: { doc: FcBaseDoc | null; months: FcBaseMonths } }
 const parseJ = <T,>(s: string | undefined, d: T): T => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
 import { useMemo } from 'react';
-import { setPyesaKey, onPyesaChange, loadSheet } from './pyesa';
+import { setPyesaKey, onPyesaChange, loadSheet, pendingRows, dropSentBefore, onPendChange } from './pyesa';
 import { REF } from './calc/herd';
 import { todayKST } from './util';
 import { useAuth } from './auth';
@@ -30,6 +30,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [st, set] = useState<{ data: AppData | null; error: string }>({ data: null, error: '' });
   const [fsDeaths, setDeaths] = useState<DeathRow[]>([]);
   const [sheet, setSheet] = useState<DeathRow[]>([]);
+  // 저장을 눌렀지만 시트에 아직 안 들어온 줄 (바로 화면에 반영)
+  const [pend, setPend] = useState<DeathRow[]>([]);
+  useEffect(() => onPendChange(() => setPend([...pendingRows()])), []);
   const [sheetErr, setSheetErr] = useState('');
   const [sheetReady, setSheetReady] = useState(false);
   const loadRef = useRef<() => Promise<void>>(async () => {});
@@ -64,7 +67,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     let alive = true;
     // 폐사입력 앱 기록은 120일치를 읽는다 (폐사현황·목록용. 재고 차감은 기준일 이후 + 미등록 전부)
     const days = Math.max(120, Math.round((Date.parse(todayKST()) - Date.parse(REF)) / 864e5) + 1);
-    const load = () => { return loadSheet(days, farmNames).then((r) => { if (alive) { setSheet(r); setSheetErr(''); } }).catch((e) => { if (alive) setSheetErr(String(e.message || e)); }).finally(() => alive && setSheetReady(true)); };
+    // 읽는 중에 또 불리면 겹쳐 읽지 않고, 끝난 뒤 한 번만 더 읽는다
+    let running: Promise<void> | null = null, again = false;
+    const once = (): Promise<void> => { const t0 = Date.now(); return loadSheet(days, farmNames).then((r) => { if (alive) { setSheet(r); setSheetErr(''); dropSentBefore(t0); } }).catch((e) => { if (alive) setSheetErr(String(e.message || e)); }).finally(() => alive && setSheetReady(true)); };
+    const load = (): Promise<void> => {
+      if (running) { again = true; return running; }
+      running = once().finally(() => { running = null; if (again && alive) { again = false; load(); } });
+      return running;
+    };
     loadRef.current = load;
     load();
     const t = setInterval(load, 60000);
@@ -77,8 +87,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const pool = new Map<string, DeathRow[]>(); sheet.forEach((r) => { const k = ck(r); pool.set(k, [...(pool.get(k) ?? []), r]); });
     const take = new Map<string, string>(); // 시트 줄 id → 공유 화면 열쇠
     const fs = fsDeaths.filter((d) => { if (!(d as any).sheetAt) return true; const m = (pool.get(ck(d)) ?? []).filter((r) => !take.has(r.id)).sort((a, b) => Number(String(b.dong).replace(/\D/g, '') === String(d.dong).replace(/\D/g, '')) - Number(String(a.dong).replace(/\D/g, '') === String(d.dong).replace(/\D/g, '')) || Number(b.sheetRow) - Number(a.sheetRow))[0]; if (!m) return true; take.set(m.id, d.key); return false; });
-    return fs.concat(sheet.map((r) => (take.has(r.id) ? { ...r, key: take.get(r.id)! } : r)));
-  }, [fsDeaths, sheet]);
+    return fs.concat(sheet.map((r) => (take.has(r.id) ? { ...r, key: take.get(r.id)! } : r)), pend);
+  }, [fsDeaths, sheet, pend]);
   const loading = !st.data || (!!key && !sheetReady);
   const refresh = useCallback(() => loadRef.current(), []);
   return <Ctx.Provider value={{ ...st, deaths, ships, groups, uploads, imports, sheetErr, loading, refresh, up }}>{children}</Ctx.Provider>;

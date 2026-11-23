@@ -7,6 +7,7 @@ import { dongsOf } from '@/lib/calc/herd';
 import { fmt, md } from '@/lib/calc/dates';
 import { todayKST } from '@/lib/util';
 import type { DeathRow } from '@/lib/repo';
+import { isPending } from '@/lib/pyesa';
 import { Sheet, Stepper, toast } from '@/components/Sheet';
 import { thisMonth } from '@/lib/useIsPhone';
 
@@ -85,14 +86,15 @@ function Item({ r, open, onOpen, onCheck }: { r: DeathRow; open: boolean; onOpen
   return (
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid #EFEBE3', background: open ? '#EEF3EF' : undefined }}>
-        <button onClick={onOpen} aria-expanded={open} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', font: 'inherit', background: 'transparent', border: 0, padding: '10px 4px 10px 8px', cursor: 'pointer', minHeight: 52, color: 'inherit' }}>
+        <button onClick={isPending(r) ? undefined : onOpen} aria-expanded={open} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', font: 'inherit', background: 'transparent', border: 0, padding: '10px 4px 10px 8px', cursor: 'pointer', minHeight: 52, color: 'inherit' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><b>{r.farm}</b> <span>{dgLabel(r)}</span></div>
             {extra && <div className="muted" style={{ fontSize: 12 }}>{extra}</div>}
           </div>
           <b style={{ fontSize: 17, fontVariantNumeric: 'tabular-nums' }}>{r.count}<span style={{ fontSize: 13, fontWeight: 400 }}>두</span></b>
         </button>
-        {!r.checked && x && x.death === 0 && x.claim > 0 ? <span className="chip" style={{ fontSize: 12, marginRight: 6 }} title="크레임 폐사 — 피그온에 등록하지 않음">크레임</span> :
+        {isPending(r) ? <span className="chip" style={{ fontSize: 12, marginRight: 6 }}>저장 중…</span> :
+        !r.checked && x && x.death === 0 && x.claim > 0 ? <span className="chip" style={{ fontSize: 12, marginRight: 6 }} title="크레임 폐사 — 피그온에 등록하지 않음">크레임</span> :
         <button onClick={onCheck} aria-pressed={r.checked} aria-label={r.checked ? '등록완료 풀기' : '피그온 등록완료'}
           style={{ minWidth: 64, minHeight: 40, borderRadius: 20, font: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer', marginRight: 4,
             ...(r.checked ? { background: '#E6EFE9', color: '#1F4E3D', border: '1px solid #E6EFE9' } : { background: '#fff', color: '#1F4E3D', border: '1px solid #1F4E3D' }) }}>
@@ -151,7 +153,7 @@ export function DeathRecords({ popup = false }: { popup?: boolean }) {
         <span className="muted small">{rows.length}건 · {fmt(total)}두</span>
         <div style={{ flex: 1 }} />
         {st === 'no' && rows.length > 1 && (allOk
-          ? <><button className="btn sm ghost" onClick={() => setAllOk(false)}>취소</button><button className="btn sm pri" onClick={async () => { setAllOk(false); for (const r of rows) await repo!.updateDeath(r, { checked: true }, email); }}>{rows.length}건 모두 완료</button></>
+          ? <><button className="btn sm ghost" onClick={() => setAllOk(false)}>취소</button><button className="btn sm pri" onClick={async () => { setAllOk(false); for (const r of rows.filter((x) => !isPending(x))) await repo!.updateDeath(r, { checked: true }, email); }}>{rows.length}건 모두 완료</button></>
           : <button className="btn sm ghost" onClick={() => setAllOk(true)}>모두 등록완료</button>)}
       </div>
       {rows.length === 0 && <div className="muted" style={{ padding: '16px 4px' }}>{st === 'no' ? '미등록 폐사가 없습니다' : '해당하는 폐사 기록이 없습니다'}</div>}

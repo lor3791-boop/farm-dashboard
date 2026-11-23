@@ -65,6 +65,36 @@ export async function saveToSheet(d: DeathRec & { heat?: boolean }, force = fals
   return j as { total: number; photos: number; spike: boolean };
 }
 
+// 저장을 누르면 시트 답을 기다리지 않고 화면(목록·재고)에 바로 보이게 하는 '보내는 중' 줄.
+// 서버 저장이 끝난 뒤 시트를 다시 읽어 온 결과에 들어오면 지운다. 실패하면 바로 지운다.
+type Pend = DeathRow & { sentAt?: number };
+let pend: Pend[] = [];
+const pendSubs = new Set<() => void>();
+export const onPendChange = (f: () => void) => { pendSubs.add(f); return () => { pendSubs.delete(f); }; };
+const pendChanged = () => pendSubs.forEach((f) => f());
+export const pendingRows = (): DeathRow[] => pend;
+export const isPending = (r: DeathRow) => r.path.startsWith('pend:');
+export function dropSentBefore(t: number) { const n = pend.length; pend = pend.filter((r) => !r.sentAt || r.sentAt > t); if (pend.length !== n) pendChanged(); }
+
+// 한 번 저장(같은 날·농장, 여러 동 줄)을 요청 한 번으로 보낸다 — 사진은 묶음으로 첫 줄에 붙음
+export async function saveRowsToSheet(recs: DeathRec[], force = false) {
+  const head = recs[0];
+  const photos = (recs.find((r) => r.photos?.length)?.photos ?? []).map(toPayload).filter(Boolean) as { mime: string; data: string }[];
+  const now = Date.now(), id = Math.random().toString(36).slice(2, 8);
+  const mine: Pend[] = recs.map((r, i) => ({ ...r, photos: undefined, id: `pend:${id}:${i}`, path: `pend:${id}:${i}`, src: 'app', checked: false, key: '', at: new Date(now).toISOString(), photoUrls: i === 0 ? (r.photos ?? []) : [] }));
+  pend = [...pend, ...mine]; pendChanged();
+  try {
+    const ph = await Promise.all(photos.map((p) => hash(p.data)));
+    const j = await post({ farm: toSheet(head.farm), date: head.date, rows: recs.map((r) => ({ dong: r.dong, group: r.group, count: r.count, heat: false })), photos, ph, ...(force ? { force: true } : {}) });
+    const t = Date.now(); pend = pend.map((r) => (mine.includes(r) ? { ...r, sentAt: t } : r));
+    changed();
+    return j as { total: number; photos: number; spike: boolean };
+  } catch (e) {
+    pend = pend.filter((r) => !mine.includes(r)); pendChanged();
+    throw e;
+  }
+}
+
 const isSheet = (r: DeathRow) => r.path.startsWith('sheet:');
 // 대시보드 저장소에 시트 연동을 얹는다: 시트 행은 시트로, 나머지는 원래대로
 export function withPyesa(repo: Repo): Repo {

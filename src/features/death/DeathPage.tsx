@@ -14,7 +14,7 @@ import { DeathRecords } from './Deaths';
 import { DeathDaily } from './DeathDaily';
 import { useRef } from 'react';
 import { shrinkImage, fitPhotos } from '@/lib/image';
-import { pyesaOn, saveToSheet } from '@/lib/pyesa';
+import { pyesaOn, saveRowsToSheet as saveToSheet } from '@/lib/pyesa';
 import { takeInbox } from '@/lib/inbox';
 import { Stepper } from '@/components/Sheet';
 import { useEffect } from 'react';
@@ -39,14 +39,15 @@ function DeathEntry() {
   const [saved, setSaved] = useState('');
   const [savedOk, setSavedOk] = useState(true);
   const [photos, setPhotos] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
   const [forceUntil, setForceUntil] = useState(0);
   // '+ 동 추가'로 담아 둔 줄 — 저장 한 번에 지금 고른 것과 함께 모두 저장 (사진은 첫 줄에만 붙음)
   const [queue, setQueue] = useState<{ dong: string; group: string; count: number }[]>([]);
   const pref = useRef<HTMLInputElement>(null);
   const addPhotos = async (L: FileList) => {
     const out: string[] = [];
-    try { for (const f of [...L]) out.push(await shrinkImage(f, pyesaOn() ? 1500 * 1024 : 220 * 1024, pyesaOn() ? [[1600, 0.85], [1280, 0.75]] : [[1280, 0.7], [1024, 0.6], [800, 0.55]])); setSaved(''); setSavedOk(true); }
+    try { for (const f of [...L]) out.push(await shrinkImage(f, pyesaOn() ? 500 * 1024 : 220 * 1024, pyesaOn() ? [[1600, 0.8], [1600, 0.7], [1280, 0.7], [1024, 0.65]] : [[1280, 0.7], [1024, 0.6], [800, 0.55]])); setSaved(''); setSavedOk(true); }
     catch (e) { setSavedOk(false); setSaved((e as Error).message); }
     setPhotos([...photos, ...out]);
   };
@@ -68,32 +69,28 @@ function DeathEntry() {
     setQueue([...queue, { dong: s.dDong ?? '', group: chosen, count: cnt }]);
     set({ dDong: null, dGroup: null }); setCnt(1); setSavedOk(true); setSaved('');
   };
+  // 저장: 화면(목록·재고)에는 바로 반영하고 입력칸도 바로 비운다. 서버 저장은 뒤에서 — 실패하면 줄·사진을 되돌리고 알린다.
+  // 시트 연결 시 여러 동 줄을 요청 한 번으로 보낸다.
   const save = async () => {
     const lines = [...queue, ...(chosen ? [{ dong: s.dDong ?? '', group: chosen, count: cnt }] : [])];
     if (!lines.length) { setSavedOk(false); setSaved('그룹을 먼저 골라야 저장됩니다'); return; }
-    setBusy(true);
-    const done: string[] = []; let spike = false;
+    const farm = s.dFarm, ph = photos, force = Date.now() < forceUntil;
+    const recs = lines.map((L, i) => ({ date, farm, dong: L.dong, group: L.group, count: L.count, ...(i === 0 && ph.length ? { photos: ph } : {}) }));
+    const label = lines.map((L) => `${L.dong ? L.dong + '동 ' : ''}${L.group} ${L.count}두`).join(', ');
+    setQueue([]); setPhotos([]); setCnt(1); setForceUntil(0);
+    setSavedOk(true); setSaved(`저장 중: ${farm} ${label} · ${md(date)}`);
+    const say = (ok: boolean, t: string) => { if (alive.current) { setSavedOk(ok); setSaved(t); } else if (!ok) alert(t); };
     try {
-      for (let i = 0; i < lines.length; i++) {
-        const L = lines[i];
-        const rec = { date, farm: s.dFarm, dong: L.dong, group: L.group, count: L.count, ...(i === 0 && photos.length ? { photos } : {}) };
-        // 폐사입력 서버 연결 시: 구글시트 기록 + 드라이브 사진 + 카톡 알림. 중복이면 30초 안에 한 번 더 누르면 저장
-        if (pyesaOn()) { const j = await saveToSheet(rec, Date.now() < forceUntil); spike = spike || j.spike; }
-        else await repo!.addDeath(rec.photos ? { ...rec, photos: await fitPhotos(rec.photos) } : rec, email, ui.shareLinks[s.dFarm] ?? '');
-        done.push(`${L.dong ? L.dong + '동 ' : ''}${L.group} ${L.count}두`);
-        if (i === 0) setPhotos([]);
-      }
-      setForceUntil(0); setQueue([]);
-      setSavedOk(true); setSaved(`저장됨: ${s.dFarm} ${done.join(', ')} · ${md(date)}` + (photos.length ? ` · 사진 ${photos.length}장 드라이브 저장` : '') + (spike ? ' · 폐사 급증 카톡 알림 보냄' : ''));
-      setCnt(1);
+      let spike = false;
+      if (pyesaOn()) spike = (await saveToSheet(recs, force)).spike;
+      else for (const r of recs) await repo!.addDeath(r.photos ? { ...r, photos: await fitPhotos(r.photos) } : r, email, ui.shareLinks[farm] ?? '');
+      say(true, `저장됨: ${farm} ${label} · ${md(date)}` + (ph.length ? ` · 사진 ${ph.length}장 드라이브 저장` : '') + (spike ? ' · 폐사 급증 카톡 알림 보냄' : ''));
     } catch (e) {
       const m = (e as Error).message;
-      setQueue(lines.slice(done.length));
-      if (done.length) set({ dDong: null, dGroup: null });
-      const pre = done.length ? `저장됨: ${done.join(', ')} / 남은 줄 ` : '';
-      if (/이미 저장/.test(m)) { setForceUntil(Date.now() + 30000); setSavedOk(false); setSaved(pre + m + ' — 그래도 저장하려면 30초 안에 저장을 한 번 더 누르세요'); }
-      else { setSavedOk(false); setSaved(pre + '저장하지 못했습니다: ' + m); }
-    } finally { setBusy(false); }
+      if (alive.current) { setQueue(lines); setPhotos(ph); set({ dFarm: farm, dDong: null, dGroup: null }); }
+      if (/이미 저장/.test(m)) { setForceUntil(Date.now() + 30000); say(false, `${farm} ${label}: ${m} — 그래도 저장하려면 30초 안에 저장을 한 번 더 누르세요`); }
+      else say(false, `${farm} ${label} 저장하지 못했습니다: ${m}`);
+    }
   };
   const cur = chosen ? dRows.find((r) => r.group === chosen) ?? null : null;
   const after = cur ? (() => { const c = Math.min(cnt, cur.claimLeft); const d = cur.death + cnt - c; return { c, d, stock: cur.stock - cnt, surv: survOf(cur.net, d) }; })() : null;
@@ -144,7 +141,7 @@ function DeathEntry() {
         </div>
       )}
       <div style={{ marginTop: 18, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button className="btn pri" disabled={busy} onClick={save} style={{ minHeight: 48, minWidth: 120, fontSize: 16 }}>{busy ? '저장 중…' : queue.length ? `저장 (${queue.length + (chosen ? 1 : 0)}줄)` : '저장'}</button>
+        <button className="btn pri" onClick={save} style={{ minHeight: 48, minWidth: 120, fontSize: 16 }}>{queue.length ? `저장 (${queue.length + (chosen ? 1 : 0)}줄)` : '저장'}</button>
         <button className="btn" disabled={!chosen} onClick={addLine}>+ 동 추가</button>
       </div>
       {saved && <div style={{ marginTop: 12 }}><span className={savedOk ? 'chip ok' : 'chip bad'} style={{ whiteSpace: 'normal' }}>{saved}</span></div>}
