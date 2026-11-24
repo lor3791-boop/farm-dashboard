@@ -23,8 +23,13 @@ import { useAuth } from './auth';
 
 // removing: 농장 공유 화면에서 지운 폐사(removedAt) — 시트로 보낸 줄(rows)까지 대시보드가 지운다
 export interface Removing { doc: DeathRow; rows: DeathRow[] }
-interface DataState { data: AppData | null; error: string; deaths: DeathRow[]; removing: Removing[]; ships: (ManualShip & { id: string })[]; groups: (ManualGroup & { id: string })[]; uploads: (ShipImport & { id: string })[]; imports: ImpRow[]; sheetErr: string; loading: boolean; refresh: () => Promise<void>; up: Uploaded }
-const Ctx = createContext<DataState>({ data: null, error: '', deaths: [], removing: [], ships: [], groups: [], uploads: [], imports: [], sheetErr: '', loading: true, refresh: async () => {}, up: { total: { doc: null, rows: [] }, loans: { doc: null, rows: [] }, monthly: { doc: null, rows: [], bins: [] }, fcBase: { doc: null, months: {} } } });
+// resync: 시트로 보낸 뒤 농장이 고친 폐사 → 시트 줄도 같은 값으로 고친다
+export interface Resync { doc: DeathRow; row: DeathRow }
+// 농장이 공유 화면에서 고친·지운 '다른 곳 입력' 폐사 (share/{열쇠}/fixes) — target 못 찾으면 undefined
+export interface FarmFix { id: string; _path: string; farm: string; ref: string; was: { date: string; dong: string; group: string; count: number }; date: string; dong: string; group: string; count: number; remove?: boolean; at: string }
+export interface Fixing { fix: FarmFix; target?: DeathRow }
+interface DataState { data: AppData | null; error: string; deaths: DeathRow[]; removing: Removing[]; resync: Resync[]; fixing: Fixing[]; ships: (ManualShip & { id: string })[]; groups: (ManualGroup & { id: string })[]; uploads: (ShipImport & { id: string })[]; imports: ImpRow[]; sheetErr: string; loading: boolean; refresh: () => Promise<void>; up: Uploaded }
+const Ctx = createContext<DataState>({ data: null, error: '', deaths: [], removing: [], resync: [], fixing: [], ships: [], groups: [], uploads: [], imports: [], sheetErr: '', loading: true, refresh: async () => {}, up: { total: { doc: null, rows: [] }, loans: { doc: null, rows: [] }, monthly: { doc: null, rows: [], bins: [] }, fcBase: { doc: null, months: {} } } });
 export const useData = () => useContext(Ctx);
 
 export function DataProvider({ children }: { children: ReactNode }) {
@@ -34,6 +39,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [sheet, setSheet] = useState<DeathRow[]>([]);
   // 저장을 눌렀지만 시트에 아직 안 들어온 줄 (바로 화면에 반영)
   const [pend, setPend] = useState<DeathRow[]>([]);
+  const [fixes, setFixes] = useState<FarmFix[]>([]);
   useEffect(() => onPendChange(() => setPend([...pendingRows()])), []);
   const [sheetErr, setSheetErr] = useState('');
   const [sheetReady, setSheetReady] = useState(false);
@@ -57,8 +63,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const u3 = repo.watch<ManualShip>('shipments', setShips);
     const u4 = repo.watch<ManualGroup>('groups', setGroups);
     const u5 = repo.watch<ShipImport>('shipImport', setUploads);
+    const u7 = repo.watch<FarmFix>('**/fixes', (L) => setFixes(L as FarmFix[]), () => {});
     const u6 = repo.watch<any>('config', (L) => { const o: Record<string, any> = {}; L.forEach((d) => { if (['shipTotal', 'bondLoan', 'bondMonthly', 'fcBase'].includes(d.id)) o[d.id] = d; }); setCfg(o); });
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); };
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); };
   }, [repo]);
   // 폐사입력 앱(구글시트) 기록: 기준일 이후를 1분마다, 저장·수정 직후에 다시 읽는다
   const key = (st.data?.ui as any)?.pyesaKey ?? '';
@@ -84,27 +91,41 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return () => { alive = false; clearInterval(t); off(); };
   }, [key, farmNames]);
   // 공유 화면 폐사를 시트로 보낸 것(sheetAt)은 원본을 빼고 시트 줄 하나로 본다 (열쇠는 이어받아 공유 화면 계산이 겹치지 않게)
-  const { deaths, removing } = useMemo(() => {
+  const { deaths, removing, resync, fixing } = useMemo(() => {
     const ck = (d: DeathRow) => [d.date, d.farm, d.group, d.count].join('|'); // 동은 표기가 달 수 있어 비교에서 뺌
+    // 시트로 보낼 때의 값(sheetWas)으로 짝을 찾는다 — 그 뒤 농장이 고쳐도 같은 시트 줄을 가리키게
+    const was = (d: DeathRow) => ((d as any).sheetWas ?? d) as { date: string; dong: string; group: string; count: number };
+    const ckD = (d: DeathRow) => { const w = was(d); return [w.date, d.farm, w.group, w.count].join('|'); };
+    const edited = (d: DeathRow) => !!(d as any).editedAt && (d as any).editedAt > (d as any).sheetAt;
     const pool = new Map<string, DeathRow[]>(); sheet.forEach((r) => { const k = ck(r); pool.set(k, [...(pool.get(k) ?? []), r]); });
     const take = new Map<string, DeathRow>(); // 시트 줄 id → 공유 화면 원본
     const gone = (d: DeathRow) => !!(d as any).removedAt;
     // 지운 것도 먼저 짝을 찾아 둬야 그 시트 줄을 알 수 있다 → 지운 것부터
     const fsAll = [...fsDeaths].sort((a, b) => Number(gone(b)) - Number(gone(a)));
-    const fs = fsAll.filter((d) => { if (!(d as any).sheetAt) return !gone(d); const m = (pool.get(ck(d)) ?? []).filter((r) => !take.has(r.id)).sort((a, b) => Number(String(b.dong).replace(/\D/g, '') === String(d.dong).replace(/\D/g, '')) - Number(String(a.dong).replace(/\D/g, '') === String(d.dong).replace(/\D/g, '')) || Number(b.sheetRow) - Number(a.sheetRow))[0]; if (!m) return !gone(d); take.set(m.id, d); return false; })
+    const fs = fsAll.filter((d) => { if (!(d as any).sheetAt) return !gone(d); const wd = String(was(d).dong).replace(/\D/g, ''); const m = (pool.get(ckD(d)) ?? []).filter((r) => !take.has(r.id)).sort((a, b) => Number(String(b.dong).replace(/\D/g, '') === wd) - Number(String(a.dong).replace(/\D/g, '') === wd) || Number(b.sheetRow) - Number(a.sheetRow))[0]; if (!m) return !gone(d); take.set(m.id, d); return false; })
       .map((d) => (d.src === 'share' ? { ...d, byFarm: true } : d));
     const rm = new Map<string, Removing>(); fsDeaths.filter(gone).forEach((d) => rm.set(d.id, { doc: d, rows: [] }));
-    const rows: DeathRow[] = [];
+    const rows: DeathRow[] = [], rs: Resync[] = [];
     sheet.forEach((r) => {
       const o = take.get(r.id);
       if (!o) { rows.push(r); return; }
+      // 농장이 고친 값을 바로 보여 주고(공유 화면과 같게), 시트 줄은 대시보드가 뒤에서 고친다
+      if (!gone(o) && edited(o)) { rs.push({ doc: o, row: r }); rows.push({ ...r, date: o.date, dong: o.dong, group: o.group, count: o.count, key: o.key, byFarm: true }); return; }
       // 피그온에 이미 등록한 줄은 자동으로 안 지우고 '농장 삭제 요청'으로 남김 (피그온도 고쳐야 하므로)
       if (gone(o)) { if (r.checked) rows.push({ ...r, key: o.key, byFarm: true, delReq: true }); else rm.get(o.id)!.rows.push(r); return; }
       rows.push({ ...r, key: o.key, byFarm: true });
     });
-    return { deaths: fs.concat(rows, pend), removing: [...rm.values()] };
-  }, [fsDeaths, sheet, pend]);
+    // 농장이 고친·지운 '다른 곳 입력' 폐사를 바로 반영 (피그온 등록된 줄을 지우라는 건 남기고 '삭제 요청' 표시)
+    let list = fs.concat(rows);
+    const fx: Fixing[] = fixes.map((f) => {
+      const same = (d: DeathRow) => d.farm === f.farm && d.date === f.was.date && d.group === f.was.group && d.count === f.was.count && !d.byFarm;
+      const t = list.find((d) => d.path === f.ref && same(d)) ?? list.find((d) => same(d) && String(d.dong ?? '') === String(f.was.dong ?? ''));
+      if (t) list = f.remove ? (t.checked ? list.map((d) => (d === t ? { ...d, delReq: true } : d)) : list.filter((d) => d !== t)) : list.map((d) => (d === t ? { ...d, date: f.date, dong: f.dong, group: f.group, count: f.count } : d));
+      return { fix: f, target: t };
+    });
+    return { deaths: list.concat(pend), removing: [...rm.values()], resync: rs, fixing: fx };
+  }, [fsDeaths, sheet, pend, fixes]);
   const loading = !st.data || (!!key && !sheetReady);
   const refresh = useCallback(() => loadRef.current(), []);
-  return <Ctx.Provider value={{ ...st, deaths, removing, ships, groups, uploads, imports, sheetErr, loading, refresh, up }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ ...st, deaths, removing, resync, fixing, ships, groups, uploads, imports, sheetErr, loading, refresh, up }}>{children}</Ctx.Provider>;
 }

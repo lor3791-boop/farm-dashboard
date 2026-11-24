@@ -3,15 +3,18 @@
 import { useEffect, useRef } from 'react';
 import { useHerd } from '@/lib/ui';
 import { useAuth } from '@/lib/auth';
+import { useData } from '@/lib/data';
 import { buildGroups, buildTasks, REF, TODAY } from '@/lib/calc/herd';
 import { buildSharePayload } from './payload';
 
 export function useSharePublisher() {
   const { all, saved, deaths, ships, shipRows, liveShips, groups, T } = useHerd();
   const { repo } = useAuth();
+  const { loading, sheetErr } = useData();
   const last = useRef<Record<string, string>>({});
   useEffect(() => {
-    if (!repo || !all.length || !T) return;
+    // 폐사 시트를 다 읽기 전·못 읽었을 때 올리면 폐사가 빠진 값이 농장 화면에 나간다 → 다 읽은 뒤에만
+    if (!repo || !all.length || !T || loading || sheetErr) return;
     const tasks = buildTasks(all), rows = shipRows;
         Object.entries(saved.shareLinks).forEach(([farm, key]) => {
       if (!key) return;
@@ -20,11 +23,11 @@ export function useSharePublisher() {
       // 농장 앱이 다시 더하는 건 기준일 이후·미확인 폐사뿐 → 그 이전 확인분은 여기서 그대로 반영(빠지면 크레임·재고가 틀어짐)
       const later = (d: (typeof deaths)[number]) => own(d) && (d.date > REF || d.checked === false);
       const g = buildGroups(T, saved.firstShipByFarm, { deaths: deaths.filter((d) => !later(d)), ships: liveShips, groups, dongs: saved.groupDong, claimFix: saved.claimFix }).filter((r) => !saved.settled[r.who]);
-      const p = buildSharePayload(farm, g, tasks, rows, REF, TODAY, T.problemSurvivalPct, undefined, deaths.filter((d) => d.farm === farm && !own(d) && d.count > 0), saved.done);
+      const p = buildSharePayload(farm, g, tasks, rows, REF, TODAY, T.problemSurvivalPct, undefined, deaths.filter((d) => d.farm === farm && !own(d) && d.count > 0).map((d) => ({ ...d, ref: d.path })), saved.done);
       const j = JSON.stringify(p);
       if (last.current[key] === j) return;
       last.current[key] = j;
       repo.put('share', key, { ...p, updatedAt: new Date().toISOString() }).catch(() => { delete last.current[key]; });
     });
-  }, [repo, all, saved.shareLinks, saved.firstShipByFarm, saved.groupDong, saved.claimFix, saved.settled, saved.done, deaths, shipRows, liveShips, groups, T]);
+  }, [repo, all, loading, sheetErr, saved.shareLinks, saved.firstShipByFarm, saved.groupDong, saved.claimFix, saved.settled, saved.done, deaths, shipRows, liveShips, groups, T]);
 }

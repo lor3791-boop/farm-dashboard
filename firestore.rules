@@ -43,7 +43,21 @@ service cloud.firestore {
           && request.resource.data.checked == false && okDeath(request.resource.data));
         allow delete: if isAdmin();
       }
+      // 농장이 '다른 곳 입력' 폐사를 고치거나 지워 달라는 요청 — 대시보드(관리자)가 반영하고 지운다
+      match /fixes/{id} {
+        allow read: if isAdmin() || exists(/databases/$(database)/documents/share/$(key));
+        allow create: if exists(/databases/$(database)/documents/share/$(key))
+          && request.resource.data.keys().hasOnly(['farm', 'ref', 'was', 'date', 'dong', 'group', 'count', 'remove', 'at'])
+          && request.resource.data.farm == get(/databases/$(database)/documents/share/$(key)).data.farm
+          && request.resource.data.ref is string && request.resource.data.was is map
+          && request.resource.data.count is int && request.resource.data.count >= 1 && request.resource.data.count <= 300
+          && request.resource.data.date is string && request.resource.data.date.matches('^20[0-9]{2}-[0-9]{2}-[0-9]{2}$')
+          && request.resource.data.dong is string && request.resource.data.group is string && request.resource.data.group.size() <= 20;
+        allow delete: if isAdmin();
+      }
     }
+    // 대시보드가 농장 고침 요청을 한 번에 읽는다
+    match /{path=**}/fixes/{id} { allow read: if isAdmin(); }
     // 대시보드가 모든 폐사(deaths + share/{열쇠}/deaths)를 한 번에 읽는다
     match /{path=**}/deaths/{id} { allow read: if isAdmin(); }
     // 공유 화면 폐사 등록: 올바른 열쇠 + 그 농장 이름 + 정해진 칸만 + 두수 1~300

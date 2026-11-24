@@ -25,6 +25,8 @@ export interface Repo {
   add(col: string, data: Record<string, unknown>, by: string): Promise<void>;
   put(col: string, id: string, data: Record<string, unknown>): Promise<void>;
   remove(col: string, id: string): Promise<void>;
+  // col이 '**/이름'이면 그 이름의 모든 하위 컬렉션(컬렉션 그룹)을 본다 — 각 줄에 _path(문서 경로)
+  removePath(path: string): Promise<void>;
 }
 
 export interface DeathRec { date: string; farm: string; dong: string; group: string; count: number; photos?: string[] }
@@ -87,7 +89,8 @@ function localCols() {
     watch: (c: string, cb: (r: any[]) => void) => { (subs[c] ||= []).push(cb); setTimeout(() => cb(read(c)), 0); return () => { subs[c] = subs[c].filter((f) => f !== cb); }; },
     add: async (c: string, d: Record<string, unknown>, by: string) => { write(c, [...read(c), { ...d, id: Math.random().toString(36).slice(2, 12), by, at: nowIso() }]); },
     put: async (c: string, id: string, d: Record<string, unknown>) => { write(c, [...read(c).filter((x) => x.id !== id), { ...d, id }]); },
-    remove: async (c: string, id: string) => { write(c, read(c).filter((x) => x.id !== id)); }
+    remove: async (c: string, id: string) => { write(c, read(c).filter((x) => x.id !== id)); },
+    removePath: async () => { /* 미리보기: 하위 컬렉션 없음 */ }
   };
 }
 
@@ -209,9 +212,10 @@ export async function cloudRepo(config: Record<string, string>): Promise<Repo> {
     addDeath: async (r, by, key) => { await addDoc(key ? collection(db, 'share', key, 'deaths') : collection(db, 'deaths'), { ...r, src: 'dash', by, at: nowIso(), checked: false }); },
     updateDeath: async (row, p, by) => { await updateDoc(doc(db, row.path), { ...p, ...(editResetsCheck(p) ? { checked: false, editedAt: nowIso(), by } : {}) }); },
     removeDeath: async (row) => { await deleteDoc(doc(db, row.path)); },
-    watch: (c, cb, onError) => onSnapshot(collection(db, c), (s) => cb(s.docs.map((d) => ({ ...(d.data() as any), id: d.id }))), (e) => onError?.(e)),
+    watch: (c, cb, onError) => onSnapshot(c.startsWith('**/') ? collectionGroup(db, c.slice(3)) : collection(db, c), (s) => cb(s.docs.map((d) => ({ ...(d.data() as any), id: d.id, _path: d.ref.path }))), (e) => onError?.(e)),
     add: async (c, d, by) => { await addDoc(collection(db, c), { ...d, by, at: nowIso() }); },
     put: async (c, id, d) => { await setDoc(doc(db, c, id), d); },
-    remove: async (c, id) => { await deleteDoc(doc(db, c, id)); }
+    remove: async (c, id) => { await deleteDoc(doc(db, c, id)); },
+    removePath: async (path) => { await deleteDoc(doc(db, path)); }
   };
 }
