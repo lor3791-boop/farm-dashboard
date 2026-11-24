@@ -21,8 +21,10 @@ import { REF } from './calc/herd';
 import { todayKST } from './util';
 import { useAuth } from './auth';
 
-interface DataState { data: AppData | null; error: string; deaths: DeathRow[]; ships: (ManualShip & { id: string })[]; groups: (ManualGroup & { id: string })[]; uploads: (ShipImport & { id: string })[]; imports: ImpRow[]; sheetErr: string; loading: boolean; refresh: () => Promise<void>; up: Uploaded }
-const Ctx = createContext<DataState>({ data: null, error: '', deaths: [], ships: [], groups: [], uploads: [], imports: [], sheetErr: '', loading: true, refresh: async () => {}, up: { total: { doc: null, rows: [] }, loans: { doc: null, rows: [] }, monthly: { doc: null, rows: [], bins: [] }, fcBase: { doc: null, months: {} } } });
+// removing: 농장 공유 화면에서 지운 폐사(removedAt) — 시트로 보낸 줄(rows)까지 대시보드가 지운다
+export interface Removing { doc: DeathRow; rows: DeathRow[] }
+interface DataState { data: AppData | null; error: string; deaths: DeathRow[]; removing: Removing[]; ships: (ManualShip & { id: string })[]; groups: (ManualGroup & { id: string })[]; uploads: (ShipImport & { id: string })[]; imports: ImpRow[]; sheetErr: string; loading: boolean; refresh: () => Promise<void>; up: Uploaded }
+const Ctx = createContext<DataState>({ data: null, error: '', deaths: [], removing: [], ships: [], groups: [], uploads: [], imports: [], sheetErr: '', loading: true, refresh: async () => {}, up: { total: { doc: null, rows: [] }, loans: { doc: null, rows: [] }, monthly: { doc: null, rows: [], bins: [] }, fcBase: { doc: null, months: {} } } });
 export const useData = () => useContext(Ctx);
 
 export function DataProvider({ children }: { children: ReactNode }) {
@@ -82,14 +84,27 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return () => { alive = false; clearInterval(t); off(); };
   }, [key, farmNames]);
   // 공유 화면 폐사를 시트로 보낸 것(sheetAt)은 원본을 빼고 시트 줄 하나로 본다 (열쇠는 이어받아 공유 화면 계산이 겹치지 않게)
-  const deaths = useMemo(() => {
+  const { deaths, removing } = useMemo(() => {
     const ck = (d: DeathRow) => [d.date, d.farm, d.group, d.count].join('|'); // 동은 표기가 달 수 있어 비교에서 뺌
     const pool = new Map<string, DeathRow[]>(); sheet.forEach((r) => { const k = ck(r); pool.set(k, [...(pool.get(k) ?? []), r]); });
-    const take = new Map<string, string>(); // 시트 줄 id → 공유 화면 열쇠
-    const fs = fsDeaths.filter((d) => { if (!(d as any).sheetAt) return true; const m = (pool.get(ck(d)) ?? []).filter((r) => !take.has(r.id)).sort((a, b) => Number(String(b.dong).replace(/\D/g, '') === String(d.dong).replace(/\D/g, '')) - Number(String(a.dong).replace(/\D/g, '') === String(d.dong).replace(/\D/g, '')) || Number(b.sheetRow) - Number(a.sheetRow))[0]; if (!m) return true; take.set(m.id, d.key); return false; });
-    return fs.concat(sheet.map((r) => (take.has(r.id) ? { ...r, key: take.get(r.id)! } : r)), pend);
+    const take = new Map<string, DeathRow>(); // 시트 줄 id → 공유 화면 원본
+    const gone = (d: DeathRow) => !!(d as any).removedAt;
+    // 지운 것도 먼저 짝을 찾아 둬야 그 시트 줄을 알 수 있다 → 지운 것부터
+    const fsAll = [...fsDeaths].sort((a, b) => Number(gone(b)) - Number(gone(a)));
+    const fs = fsAll.filter((d) => { if (!(d as any).sheetAt) return !gone(d); const m = (pool.get(ck(d)) ?? []).filter((r) => !take.has(r.id)).sort((a, b) => Number(String(b.dong).replace(/\D/g, '') === String(d.dong).replace(/\D/g, '')) - Number(String(a.dong).replace(/\D/g, '') === String(d.dong).replace(/\D/g, '')) || Number(b.sheetRow) - Number(a.sheetRow))[0]; if (!m) return !gone(d); take.set(m.id, d); return false; })
+      .map((d) => (d.src === 'share' ? { ...d, byFarm: true } : d));
+    const rm = new Map<string, Removing>(); fsDeaths.filter(gone).forEach((d) => rm.set(d.id, { doc: d, rows: [] }));
+    const rows: DeathRow[] = [];
+    sheet.forEach((r) => {
+      const o = take.get(r.id);
+      if (!o) { rows.push(r); return; }
+      // 피그온에 이미 등록한 줄은 자동으로 안 지우고 '농장 삭제 요청'으로 남김 (피그온도 고쳐야 하므로)
+      if (gone(o)) { if (r.checked) rows.push({ ...r, key: o.key, byFarm: true, delReq: true }); else rm.get(o.id)!.rows.push(r); return; }
+      rows.push({ ...r, key: o.key, byFarm: true });
+    });
+    return { deaths: fs.concat(rows, pend), removing: [...rm.values()] };
   }, [fsDeaths, sheet, pend]);
   const loading = !st.data || (!!key && !sheetReady);
   const refresh = useCallback(() => loadRef.current(), []);
-  return <Ctx.Provider value={{ ...st, deaths, ships, groups, uploads, imports, sheetErr, loading, refresh, up }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ ...st, deaths, removing, ships, groups, uploads, imports, sheetErr, loading, refresh, up }}>{children}</Ctx.Provider>;
 }

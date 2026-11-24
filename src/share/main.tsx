@@ -10,7 +10,14 @@ import type { SharePayload } from './payload';
 import '@/styles/index.css';
 
 const db = getFirestore(initializeApp(firebaseConfig!));
-const key = location.hash.replace(/^#\/?/, '').trim();
+// 폰에 앱으로 설치하면 주소 끝(#열쇠) 없이 열리므로, 링크로 처음 열 때 열쇠를 기억해 둔다
+const hashKey = location.hash.replace(/^#\/?/, '').trim();
+const okKey = (k: string) => /^[A-Za-z0-9]{12,40}$/.test(k);
+const stored = (() => { try { return localStorage.getItem('farmKey') ?? ''; } catch { return ''; } })();
+const key = okKey(hashKey) ? hashKey : stored;
+if (okKey(hashKey)) { try { localStorage.setItem('farmKey', hashKey); } catch { /* 저장 안 되는 브라우저 */ } }
+else if (okKey(stored)) history.replaceState(null, '', '#' + stored);
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./farm-sw.js').catch(() => {});
 const now = () => new Date().toISOString();
 
 function App() {
@@ -21,7 +28,8 @@ function App() {
     if (!/^[A-Za-z0-9]{12,40}$/.test(key)) { setState('none'); return; }
     // today는 올린 날이 아니라 지금 날짜(한국) — 대시보드를 며칠 안 열어도 날짜·일령이 맞게
     const u1 = onSnapshot(doc(db, 'share', key), (s) => { if (s.exists()) { setP({ ...(s.data() as SharePayload), today: new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10) }); setState('ok'); } else setState('none'); }, () => setState('none'));
-    const u2 = onSnapshot(collection(db, 'share', key, 'deaths'), (s) => setDeaths(s.docs.map((d) => ({ ...(d.data() as any), id: d.id }))), () => {});
+    // 지운 것(removedAt)은 빼고 — 대시보드가 시트 줄까지 정리한 뒤 원본을 지운다
+    const u2 = onSnapshot(collection(db, 'share', key, 'deaths'), (s) => setDeaths(s.docs.map((d) => ({ ...(d.data() as any), id: d.id })).filter((d) => !d.removedAt)), () => {});
     return () => { u1(); u2(); };
   }, []);
   if (state === 'loading') return <div className="v5 share" style={{ padding: 40, textAlign: 'center' }}>…</div>;
@@ -29,7 +37,8 @@ function App() {
   return (
     <ShareView p={p} deaths={deaths}
       onSaveDeath={async (d) => { await addDoc(collection(db, 'share', key, 'deaths'), { farm: p.farm, date: d.date, dong: d.dong, group: d.group, count: d.count, ...(d.photos?.length ? { photos: d.photos } : {}), src: 'share', checked: false, at: now() }); }}
-      onEditDeath={async (id, d) => { await updateDoc(doc(db, 'share', key, 'deaths', id), { date: d.date, dong: d.dong, group: d.group, count: d.count, checked: false, editedAt: now() }); }} />
+      onEditDeath={async (id, d) => { await updateDoc(doc(db, 'share', key, 'deaths', id), { date: d.date, dong: d.dong, group: d.group, count: d.count, checked: false, editedAt: now() }); }}
+      onDeleteDeath={async (id) => { await updateDoc(doc(db, 'share', key, 'deaths', id), { removedAt: now() }); }} />
   );
 }
 createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>);

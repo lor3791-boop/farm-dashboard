@@ -20,13 +20,17 @@ import { Stepper } from '@/components/Sheet';
 import { useEffect } from 'react';
 
 export function DeathPage() {
-  const { s, set } = useHerd();
+  const { s, set, deaths, split } = useHerd();
+  // 농장입력 탭에 농장 공유 화면에서 들어온 미등록 건수 표시
+  const nFarm = deaths.filter((r) => r.byFarm && !r.checked && !(split[r.id] && split[r.id].death === 0 && split[r.id].claim > 0)).length;
+  const opts = (SUBS.death as [UiState['deathTab'], string][]).map(([k, l]) => [k, k === 'farm' && nFarm ? `${l} ${nFarm}` : l] as [UiState['deathTab'], string]);
   return (
     <>
-      <Tabs opts={SUBS.death as [UiState['deathTab'], string][]} value={s.deathTab} onPick={(k) => set({ deathTab: k })} />
+      <Tabs opts={opts} value={s.deathTab} onPick={(k) => set({ deathTab: k })} />
       {s.deathTab === 'status' && <DeathDaily />}
       {s.deathTab === 'input' && <DeathEntry />}
       {s.deathTab === 'list' && <DeathRecords />}
+      {s.deathTab === 'farm' && <DeathRecords farm="farm" />}
     </>
   );
 }
@@ -98,7 +102,7 @@ function DeathEntry() {
     <DropCard style={{ maxWidth: 560 }} accept="image/*" onFiles={(F) => { const dt = new DataTransfer(); F.forEach((f) => dt.items.add(f)); addPhotos(dt.files); }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
         <h2 className="h2">폐사 입력</h2>
-        <span><input ref={pref} type="file" accept="image/*,.heic,.heif" multiple hidden onChange={(e) => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = ''; }} /><button className="btn" onClick={() => pref.current?.click()}>사진 등록{photos.length ? ` (${photos.length})` : ''}</button></span>
+        <span><input ref={pref} type="file" accept="image/*" multiple hidden onChange={(e) => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = ''; }} /><button className="btn" onClick={() => pref.current?.click()}>사진 등록{photos.length ? ` (${photos.length})` : ''}</button></span>
       </div>
       {photos.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>

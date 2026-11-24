@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useHerd } from '@/lib/ui';
 import { useAuth } from '@/lib/auth';
+import { useData } from '@/lib/data';
 import { dongsOf } from '@/lib/calc/herd';
 import { fmt, md } from '@/lib/calc/dates';
 import { todayKST } from '@/lib/util';
@@ -82,7 +83,7 @@ function EditPanel({ r, onDone }: { r: DeathRow; onDone: () => void }) {
 function Item({ r, open, onOpen, onCheck }: { r: DeathRow; open: boolean; onOpen: () => void; onCheck: () => void }) {
   const { split } = useHerd();
   const x = split[r.id];
-  const extra = [nPhotos(r) ? '사진 ' + nPhotos(r) : '', r.heat ? '폭염' : '', x?.claim ? (x.death ? `크레임 ${x.claim} · 피그온 등록 ${x.death}두` : `크레임 ${x.claim} (피그온 등록 안 함)`) : ''].filter(Boolean).join(' · ');
+  const extra = [r.delReq ? '⚠ 농장에서 삭제 요청 — 피그온에서 지운 뒤 여기서 삭제' : '', nPhotos(r) ? '사진 ' + nPhotos(r) : '', r.heat ? '폭염' : '', x?.claim ? (x.death ? `크레임 ${x.claim} · 피그온 등록 ${x.death}두` : `크레임 ${x.claim} (피그온 등록 안 함)`) : ''].filter(Boolean).join(' · ');
   return (
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid #EFEBE3', background: open ? '#EEF3EF' : undefined }}>
@@ -112,8 +113,10 @@ export const openUnregWindow = () => {
 };
 
 type St = 'no' | 'ok' | 'all';
-export function DeathRecords({ popup = false }: { popup?: boolean }) {
+// farm: 'mine' = 대시보드·폐사입력 앱 입력만(폐사입력현황), 'farm' = 농장 공유 화면 입력만(농장입력), 'all' = 전부(새 창)
+export function DeathRecords({ popup = false, farm: who = popup ? 'all' : 'mine' }: { popup?: boolean; farm?: 'all' | 'mine' | 'farm' }) {
   const { deaths, passFarm, split } = useHerd();
+  const { removing } = useData();
   const { repo, email } = useAuth();
   // 크레임으로만 처리되는 폐사(피그온에 안 올림)는 미등록이 아님 → '등록완료' 쪽에 둔다
   const claimOnly = (r: DeathRow) => !r.checked && !!split[r.id] && split[r.id].death === 0 && split[r.id].claim > 0;
@@ -124,7 +127,8 @@ export function DeathRecords({ popup = false }: { popup?: boolean }) {
   const [open, setOpen] = useState<string | null>(null);
   const [allOk, setAllOk] = useState(false);
   const [more, setMore] = useState(false);
-  const base = deaths.filter((r) => popup || passFarm(r.farm));
+  const base = deaths.filter((r) => (popup || passFarm(r.farm)) && (who === 'all' || (who === 'farm') === !!r.byFarm));
+  const stuck = who === 'farm' ? removing.filter((x) => (x.doc as any).sheetAt && !x.rows.length) : [];
   const unregN = base.filter((r) => !done(r)).length;
   const inSt = base.filter((r) => st === 'all' || (st === 'ok') === done(r));
   const months = useMemo(() => [...new Set([thisMonth(), ...base.map((r) => r.date.slice(0, 7))])].sort().reverse(), [base]);
@@ -156,6 +160,7 @@ export function DeathRecords({ popup = false }: { popup?: boolean }) {
           ? <><button className="btn sm ghost" onClick={() => setAllOk(false)}>취소</button><button className="btn sm pri" onClick={async () => { setAllOk(false); for (const r of rows.filter((x) => !isPending(x))) await repo!.updateDeath(r, { checked: true }, email); }}>{rows.length}건 모두 완료</button></>
           : <button className="btn sm ghost" onClick={() => setAllOk(true)}>모두 등록완료</button>)}
       </div>
+      {stuck.map((x) => <div key={x.doc.id} className="chip" style={{ display: 'block', margin: '6px 0', background: '#FBEDE7', color: '#9A3216' }}>농장에서 지움 · {md(x.doc.date)} {x.doc.farm} {dgLabel(x.doc)} {x.doc.count}두 — 시트 줄을 찾지 못했습니다. 폐사입력현황에서 직접 지워 주세요.</div>)}
       {rows.length === 0 && <div className="muted" style={{ padding: '16px 4px' }}>{st === 'no' ? '미등록 폐사가 없습니다' : '해당하는 폐사 기록이 없습니다'}</div>}
       {days.map(([d, L]) => (
         <div key={d}>

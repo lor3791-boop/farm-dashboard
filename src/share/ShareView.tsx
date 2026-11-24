@@ -9,8 +9,8 @@ import { useSwipeFx } from '@/lib/swipeFx';
 import { ToTop } from '@/components/ToTop';
 import { VaxTags } from '@/components/VaxTags';
 
-const KO = { fmd: '구제역', dew: '구충', first: '최초두수', claim: '크레임', claimLeft: '크레임 잔여', tabHome: '홈', tabStatus: '돈군', tabDeath: '폐사 등록', tabShip: '출하', tabTask: '작업', stock: '현재 두수', groups: '돈군', deathAll: '누적 폐사', matrix: '돈군별 주차 폐사', month: '개월차', wk: '주', issue: '이번 주 확인할 것', inn: '전입', death: '폐사', sold: '출하', surv: '육성률', photo: '폐사 사진', addPhoto: '사진', dong: '어느 동인가요?', group: '어느 그룹인가요?', auto: '자동 연결', count: '몇 두인가요?', unit: '두', save: '등록', saved: '등록했습니다', recent: '최근 등록', heads: '두수', avgw: '평균체중', out: '등외', avgTitle: '평균 출하 성적', aN: '출하두수', aW: '평균체중', aYield: '지육율', aGrade: '등급율 (1+·1)', g1p: '1+ 등급', aOut: '등외', times: '회', recentShip: '최근 출하', date: '날짜', yield: '지육율', jobDew: '구충제 · 사료 2호 변경', jobFmd: '구제역 백신', farmSfx: ' 농장', asOf: (d: string) => d + ' 기준', noIssue: '특별히 확인할 것이 없습니다', iDeath: (g: string, d: string, w: number, n: number) => `${g} (${d}): ${w}주차에 ${n}두 폐사 → 원인 확인`, iJob: (g: string, d: string, dt: string, j: string) => `${g} (${d}): ${dt} ${j}`, meta: (d: string, a: number, w: number) => `${d} 전입 · ${a}일령 · ${w}주차`, shipTotal: (g: string, s: number, k: number) => `${g}: 지금까지 ${s}두 출하 · ${k}두 남음`, avgSub: (f: string, t: string, n: number) => `${f}~${t} · ${n}회 출하`, noShip: '아직 출하가 없습니다', noTask: '예정된 작업이 없습니다', fail: '등록하지 못했습니다. 인터넷 연결을 확인하세요', list: '등록한 폐사', edit: '수정', cancel: '취소', keep: '저장', del: '삭제', dongGroup: '동 (그룹)', when: '날짜', more: '더 보기', none: '등록한 폐사가 없습니다', edited: '수정했습니다', done: '확인 완료', dIn: '폐사입력', dSt: '폐사현황', after: '등록하면', recentDays: '최근 7일 등록', dayTot: (n: number) => `합계 ${n}두`, days: (n: number) => `${n}일`, periodTot: (n: number, d: number) => `${d}일 동안 ${n}두` };
-const NE: typeof KO = { fmd: 'खोरेत', dew: 'जुका', first: 'सुरुमा ल्याएको', claim: 'क्लेम', claimLeft: 'बाँकी क्लेम', tabHome: 'होम', tabStatus: 'बंगुर समूह', tabDeath: 'मरेको दर्ता', tabShip: 'बिक्री', tabTask: 'काम', stock: 'अहिले भएका बंगुर', groups: 'समूह', deathAll: 'जम्मा मरेका', matrix: 'हप्ता अनुसार मरेका बंगुर', month: 'महिना', wk: 'हप्ता', issue: 'यो हप्ता हेर्नुपर्ने कुरा', inn: 'ल्याएको', death: 'मरेको', sold: 'बिक्री', surv: 'बाँचेको', photo: 'मरेको बंगुरको फोटो', addPhoto: 'फोटो', dong: 'कुन खोर (동)?', group: 'कुन समूह?', auto: 'समूह आफैं मिल्यो', count: 'कति वटा?', unit: 'वटा', save: 'दर्ता गर्नुहोस्', saved: 'दर्ता भयो', recent: 'भर्खरको दर्ता', heads: 'संख्या', avgw: 'औसत तौल', out: 'ग्रेड बाहिर', avgTitle: 'बिक्रीको औसत नतिजा', aN: 'बिक्री संख्या', aW: 'औसत तौल', aYield: 'मासु प्रतिशत', aGrade: 'ग्रेड 1+ र 1', g1p: 'ग्रेड 1+', aOut: 'ग्रेड बाहिर', times: 'पटक', recentShip: 'हालको बिक्री', date: 'मिति', yield: 'मासु %', jobDew: 'जुकाको औषधि · दाना 2 नम्बर', jobFmd: 'खोरेत खोप', farmSfx: ' फार्म', asOf: (d) => d + ' सम्मको', noIssue: 'विशेष हेर्नुपर्ने कुरा छैन', iDeath: (g, d, w, n) => `${g} (${d}): हप्ता ${w} मा ${n} वटा मरे → कारण हेर्नुहोस्`, iJob: (g, d, dt, j) => `${g} (${d}): ${dt} मा ${j}`, meta: (d, a, w) => `${d} मा ल्याएको · ${a} दिनको · हप्ता ${w}`, shipTotal: (g, s, k) => `${g}: अहिलेसम्म ${s} वटा बिक्री · ${k} वटा बाँकी`, avgSub: (f, t, n) => `${f}~${t} · ${n} पटक बिक्री`, noShip: 'अहिलेसम्म बिक्री छैन', noTask: 'कुनै काम छैन', fail: 'दर्ता भएन। इन्टरनेट जाँच गर्नुहोस्', list: 'दर्ता गरिएका मरेका', edit: 'सच्याउनुहोस्', cancel: 'रद्द', keep: 'सेभ', del: 'हटाउनुहोस्', dongGroup: 'खोर (समूह)', when: 'मिति', more: 'अझै हेर्नुहोस्', none: 'दर्ता छैन', edited: 'सच्याइयो', done: 'जाँच भयो', dIn: 'मरेको दर्ता', dSt: 'मरेको हिसाब', after: 'दर्ता पछि', recentDays: 'पछिल्लो ७ दिनको दर्ता', dayTot: (n) => `जम्मा ${n} वटा`, days: (n) => `${n} दिन`, periodTot: (n, d) => `${d} दिनमा ${n} वटा` };
+const KO = { fmd: '구제역', dew: '구충', first: '최초두수', claim: '크레임', claimLeft: '크레임 잔여', tabHome: '홈', tabStatus: '돈군', tabDeath: '폐사 등록', tabShip: '출하', tabTask: '작업', stock: '현재 두수', groups: '돈군', deathAll: '누적 폐사', matrix: '돈군별 주차 폐사', month: '개월차', wk: '주', issue: '이번 주 확인할 것', inn: '전입', death: '폐사', sold: '출하', surv: '육성률', photo: '폐사 사진', addPhoto: '사진', dong: '어느 동인가요?', group: '어느 그룹인가요?', auto: '자동 연결', count: '몇 두인가요?', unit: '두', save: '등록', saved: '등록했습니다', recent: '최근 등록', heads: '두수', avgw: '평균체중', out: '등외', avgTitle: '평균 출하 성적', aN: '출하두수', aW: '평균체중', aYield: '지육율', aGrade: '등급율 (1+·1)', g1p: '1+ 등급', aOut: '등외', times: '회', recentShip: '최근 출하', date: '날짜', yield: '지육율', jobDew: '구충제 · 사료 2호 변경', jobFmd: '구제역 백신', farmSfx: ' 농장', asOf: (d: string) => d + ' 기준', noIssue: '특별히 확인할 것이 없습니다', iDeath: (g: string, d: string, w: number, n: number) => `${g} (${d}): ${w}주차에 ${n}두 폐사 → 원인 확인`, iJob: (g: string, d: string, dt: string, j: string) => `${g} (${d}): ${dt} ${j}`, meta: (d: string, a: number, w: number) => `${d} 전입 · ${a}일령 · ${w}주차`, shipTotal: (g: string, s: number, k: number) => `${g}: 지금까지 ${s}두 출하 · ${k}두 남음`, avgSub: (f: string, t: string, n: number) => `${f}~${t} · ${n}회 출하`, noShip: '아직 출하가 없습니다', noTask: '예정된 작업이 없습니다', fail: '등록하지 못했습니다. 인터넷 연결을 확인하세요', list: '등록한 폐사', edit: '수정', cancel: '취소', keep: '저장', del: '삭제', delAsk: '정말 지울까요? (두 번 올린 것 등)', deleted: '지웠습니다', dupWait: '방금 같은 내용을 등록했습니다. 한 번 더 누르면 또 등록됩니다', dongGroup: '동 (그룹)', when: '날짜', more: '더 보기', none: '등록한 폐사가 없습니다', edited: '수정했습니다', done: '확인 완료', dIn: '폐사입력', dSt: '폐사현황', after: '등록하면', recentDays: '최근 7일 등록', dayTot: (n: number) => `합계 ${n}두`, days: (n: number) => `${n}일`, periodTot: (n: number, d: number) => `${d}일 동안 ${n}두` };
+const NE: typeof KO = { fmd: 'खोरेत', dew: 'जुका', first: 'सुरुमा ल्याएको', claim: 'क्लेम', claimLeft: 'बाँकी क्लेम', tabHome: 'होम', tabStatus: 'बंगुर समूह', tabDeath: 'मरेको दर्ता', tabShip: 'बिक्री', tabTask: 'काम', stock: 'अहिले भएका बंगुर', groups: 'समूह', deathAll: 'जम्मा मरेका', matrix: 'हप्ता अनुसार मरेका बंगुर', month: 'महिना', wk: 'हप्ता', issue: 'यो हप्ता हेर्नुपर्ने कुरा', inn: 'ल्याएको', death: 'मरेको', sold: 'बिक्री', surv: 'बाँचेको', photo: 'मरेको बंगुरको फोटो', addPhoto: 'फोटो', dong: 'कुन खोर (동)?', group: 'कुन समूह?', auto: 'समूह आफैं मिल्यो', count: 'कति वटा?', unit: 'वटा', save: 'दर्ता गर्नुहोस्', saved: 'दर्ता भयो', recent: 'भर्खरको दर्ता', heads: 'संख्या', avgw: 'औसत तौल', out: 'ग्रेड बाहिर', avgTitle: 'बिक्रीको औसत नतिजा', aN: 'बिक्री संख्या', aW: 'औसत तौल', aYield: 'मासु प्रतिशत', aGrade: 'ग्रेड 1+ र 1', g1p: 'ग्रेड 1+', aOut: 'ग्रेड बाहिर', times: 'पटक', recentShip: 'हालको बिक्री', date: 'मिति', yield: 'मासु %', jobDew: 'जुकाको औषधि · दाना 2 नम्बर', jobFmd: 'खोरेत खोप', farmSfx: ' फार्म', asOf: (d) => d + ' सम्मको', noIssue: 'विशेष हेर्नुपर्ने कुरा छैन', iDeath: (g, d, w, n) => `${g} (${d}): हप्ता ${w} मा ${n} वटा मरे → कारण हेर्नुहोस्`, iJob: (g, d, dt, j) => `${g} (${d}): ${dt} मा ${j}`, meta: (d, a, w) => `${d} मा ल्याएको · ${a} दिनको · हप्ता ${w}`, shipTotal: (g, s, k) => `${g}: अहिलेसम्म ${s} वटा बिक्री · ${k} वटा बाँकी`, avgSub: (f, t, n) => `${f}~${t} · ${n} पटक बिक्री`, noShip: 'अहिलेसम्म बिक्री छैन', noTask: 'कुनै काम छैन', fail: 'दर्ता भएन। इन्टरनेट जाँच गर्नुहोस्', list: 'दर्ता गरिएका मरेका', edit: 'सच्याउनुहोस्', cancel: 'रद्द', keep: 'सेभ', del: 'हटाउनुहोस्', delAsk: 'साँच्चै हटाउने? (दुई पटक दर्ता भएको आदि)', deleted: 'हटाइयो', dupWait: 'भर्खरै यही दर्ता भयो। फेरि थिच्नुभयो भने फेरि दर्ता हुन्छ', dongGroup: 'खोर (समूह)', when: 'मिति', more: 'अझै हेर्नुहोस्', none: 'दर्ता छैन', edited: 'सच्याइयो', done: 'जाँच भयो', dIn: 'मरेको दर्ता', dSt: 'मरेको हिसाब', after: 'दर्ता पछि', recentDays: 'पछिल्लो ७ दिनको दर्ता', dayTot: (n) => `जम्मा ${n} वटा`, days: (n) => `${n} दिन`, periodTot: (n, d) => `${d} दिनमा ${n} वटा` };
 
 const addIso = (d: string, n: number) => { const t = new Date(d + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
 const md = (s: string) => s.slice(5).replace('-', '/');
@@ -33,7 +33,7 @@ export interface ShareDeath extends DeathInput { id: string; checked: boolean; a
 // 동·그룹 선택지: '3동 · 26-7' (동 없이 관리하는 그룹은 그룹만)
 export const dongGroupOpts = (G: { group: string; dong: string }[]) => G.flatMap((r) => { const ds = dongsOf(r.dong); return ds.length ? ds.map((d) => ({ v: d + '|' + r.group, l: d + '동 · ' + r.group })) : [{ v: '|' + r.group, l: r.group }]; });
 
-export function ShareView({ p, deaths = [], onSaveDeath, onEditDeath }: { p: SharePayload; deaths?: ShareDeath[]; onSaveDeath: (d: DeathInput) => Promise<void>; onEditDeath?: (id: string, d: DeathInput) => Promise<void> }) {
+export function ShareView({ p, deaths = [], onSaveDeath, onEditDeath, onDeleteDeath }: { p: SharePayload; deaths?: ShareDeath[]; onSaveDeath: (d: DeathInput) => Promise<void>; onEditDeath?: (id: string, d: DeathInput) => Promise<void>; onDeleteDeath?: (id: string) => Promise<void> }) {
   const [lang, setLang] = useState<'ko' | 'ne'>('ko');
   const [tab, setTab] = useState<'home' | 'status' | 'death' | 'ship' | 'task'>('home');
   const [dong, setDong] = useState<string | null>(null);
@@ -96,15 +96,21 @@ export function ShareView({ p, deaths = [], onSaveDeath, onEditDeath }: { p: Sha
   const g1p = S.reduce((a, x) => a + x.a, 0), g1 = S.reduce((a, x) => a + x.b, 0), out = S.reduce((a, x) => a + x.o, 0);
   const avg: [string, string, string][] = [[t.aN, n.toLocaleString(), S.length + ' ' + t.times], [t.aW, n ? r1(wsum / n) + 'kg' : '—', ''], [t.aYield, wsum ? r1(ysum / wsum) + '%' : '—', ''], [t.aGrade, n ? r1(((g1p + g1) / n) * 100) + '%' : '—', ''], [t.g1p, n ? r1((g1p / n) * 100) + '%' : '—', ''], [t.aOut, String(out), n ? r1((out / n) * 100) + '%' : '']];
 
+  // 두 번 눌러 두 번 올라가는 것 막기: 누르는 즉시 잠그고(ref), 같은 내용을 15초 안에 다시 누르면 한 번 더 확인
+  const lock = useRef(false), last = useRef<{ k: string; t: number; warned: boolean } | null>(null);
   const save = async () => {
-    if (!chosen || busy) return;
+    if (!chosen || busy || lock.current) return;
+    const k = [day, dong ?? '', chosen, cnt].join('|');
+    if (last.current && last.current.k === k && Date.now() - last.current.t < 15000 && !last.current.warned) { last.current.warned = true; setSaved({ ok: false, t: t.dupWait }); return; }
+    lock.current = true;
     setBusy(true);
     try {
       await onSaveDeath({ date: day, dong: dong ?? '', group: chosen, count: cnt, ...(photos.length ? { photos: await fitPhotos(photos) } : {}) });
       setPhotos([]);
       setSaved({ ok: true, t: t.saved + ' · ' + (dong ? dong + '동 ' : '') + '(' + chosen + ') · ' + cnt + ' ' + t.unit });
       setRecent([{ date: md(day), dong: dong ? dong + '동' : '—', group: chosen, n: cnt }, ...recent].slice(0, 5)); setCnt(1);
-    } catch { setSaved({ ok: false, t: t.fail }); } finally { setBusy(false); }
+      last.current = { k, t: Date.now(), warned: false };
+    } catch { setSaved({ ok: false, t: t.fail }); } finally { setBusy(false); lock.current = false; }
   };
   const opts = dongGroupOpts(p.groups);
   const cur = chosen ? G.find((r) => r.group === chosen) ?? null : null;
@@ -114,6 +120,10 @@ export function ShareView({ p, deaths = [], onSaveDeath, onEditDeath }: { p: Sha
                 <label style={{ fontSize: 14 }}>{t.when}<br /><input type="date" value={ed.date} max={p.today} onChange={(e) => setEd({ ...ed, date: e.target.value })} style={{ fontSize: 16, minHeight: 44, width: '100%' }} /></label>
                 <label style={{ fontSize: 14 }}>{t.dongGroup}<br /><select value={ed.dg} onChange={(e) => setEd({ ...ed, dg: e.target.value })} style={{ fontSize: 16, minHeight: 44, width: '100%' }}>{opts.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}</select></label>
                 <label style={{ fontSize: 14 }}>{t.count}<br /><input type="number" inputMode="numeric" min={1} max={300} value={ed.count} onChange={(e) => setEd({ ...ed, count: e.target.value })} style={{ fontSize: 16, minHeight: 44, width: '100%' }} /></label>
+                {onDeleteDeath && (delAsk
+                  ? <div style={{ display: 'grid', gap: 6 }}><span style={{ fontSize: 14, color: '#9A3216' }}>{t.delAsk}</span>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}><button className="pill" style={{ minHeight: 44 }} onClick={() => setDelAsk(false)}>{t.cancel}</button><button className="pill" disabled={busy} style={{ minHeight: 44, background: '#9A3216', borderColor: '#9A3216', color: '#fff' }} onClick={delOne}>{t.del}</button></div></div>
+                  : <button className="pill" style={{ minHeight: 40, color: '#9A3216', borderColor: '#E7C3B5' }} onClick={() => setDelAsk(true)}>{t.del}</button>)}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   <button className="pill" style={{ minHeight: 44 }} onClick={() => setEd(null)}>{t.cancel}</button>
                   <button className="pill on" style={{ minHeight: 44 }} disabled={busy || !(Number(ed.count) >= 1 && Number(ed.count) <= 300) || !ed.date} onClick={saveEdit}>{t.keep}</button>
@@ -122,7 +132,7 @@ export function ShareView({ p, deaths = [], onSaveDeath, onEditDeath }: { p: Sha
             ) : (
               <div key={x.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, padding: '6px 0', borderBottom: '1px solid #EFEBE3' }}>
                 <span style={{ flex: 1 }}>{md(x.date)} · {x.dong ? x.dong + '동 ' : ''}({x.group})</span><b>{x.count} {t.unit}</b>
-                {onEditDeath && !('other' in x) && <button className="pill" style={{ minHeight: 40, fontSize: 14 }} onClick={() => { setEd({ id: x.id, date: x.date, dg: (x.dong ?? '') + '|' + x.group, count: String(x.count) }); setSaved(null); }}>{t.edit}</button>}
+                {onEditDeath && !('other' in x) && <button className="pill" style={{ minHeight: 40, fontSize: 14 }} onClick={() => { setEd({ id: x.id, date: x.date, dg: (x.dong ?? '') + '|' + x.group, count: String(x.count) }); setDelAsk(false); setSaved(null); }}>{t.edit}</button>}
               </div>
             );
   const recentList = list.filter((x) => x.date >= addIso(p.today, -6));
@@ -130,6 +140,13 @@ export function ShareView({ p, deaths = [], onSaveDeath, onEditDeath }: { p: Sha
   const others = (p.others ?? []).map((x, i) => ({ id: 'o' + i, ...x, checked: true, other: true }));
   const stList = [...list, ...others].filter((x) => x.date >= addIso(p.today, -(range - 1)));
   const stDays = [...new Set(stList.map((x) => x.date))];
+  const [delAsk, setDelAsk] = useState(false);
+  const delOne = async () => {
+    if (!ed || !onDeleteDeath || busy) return;
+    setBusy(true);
+    try { await onDeleteDeath(ed.id); setEd(null); setDelAsk(false); setSaved({ ok: true, t: t.deleted }); }
+    catch { setSaved({ ok: false, t: t.fail }); } finally { setBusy(false); }
+  };
   const saveEdit = async () => {
     if (!ed || !onEditDeath || busy) return;
     const [d, g] = ed.dg.split('|');
@@ -241,7 +258,7 @@ export function ShareView({ p, deaths = [], onSaveDeath, onEditDeath }: { p: Sha
           <div className="card" style={{ marginTop: 12 }}>
             <div style={{ fontWeight: 700 }}>{t.photo}</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-              <input ref={pref} type="file" accept="image/*,.heic,.heif" multiple hidden onChange={(e) => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = ''; }} />
+              <input ref={pref} type="file" accept="image/*" multiple hidden onChange={(e) => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = ''; }} />
               {photos.map((s, i) => <div key={i} style={{ position: 'relative' }}><img src={s} alt={t.photo + ' ' + (i + 1)} style={{ width: 84, height: 84, objectFit: 'cover', borderRadius: 10, display: 'block' }} /><button aria-label="✕" onClick={() => setPhotos(photos.filter((_, j) => j !== i))} style={{ position: 'absolute', top: 2, right: 2, width: 28, height: 28, borderRadius: 14, border: 0, background: 'rgba(0,0,0,.55)', color: '#fff', cursor: 'pointer' }}>✕</button></div>)}
               <button onClick={() => pref.current?.click()} style={{ font: 'inherit', width: 84, height: 84, borderRadius: 10, border: '2px dashed #B9B3A6', background: '#fff', color: '#3E4B45', cursor: 'pointer', fontSize: 13 }}>+ {t.addPhoto}</button>
             </div>

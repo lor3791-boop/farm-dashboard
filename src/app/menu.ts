@@ -6,7 +6,7 @@ export interface MenuItem { path: string; label: string; filter: boolean; accent
 export const SUBS = {
   herd: [['herd', '돈군'], ['entry', '전입등록'], ['warn', '출하지연'], ['fcr', 'FCR 추이']],
   ship: [['status', '출하현황'], ['input', '출하입력'], ['grade', '농장별 출하성적'], ['fc', '원료돈 예상물량']],
-  death: [['status', '폐사현황'], ['input', '폐사입력'], ['list', '폐사입력현황']],
+  death: [['status', '폐사현황'], ['input', '폐사입력'], ['list', '폐사입력현황'], ['farm', '농장입력']],
   an: [['surv', '예상육성률'], ['rank', '폐사율 순위'], ['report', '보고자료']],
   settle: [['plan', '정산예정'], ['excel', '정산자료 엑셀'], ['feed', '사료 사용'], ['vaccine', '구제역 백신비']],
   bond: [['sum', '종합현황'], ['loan', '일반선급금'], ['monthly', '월대선급금']],

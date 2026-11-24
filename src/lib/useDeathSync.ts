@@ -15,7 +15,7 @@ const FROM = '2026-10-01'; // 이보다 오래된 미등록은 건드리지 않�
 // (정축산 26-4 11/15는 크레임 잔여 0 지정으로 이미 체크를 풀었고 피그온에 등록됨 → 뺌)
 const SEED: Record<string, string> = Object.fromEntries(['2026-11-19|민서|26-10|4', '2026-11-19|민서|26-9|1', '2026-11-21|민서|26-11|1', '2026-11-17|아멘|26-9|1', '2026-11-16|재성|26-9|2', '2026-11-19|재성|26-9|2'].map((k) => [k, '2026-11-21']));
 export function useDeathSync() {
-  const { deaths, loading } = useData();
+  const { deaths, removing, loading, sheetErr } = useData();
   const { split, saved, save } = useHerd();
   const { repo } = useAuth();
   const busy = useRef(false);
@@ -23,6 +23,9 @@ export function useDeathSync() {
   useEffect(() => {
     if (!pyesaOn() || loading || busy.current || !repo || document.visibilityState !== 'visible') return;
     const isSheet = (d: DeathRow) => d.path.startsWith('sheet:');
+    // 0) 농장 공유 화면에서 지운 폐사 → 시트로 보낸 줄을 지우고 원본도 지움 (피그온 등록된 줄은 남김 — data.tsx에서 '삭제 요청' 표시)
+    //    시트를 못 읽었거나 짝 줄을 못 찾았으면(그 사이 고친 경우 등) 원본만 지우지 않는다 — 시트 줄이 고아가 되므로
+    const del = sheetErr ? undefined : removing.find((x) => !tried.current.has('d' + x.doc.id) && (!(x.doc as any).sheetAt || x.rows.length > 0));
     // 1) 공유 화면 폐사 → 시트
     const fwd = deaths.find((d) => !isSheet(d) && d.src === 'share' && !d.checked && !(d as any).sheetAt && d.count > 0 && d.date >= FROM && !tried.current.has('f' + d.id));
     // 2) 크레임 줄
@@ -31,11 +34,15 @@ export function useDeathSync() {
     const MK = { ...SEED, ...(saved.claimMarked ?? {}) };
     const ck = (d: DeathRow) => [d.date, d.farm, d.group, d.count].join('|');
     const un = deaths.find((d) => isSheet(d) && d.checked && MK[ck(d)] && (split[d.id]?.claim ?? 0) === 0 && (split[d.id]?.death ?? 0) > 0 && !tried.current.has('u' + d.id));
-    if (!fwd && !cl && !un) return;
+    if (!del && !fwd && !cl && !un) return;
     busy.current = true;
     (async () => {
       try {
-        if (fwd) {
+        if (del) {
+          tried.current.add('d' + del.doc.id);
+          for (const r of del.rows) await repo.removeDeath(r);
+          await repo.removeDeath(del.doc);
+        } else if (fwd) {
           tried.current.add('f' + fwd.id);
           await saveToSheet({ date: fwd.date, farm: fwd.farm, dong: fwd.dong, group: fwd.group, count: fwd.count, photos: fwd.photos ?? [] });
           await repo.updateDeath(fwd, { sheetAt: new Date().toISOString() } as any, 'sync');
@@ -58,5 +65,5 @@ export function useDeathSync() {
       } catch (e) { console.warn('[폐사정리]', e); }
       finally { busy.current = false; }
     })();
-  }, [deaths, split, loading, repo, saved.settled, saved.claimMarked, save]);
+  }, [deaths, removing, sheetErr, split, loading, repo, saved.settled, saved.claimMarked, save]);
 }
