@@ -55,7 +55,15 @@ export function ShareView({ p, deaths = [], fixes = [], onSaveDeath, onEditDeath
   };
   const [recent, setRecent] = useState<{ date: string; dong: string; group: string; n: number }[]>([]);
   const [day, setDay] = useState(p.today);
-  const [ed, setEd] = useState<{ id: string; date: string; dg: string; count: string; other?: Other } | null>(null);
+  // ph: 고치는 중인 사진(내가 등록한 폐사만) — ph0과 다르면 사진도 바꿔 저장
+  const [ed, setEd] = useState<{ id: string; date: string; dg: string; count: string; other?: Other; ph?: string[]; ph0?: string[] } | null>(null);
+  const epref = useRef<HTMLInputElement>(null);
+  const addEdPhotos = async (L: FileList) => {
+    const out: string[] = [];
+    try { for (const f of [...L]) out.push(await shrinkImage(f, 200 * 1024, [[1280, 0.7], [1024, 0.6], [800, 0.55], [640, 0.5]])); }
+    catch (e) { setSaved({ ok: false, t: (e as Error).message }); }
+    setEd((x) => (x ? { ...x, ph: [...(x.ph ?? []), ...out] } : x));
+  };
   const [showAll, setShowAll] = useState(false);
   const [dTab, setDTab] = useState<'in' | 'st'>('in');
   const [range, setRange] = useState(7);
@@ -123,6 +131,13 @@ export function ShareView({ p, deaths = [], fixes = [], onSaveDeath, onEditDeath
                 <label style={{ fontSize: 14 }}>{t.when}<br /><input type="date" value={ed.date} max={p.today} onChange={(e) => setEd({ ...ed, date: e.target.value })} style={{ fontSize: 16, minHeight: 44, width: '100%' }} /></label>
                 <label style={{ fontSize: 14 }}>{t.dongGroup}<br /><select value={ed.dg} onChange={(e) => setEd({ ...ed, dg: e.target.value })} style={{ fontSize: 16, minHeight: 44, width: '100%' }}>{opts.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}</select></label>
                 <label style={{ fontSize: 14 }}>{t.count}<br /><input type="number" inputMode="numeric" min={1} max={300} value={ed.count} onChange={(e) => setEd({ ...ed, count: e.target.value })} style={{ fontSize: 16, minHeight: 44, width: '100%' }} /></label>
+                {!ed.other && <div style={{ fontSize: 14 }}>{t.photo}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 6 }}>
+                    {(ed.ph ?? []).map((p, i) => <span key={i} style={{ position: 'relative' }}><img src={p} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, display: 'block' }} />
+                      <button aria-label={t.del} onClick={() => setEd({ ...ed, ph: (ed.ph ?? []).filter((_, j) => j !== i) })} style={{ position: 'absolute', top: -8, right: -8, width: 30, height: 30, borderRadius: 15, border: 'none', background: '#9A3216', color: '#fff', fontSize: 16, padding: 0 }}>✕</button></span>)}
+                    <input ref={epref} type="file" accept="image/*" multiple hidden onChange={(e) => { if (e.target.files?.length) addEdPhotos(e.target.files); e.target.value = ''; }} />
+                    <button className="pill" style={{ minHeight: 72, minWidth: 72 }} onClick={() => epref.current?.click()}>+ {t.addPhoto}</button>
+                  </div></div>}
                 {(ed.other ? onFixOther : onDeleteDeath) && (delAsk
                   ? <div style={{ display: 'grid', gap: 6 }}><span style={{ fontSize: 14, color: '#9A3216' }}>{t.delAsk}</span>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}><button className="pill" style={{ minHeight: 44 }} onClick={() => setDelAsk(false)}>{t.cancel}</button><button className="pill" disabled={busy} style={{ minHeight: 44, background: '#9A3216', borderColor: '#9A3216', color: '#fff' }} onClick={delOne}>{t.del}</button></div></div>
@@ -142,7 +157,7 @@ export function ShareView({ p, deaths = [], fixes = [], onSaveDeath, onEditDeath
                 <b style={{ fontSize: 17, whiteSpace: 'nowrap' }}>{x.count} {t.unit}</b>
                 {(('other' in x) ? !!onFixOther && !!(x as any).ref : !!onEditDeath) && !('fixing' in x && !!x.fixing) &&
                   <button className="pill" aria-label={t.edit} style={{ minHeight: 44, minWidth: 76, fontSize: 15, fontWeight: 600, borderWidth: 2, borderColor: '#1F4E3D', color: '#1F4E3D', background: '#fff' }}
-                    onClick={() => { setEd({ id: x.id, date: x.date, dg: (x.dong ?? '') + '|' + x.group, count: String(x.count), ...('other' in x ? { other: x as unknown as Other } : {}) }); setDelAsk(false); setSaved(null); }}>✎ {t.edit}</button>}
+                    onClick={() => { const ph = 'other' in x ? undefined : ((x as ShareDeath).photos ?? []); setEd({ id: x.id, date: x.date, dg: (x.dong ?? '') + '|' + x.group, count: String(x.count), ...('other' in x ? { other: x as unknown as Other } : { ph, ph0: ph }) }); setDelAsk(false); setSaved(null); }}>✎ {t.edit}</button>}
               </div>
             );
   const recentList = list.filter((x) => x.date >= addIso(p.today, -6));
@@ -163,7 +178,8 @@ export function ShareView({ p, deaths = [], fixes = [], onSaveDeath, onEditDeath
     if (!ed || busy || !(ed.other ? onFixOther : onEditDeath)) return;
     const [d, g] = ed.dg.split('|');
     setBusy(true);
-    const v = { date: ed.date, dong: d, group: g, count: Math.round(Number(ed.count)) };
+    const phChanged = !ed.other && JSON.stringify(ed.ph ?? []) !== JSON.stringify(ed.ph0 ?? []);
+    const v = { date: ed.date, dong: d, group: g, count: Math.round(Number(ed.count)), ...(phChanged ? { photos: await fitPhotos(ed.ph ?? []) } : {}) };
     try { if (ed.other) await onFixOther!(ed.other, v); else await onEditDeath!(ed.id, v); setEd(null); setSaved({ ok: true, t: t.edited }); }
     catch { setSaved({ ok: false, t: t.fail }); } finally { setBusy(false); }
   };

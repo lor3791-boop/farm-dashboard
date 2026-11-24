@@ -40,7 +40,7 @@ function App() {
   return (
     <ShareView p={p} deaths={deaths} fixes={fixes}
       onSaveDeath={async (d) => { await addDoc(collection(db, 'share', key, 'deaths'), { farm: p.farm, date: d.date, dong: d.dong, group: d.group, count: d.count, ...(d.photos?.length ? { photos: d.photos } : {}), src: 'share', checked: false, at: now() }); }}
-      onEditDeath={async (id, d) => { await updateDoc(doc(db, 'share', key, 'deaths', id), { date: d.date, dong: d.dong, group: d.group, count: d.count, checked: false, editedAt: now() }); }}
+      onEditDeath={async (id, d) => { await updateDoc(doc(db, 'share', key, 'deaths', id), { date: d.date, dong: d.dong, group: d.group, count: d.count, checked: false, editedAt: now(), ...(d.photos ? { photos: d.photos, photosAt: now() } : {}) }); }}
       onDeleteDeath={async (id) => { await updateDoc(doc(db, 'share', key, 'deaths', id), { removedAt: now() }); }}
       onFixOther={async (o, d) => { await addDoc(collection(db, 'share', key, 'fixes'), { farm: p.farm, ref: o.ref ?? '', was: { date: o.date, dong: o.dong ?? '', group: o.group, count: o.count }, ...(d ? { date: d.date, dong: d.dong, group: d.group, count: d.count } : { date: o.date, dong: o.dong ?? '', group: o.group, count: o.count, remove: true }), at: now() }); }} />
   );

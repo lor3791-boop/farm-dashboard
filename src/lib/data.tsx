@@ -96,7 +96,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     // 시트로 보낼 때의 값(sheetWas)으로 짝을 찾는다 — 그 뒤 농장이 고쳐도 같은 시트 줄을 가리키게
     const was = (d: DeathRow) => ((d as any).sheetWas ?? d) as { date: string; dong: string; group: string; count: number };
     const ckD = (d: DeathRow) => { const w = was(d); return [w.date, d.farm, w.group, w.count].join('|'); };
-    const edited = (d: DeathRow) => !!(d as any).editedAt && (d as any).editedAt > (d as any).sheetAt;
+    // 농장이 시트로 보낸 뒤 값을 고쳤거나(보낼 때 값과 다름) 사진을 고쳤으면(photosAt) 시트 줄도 맞춰야 함
+    const edited = (d: DeathRow) => { const w = was(d); return w.date !== d.date || String(w.dong ?? '') !== String(d.dong ?? '') || w.group !== d.group || w.count !== d.count || ((d as any).photosAt ?? '') > ((d as any).sheetAt ?? ''); };
     const pool = new Map<string, DeathRow[]>(); sheet.forEach((r) => { const k = ck(r); pool.set(k, [...(pool.get(k) ?? []), r]); });
     const take = new Map<string, DeathRow>(); // 시트 줄 id → 공유 화면 원본
     const gone = (d: DeathRow) => !!(d as any).removedAt;
@@ -110,10 +111,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const o = take.get(r.id);
       if (!o) { rows.push(r); return; }
       // 농장이 고친 값을 바로 보여 주고(공유 화면과 같게), 시트 줄은 대시보드가 뒤에서 고친다
-      if (!gone(o) && edited(o)) { rs.push({ doc: o, row: r }); rows.push({ ...r, date: o.date, dong: o.dong, group: o.group, count: o.count, key: o.key, byFarm: true }); return; }
+      if (!gone(o) && edited(o)) { rs.push({ doc: o, row: r }); rows.push({ ...r, date: o.date, dong: o.dong, group: o.group, count: o.count, key: o.key, byFarm: true, farmDoc: o.path }); return; }
       // 피그온에 이미 등록한 줄은 자동으로 안 지우고 '농장 삭제 요청'으로 남김 (피그온도 고쳐야 하므로)
       if (gone(o)) { if (r.checked) rows.push({ ...r, key: o.key, byFarm: true, delReq: true }); else rm.get(o.id)!.rows.push(r); return; }
-      rows.push({ ...r, key: o.key, byFarm: true });
+      rows.push({ ...r, key: o.key, byFarm: true, farmDoc: o.path });
     });
     // 농장이 고친·지운 '다른 곳 입력' 폐사를 바로 반영 (피그온 등록된 줄을 지우라는 건 남기고 '삭제 요청' 표시)
     let list = fs.concat(rows);

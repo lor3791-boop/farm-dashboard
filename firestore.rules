@@ -39,7 +39,8 @@ service cloud.firestore {
           && (!('photos' in request.resource.data) || request.resource.data.photos is list)
           && request.resource.data.checked == false && okDeath(request.resource.data));
         allow update: if isAdmin() || (exists(/databases/$(database)/documents/share/$(key))
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['date', 'dong', 'group', 'count', 'checked', 'editedAt', 'removedAt'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['date', 'dong', 'group', 'count', 'checked', 'editedAt', 'removedAt', 'photos', 'photosAt'])
+          && (!('photos' in request.resource.data) || request.resource.data.photos is list)
           && request.resource.data.checked == false && okDeath(request.resource.data));
         allow delete: if isAdmin();
       }

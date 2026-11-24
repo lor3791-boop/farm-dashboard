@@ -1,6 +1,6 @@
 // 폐사입력현황 — 미등록 / 등록완료 / 전체를 한 목록에서. 줄을 누르면 수정·삭제, 오른쪽 버튼은 피그온 등록완료.
 // 대시보드·농장 앱·폐사입력 앱(구글시트) 입력이 한 목록이다 (어디서 넣었는지는 표시하지 않음).
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useHerd } from '@/lib/ui';
 import { useAuth } from '@/lib/auth';
 import { useData } from '@/lib/data';
@@ -8,7 +8,8 @@ import { dongsOf } from '@/lib/calc/herd';
 import { fmt, md } from '@/lib/calc/dates';
 import { todayKST } from '@/lib/util';
 import type { DeathRow } from '@/lib/repo';
-import { isPending } from '@/lib/pyesa';
+import { isPending, pyesaOn, editSheetPhotos } from '@/lib/pyesa';
+import { shrinkImage, fitPhotos } from '@/lib/image';
 import { Sheet, Stepper, toast } from '@/components/Sheet';
 import { thisMonth } from '@/lib/useIsPhone';
 
@@ -47,14 +48,34 @@ function EditPanel({ r, onDone }: { r: DeathRow; onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const [del, setDel] = useState(false);
   const has = opts.some((o) => o.v === dg);
-  const dirty = date !== r.date || dg !== (r.dong ?? '') + '|' + r.group || cnt !== r.count;
+  // 사진: 시트 줄은 드라이브 링크(urls), 대시보드·농장 앱 기록은 사진 자체(imgs). 새로 넣은 건 added
+  const isSheetRow = r.path.startsWith('sheet:');
+  const [urls, setUrls] = useState<string[]>(r.photoUrls ?? []);
+  const [imgs, setImgs] = useState<string[]>(r.photos ?? []);
+  const [added, setAdded] = useState<string[]>([]);
+  const pref = useRef<HTMLInputElement>(null);
+  const addPh = async (L: FileList) => { try { const out: string[] = []; for (const f of [...L]) out.push(await shrinkImage(f, isSheetRow && pyesaOn() ? 500 * 1024 : 200 * 1024, [[1600, 0.8], [1280, 0.7], [1024, 0.6], [800, 0.55]])); setAdded((x) => [...x, ...out]); setErr(''); } catch (e) { setErr((e as Error).message); } };
+  const phDirty = added.length > 0 || urls.length !== (r.photoUrls ?? []).length || imgs.length !== (r.photos ?? []).length;
+  const fieldDirty = date !== r.date || dg !== (r.dong ?? '') + '|' + r.group || cnt !== r.count;
+  const dirty = fieldDirty || phDirty;
   const run = async (f: () => Promise<void>) => { setBusy(true); setErr(''); try { await f(); onDone(); } catch (e) { setErr((e as Error).message || String(e)); } finally { setBusy(false); } };
   const save = () => {
     const n = cnt;
     if (!date) return setErr('날짜를 넣으세요');
     if (!(Number.isInteger(n) && n >= 1 && n <= 300)) return setErr('두수는 1~300');
     const [dong, group] = dg.split('|');
-    run(() => repo!.updateDeath(r, { date, dong, group, count: n }, email));
+    run(async () => {
+      // 사진 먼저(시트는 지금 값으로 기록을 확인하므로), 그다음 날짜·동·두수
+      if (phDirty) {
+        if (isSheetRow) await editSheetPhotos(r, urls, added);
+        else await repo!.updateDeath(r, { photos: await fitPhotos([...imgs, ...added]), photosAt: new Date().toISOString() } as any, email);
+      }
+      if (fieldDirty) {
+        await repo!.updateDeath(r, { date, dong, group, count: n }, email);
+        // 농장 공유 화면에서 온 줄이면 농장 화면 원본도 같은 값으로 (두 화면이 같게)
+        if (r.farmDoc) await repo!.updateDeath({ ...r, path: r.farmDoc } as DeathRow, { date, dong, group, count: n, sheetWas: { date, dong, group, count: n }, sheetAt: new Date().toISOString() } as any, email);
+      }
+    });
   };
   const lab = { fontSize: 13, color: '#6B6A63', display: 'grid', gap: 4 } as const;
   const inp = { width: '100%', minHeight: 44, boxSizing: 'border-box' } as const;
@@ -65,8 +86,18 @@ function EditPanel({ r, onDone }: { r: DeathRow; onDone: () => void }) {
         <label style={lab}>동 · 그룹<select value={dg} onChange={(e) => { setDg(e.target.value); setErr(''); }} style={inp}>{!has && <option value={dg}>{dgLabel({ dong: dg.split('|')[0], group: dg.split('|')[1] })}</option>}{opts.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}</select></label>
       </div>
       <div style={lab}>두수<Stepper value={cnt} onChange={(n) => { setCnt(n); setErr(''); }} /></div>
-      <Photos r={r} />
-      {r.checked && dirty && <div className="small" style={{ color: '#7A4F00' }}>고쳐 저장하면 미등록으로 돌아갑니다</div>}
+      <div style={{ display: 'grid', gap: 6 }}>
+        <span style={{ fontSize: 13, color: '#6B6A63' }}>사진</span>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          {urls.map((u, i) => <span key={u} className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 36 }}><a href={u} target="_blank" rel="noopener noreferrer">사진 {i + 1}</a><button className="btn sm ghost" aria-label={'사진 ' + (i + 1) + ' 빼기'} style={{ minHeight: 28, padding: '0 8px' }} onClick={() => setUrls(urls.filter((x) => x !== u))}>✕</button></span>)}
+          {[...imgs.map((p, i) => ({ p, k: 'i' + i, rm: () => setImgs(imgs.filter((_, j) => j !== i)) })), ...added.map((p, i) => ({ p, k: 'a' + i, rm: () => setAdded(added.filter((_, j) => j !== i)) }))].map((x) => (
+            <span key={x.k} style={{ position: 'relative' }}><img src={x.p} alt="" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6, display: 'block', border: '1px solid #E2DDD2' }} />
+              <button aria-label="사진 빼기" onClick={x.rm} style={{ position: 'absolute', top: -6, right: -6, width: 26, height: 26, borderRadius: 13, border: 'none', background: '#9A3216', color: '#fff', fontSize: 14, lineHeight: '26px', padding: 0 }}>✕</button></span>))}
+          <input ref={pref} type="file" accept="image/*" multiple hidden onChange={(e) => { if (e.target.files?.length) addPh(e.target.files); e.target.value = ''; }} />
+          <button className="btn sm" style={{ minHeight: 40 }} onClick={() => pref.current?.click()}>+ 사진</button>
+        </div>
+      </div>
+      {r.checked && fieldDirty && <div className="small" style={{ color: '#7A4F00' }}>고쳐 저장하면 미등록으로 돌아갑니다</div>}
       {err && <div className="small" style={{ color: '#9A3216' }}>{err}</div>}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         {del

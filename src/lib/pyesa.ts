@@ -119,6 +119,11 @@ export function withPyesa(repo: Repo): Repo {
 
 // 크레임 처리용 — 피그온에는 올리지 않는 크레임 폐사를 시트에서 '등록완료'로 돌려 놓는다 (스킬·카톡 미등록에서 빠짐)
 export async function markSheet(rows: number[], done: boolean) { await post({ action: 'mark', rows, done }); changed(); }
+// 시트 줄 사진 바꾸기: keep = 남길 드라이브 링크, add = 새 사진(data URL). 빠진 사진은 서버가 휴지통으로
+export async function editSheetPhotos(r: DeathRow, keep: string[], add: string[]) {
+  await post({ action: 'photos', row: Number(r.sheetRow), was: { date: r.date, farm: r.sheetFarm, count: r.count }, keep, add: add.map(toPayload).filter(Boolean) });
+  changed();
+}
 export async function editSheetCount(r: DeathRow, count: number) {
   await post({ action: 'edit', row: Number(r.sheetRow), was: { date: r.date, farm: r.sheetFarm, count: r.count }, date: r.date, dong: r.dong, group: r.group, count });
 }

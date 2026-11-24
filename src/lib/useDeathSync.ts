@@ -7,7 +7,7 @@ import { useEffect, useRef } from 'react';
 import { useData } from './data';
 import { useHerd } from './ui';
 import { useAuth } from './auth';
-import { pyesaOn, saveToSheet, markSheet, editSheetCount } from './pyesa';
+import { pyesaOn, saveToSheet, markSheet, editSheetCount, editSheetPhotos } from './pyesa';
 import type { DeathRow } from './repo';
 
 const FROM = '2026-10-01'; // 이보다 오래된 미등록은 건드리지 않음
@@ -27,7 +27,7 @@ export function useDeathSync() {
     //    시트를 못 읽었거나 짝 줄을 못 찾았으면(그 사이 고친 경우 등) 원본만 지우지 않는다 — 시트 줄이 고아가 되므로
     const del = sheetErr ? undefined : removing.find((x) => !tried.current.has('d' + x.doc.id) && (!(x.doc as any).sheetAt || x.rows.length > 0));
     // 0-1) 시트로 보낸 뒤 농장이 고친 폐사 → 시트 줄도 같게
-    const rsy = sheetErr ? undefined : resync.find((x) => !tried.current.has('r' + x.doc.id + (x.doc as any).editedAt));
+    const rsy = sheetErr ? undefined : resync.find((x) => !tried.current.has('r' + x.doc.id + (x.doc as any).editedAt + (x.doc as any).photosAt));
     // 0-2) 농장이 고친·지운 다른 곳 입력 폐사 (피그온 등록된 줄 지우기는 사람이 확인 — 남겨 둠)
     const fixx = sheetErr ? undefined : fixing.find((x) => !tried.current.has('x' + x.fix.id) && !(x.fix.remove && x.target?.checked));
     // 1) 공유 화면 폐사 → 시트
@@ -47,9 +47,11 @@ export function useDeathSync() {
           for (const r of del.rows) await repo.removeDeath(r);
           await repo.removeDeath(del.doc);
         } else if (rsy) {
-          const d = rsy.doc;
-          tried.current.add('r' + d.id + (d as any).editedAt);
-          await repo.updateDeath(rsy.row, { date: d.date, dong: d.dong, group: d.group, count: d.count }, 'farm');
+          const d = rsy.doc, r = rsy.row;
+          tried.current.add('r' + d.id + (d as any).editedAt + (d as any).photosAt);
+          // 사진 먼저(시트 줄의 지금 값으로 확인하므로), 그다음 날짜·동·두수
+          if (((d as any).photosAt ?? '') > ((d as any).sheetAt ?? '')) await editSheetPhotos(r, [], d.photos ?? []);
+          if (r.date !== d.date || String(r.dong ?? '') !== String(d.dong ?? '') || r.group !== d.group || r.count !== d.count) await repo.updateDeath(r, { date: d.date, dong: d.dong, group: d.group, count: d.count }, 'farm');
           await repo.updateDeath(d, { sheetAt: new Date().toISOString(), sheetWas: { date: d.date, dong: d.dong, group: d.group, count: d.count } } as any, 'sync');
         } else if (fixx) {
           const { fix: f, target: t } = fixx;
