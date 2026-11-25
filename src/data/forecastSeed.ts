@@ -65,7 +65,9 @@ export const FC_HAND: Record<string, number[]> = {"희망1": [90, 50, 50, 50, 0,
 export const MY_MGR = '이오름';
 // 양식 행 순서 (담당자 → 농장)
 export const FC_LAYOUT: { mgr: string; farms: string[] }[] = [
-  { mgr: '신동영', farms: ['희망1', '희망2', '가경', '대동', '예성', '승리', '오공주'] },
-  { mgr: '이오름', farms: ['욥', '골드피그', '명임', '평지', '산성농원', '아멘', '원가림', '민서', '세희', '루카', '정축산', '용암', '재성'] }
+  { mgr: '신동영', farms: ['희망1', '희망2', '가경', '대동', '승리', '오공주'] },
+  { mgr: '이오름', farms: ['욥', '골드피그', '명임', '평지', '산성농원', '아멘', '원가림', '민서', '세희', '루카', '정축산', '용암', '재성', '예성'] }
 ];
+// 담당이 중간에 바뀐 농장: 이 날짜 이후 입식 돈군부터 내 실적·예상 (예성 = 26년 11월 입식 회전부터)
+export const FARM_FROM: Record<string, string> = { 예성: '2026-11-01' };
 export const MY_FARMS: string[] = FC_LAYOUT.find((m) => m.mgr === MY_MGR)!.farms;

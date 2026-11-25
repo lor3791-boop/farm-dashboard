@@ -8,7 +8,7 @@ import { addIso } from '@/lib/calc/dates';
 import { useHerd } from '@/lib/ui';
 import { useSettle } from '@/lib/useSettle';
 import { TODAY } from '@/lib/calc/herd';
-import { FC_SETTINGS, FC_GROUPS, FC_HAND, MY_FARMS, MY_MGR } from '@/data/forecastSeed';
+import { FC_SETTINGS, FC_GROUPS, FC_HAND, MY_FARMS, MY_MGR, FARM_FROM } from '@/data/forecastSeed';
 import { fmt, md } from '@/lib/calc/dates';
 import { Chip, Segs } from '@/components/v5';
 import { exportPlan, exportFarm } from './forecastExport';
@@ -34,7 +34,7 @@ function useLiveGroups(S: FcSettings): FcGroup[] {
   return useMemo(() => {
     const cum = makeCum(S);
     const keyOf = (f: string) => FC_GROUPS.find((x) => x.farm === f)?.key ?? f;
-    const L = all.filter((g) => MY_FARMS.includes(g.farm) && (g.stock > 0 || g.sold > 0)).map((g) => {
+    const L = all.filter((g) => MY_FARMS.includes(g.farm) && (g.stock > 0 || g.sold > 0) && !(FARM_FROM[g.farm] && g.date < FARM_FROM[g.farm])).map((g) => {
       const [y, n] = g.group.split('-');
       // 이 그룹 출하: 출하실적종합(그룹 배정) + 그 뒤의 등판서·직접 입력·피그온 출하
       const tot = st.rowsOf(g).map((r) => ({ date: r.date, n: r.n, live: r.live }));
@@ -60,7 +60,13 @@ export function Forecast() {
   const [start, setStart] = useState(TODAY.slice(0, 7));
   const MINE = useLiveGroups(S);
   // 실적 자료가 오늘까지 안 들어왔으면(출하실적 업로드 전) 그 사이 날짜는 '예상'으로 채운다 — 비워 두면 그만큼 빠짐
-  const { shipRows } = useHerd();
+  const { shipRows: shipAll } = useHerd();
+  // 담당이 바뀐 농장(예성)은 내 담당 돈군 입식 후 100일 이후 출하만 실적으로 (그 전 출하는 전 담당 돈군)
+  const shipRows = useMemo(() => {
+    const cut: Record<string, string> = {};
+    Object.entries(FARM_FROM).forEach(([f, d]) => { const ins = MINE.filter((g) => g.farm === f).map((g) => g.indate).sort(); cut[f] = addIso(ins[0] ?? d, 100); });
+    return shipAll.filter((x) => !cut[x[1]] || x[0] >= cut[x[1]]);
+  }, [shipAll, MINE]);
   const lastShip = useMemo(() => shipRows.reduce((m, x) => (MY_FARMS.includes(x[1]) && x[0] <= TODAY && x[0] > m ? x[0] : m), ''), [shipRows]);
   const FC_ASOF = lastShip && addIso(lastShip, 1) < TODAY ? addIso(lastShip, 1) : TODAY;
   const [adj, setAdj] = useState<Record<string, number[]>>(load);
@@ -127,7 +133,8 @@ export function Forecast() {
   // 기준값(월말 작성 계획): 올린 엑셀 > 10/26 작성분(기본값)
   const baseMonths = useMemo<FcBaseMonths>(() => {
     const d: FcBaseMonths = {}; const yms = ['2026-11', '2026-12', '2027-01'];
-    Object.entries(FC_HAND).forEach(([f, v]) => yms.forEach((ym, k) => { (d[ym] ??= {})[f] = v.slice(k * 5, k * 5 + 5); }));
+    // 담당이 바뀐 농장(예성)의 10/26 작성분은 전 담당 계획이라 기준에서 뺌
+    Object.entries(FC_HAND).filter(([f]) => !FARM_FROM[f]).forEach(([f, v]) => yms.forEach((ym, k) => { (d[ym] ??= {})[f] = v.slice(k * 5, k * 5 + 5); }));
     Object.entries(up.fcBase.months).forEach(([ym, m]) => { d[ym] = m; });
     return d;
   }, [up.fcBase.months]);
