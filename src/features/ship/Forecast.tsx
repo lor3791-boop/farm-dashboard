@@ -3,7 +3,8 @@
 // 증체계수는 입력된 출하실적(출하실적종합·등판서·직접 입력·피그온 출하)으로 역산: 그룹 출하가 있으면 그 그룹 값,
 // 없으면 같은 농장 출하 그룹들의 평균, 그것도 없으면 기본 농장계수. 계획체중(첫출하·이후)을 바꾸면 바로 다시 계산.
 import { useMemo, useState } from 'react';
-import { forecast, farmTable, monthsToCover, ymOf, backRate, makeCum, weekActual, type FcSettings, type FcGroup, type FcSeg } from '@/lib/calc/forecast';
+import { forecast, farmTable, monthsToCover, ymOf, backRate, makeCum, weekActual, splitRest, takeRest, type FcSettings, type FcGroup, type FcSeg } from '@/lib/calc/forecast';
+import { addIso } from '@/lib/calc/dates';
 import { useHerd } from '@/lib/ui';
 import { useSettle } from '@/lib/useSettle';
 import { TODAY } from '@/lib/calc/herd';
@@ -58,7 +59,10 @@ export function Forecast() {
   const [S, setS] = useState<FcSettings>(FC_SETTINGS);
   const [start, setStart] = useState(TODAY.slice(0, 7));
   const MINE = useLiveGroups(S);
-  const FC_ASOF = TODAY;
+  // 실적 자료가 오늘까지 안 들어왔으면(출하실적 업로드 전) 그 사이 날짜는 '예상'으로 채운다 — 비워 두면 그만큼 빠짐
+  const { shipRows } = useHerd();
+  const lastShip = useMemo(() => shipRows.reduce((m, x) => (MY_FARMS.includes(x[1]) && x[0] <= TODAY && x[0] > m ? x[0] : m), ''), [shipRows]);
+  const FC_ASOF = lastShip && addIso(lastShip, 1) < TODAY ? addIso(lastShip, 1) : TODAY;
   const [adj, setAdj] = useState<Record<string, number[]>>(load);
   const [edit, setEdit] = useState(false);
   const [view, setView] = useState<'form' | 'cmp' | 'group'>('form');
@@ -70,19 +74,57 @@ export function Forecast() {
   const groupOpts = MINE.filter((g) => (!fFarm || g.farm === fFarm) && (!fIn || ymOf(g.indate) === fIn));
   const picked = groupOpts.filter((g) => !fGroup || g.group === fGroup);
   const filtered = !!(fFarm || fIn || fGroup);
-  const { segs, rows } = useMemo(() => forecast(picked, S, FC_ASOF, start), [picked, S, start]);
-  const fcTable = useMemo(() => farmTable(rows, filtered ? {} : adj), [rows, adj, filtered]);
-  // 지난 주차 = 실제 출하(입력한 출하 자료 전부, 같은 날·농장은 한 번만), 이번 주 = 실제 + 남은 예상, 앞으로 = 예상
-  const { shipRows } = useHerd();
   const byGroup = !!(fIn || fGroup); // 전입월·그룹으로 거르면 실제 출하는 그룹별로 못 나눠 예상만
-  const actual = useMemo(() => (byGroup ? {} : weekActual(segs, shipRows.map((x) => ({ date: x[0], farm: x[1], n: x[3] })), MY_FARMS)), [segs, shipRows, byGroup]);
   const isPast = (s: FcSeg | null) => !!s && s.end < FC_ASOF;
-  const table = useMemo(() => { const o: Record<string, number[]> = {}; MY_FARMS.forEach((f) => { const A = actual[f] ?? Array(15).fill(0), F = fcTable[f] ?? Array(15).fill(0); o[f] = segs.map((s, i) => (isPast(s) ? A[i] : A[i] + F[i])); }); return o; }, [actual, fcTable, segs]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { up } = useData();
+  const { repo } = useAuth();
+  // 말일까지 예상 출하(직접 입력): 이번 달(오늘이 든 달)만. 입력한 농장은 이번 달 남은 주차에 그 두수를 나눠 넣고, 다음 달부터는 그만큼 뺀 재고로 다시 예상
+  const restYm = TODAY.slice(0, 7);
+  const [restEd, setRestEd] = useState<Record<string, string> | null>(null);
+  const restSaved = up.fcRest.ym === restYm ? up.fcRest.farms : {};
+  const restVals: Record<string, number> = useMemo(() => {
+    const src = restEd ? Object.fromEntries(Object.entries(restEd).filter(([, v]) => v !== '').map(([k, v]) => [k, Math.max(0, Math.round(Number(v) || 0))])) : restSaved;
+    return src;
+  }, [restEd, restSaved]);
+  const segYm = (s: FcSeg | null) => (s ? `${s.y}-${String(s.month).padStart(2, '0')}` : '');
+  // 표 만들기: 지난 주차 = 실제, 이번 주 = 실제 + 남은 예상, 앞으로 = 예상, 말일까지 입력한 농장은 입력값 + 다음 달부터 재계산
+  const build = (G: FcGroup[], adjUse: Record<string, number[]>, withActual: boolean, useRest: boolean) => {
+    const A = forecast(G, S, FC_ASOF, start), F = farmTable(A.rows, adjUse), segs = A.segs;
+    const act = withActual ? weekActual(segs, shipRows.map((x) => ({ date: x[0], farm: x[1], n: x[3] })), MY_FARMS) : {};
+    const curIdx = segs.map((s, i) => (s && segYm(s) === restYm && !isPast(s) ? i : -1)).filter((i) => i >= 0);
+    const rest = useRest && curIdx.length ? Object.fromEntries(Object.entries(restVals).filter(([f]) => G.some((g) => g.farm === f))) : {};
+    const monthEnd = addIso(addIso(restYm + '-01', 32).slice(0, 8) + '01', -1);
+    const B = Object.keys(rest).length ? farmTable(forecast(takeRest(G, A.rows, rest, curIdx, monthEnd), S, addIso(monthEnd, 1), start).rows, adjUse) : {};
+    const model: Record<string, number> = {};
+    const T: Record<string, number[]> = {};
+    MY_FARMS.forEach((f) => {
+      const a = act[f] ?? Array(15).fill(0), p = F[f] ?? Array(15).fill(0);
+      model[f] = curIdx.reduce((x, i) => x + p[i], 0);
+      const sp = f in rest ? splitRest(rest[f], curIdx, p, segs.map((s) => s?.days ?? 0)) : null;
+      T[f] = segs.map((s, i) => {
+        if (!s) return 0;
+        if (sp && segYm(s) === restYm) return isPast(s) ? a[i] : a[i] + sp[i];
+        if (sp && segYm(s) > restYm) return B[f]?.[i] ?? 0;
+        return isPast(s) ? a[i] : a[i] + p[i];
+      });
+    });
+    return { segs, rows: A.rows, table: T, actual: act as Record<string, number[]>, model, curIdx };
+  };
+  const view0 = useMemo(() => build(picked, filtered ? {} : adj, !byGroup, !byGroup), [picked, S, start, adj, filtered, byGroup, shipRows, restVals, FC_ASOF]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { segs, rows, table, actual } = view0;
+  // 입력칸 안내용: 필터와 상관없이 전체, 입력 반영 전 모델 값
+  const full0 = useMemo(() => build(MINE, adj, true, false), [MINE, S, start, adj, shipRows, FC_ASOF]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [restMsg, setRestMsg] = useState<{ ok: boolean; t: string } | null>(null);
+  const saveRest = async (farms: Record<string, number>) => {
+    setRestMsg(null);
+    try { await repo!.put('config', 'fcRest', { ym: restYm, at: new Date().toISOString(), farms: JSON.stringify(farms) }); setRestEd(null); setRestMsg({ ok: true, t: Object.keys(farms).length ? `저장: ${Object.keys(farms).length}개 농장` : '입력값을 지웠습니다' }); }
+    catch (e) { setRestMsg({ ok: false, t: '저장하지 못했습니다: ' + (e as Error).message }); }
+  };
+  const restFarms = MY_FARMS.filter((f) => MINE.some((g) => g.farm === f) || (full0.actual[f] ?? []).some(Boolean));
+  const monthAct = (f: string) => full0.segs.reduce((a, s, i) => a + (s && segYm(s) === restYm ? full0.actual[f]?.[i] ?? 0 : 0), 0);
   const farms = MY_FARMS.filter((f) => !fFarm || f === fFarm).filter((f) => !filtered || rows.some((r) => r.farm === f) || (!byGroup && (actual[f] ?? []).some(Boolean)));
   const row = (f: string) => table[f] ?? Array(15).fill(0);
   // 기준값(월말 작성 계획): 올린 엑셀 > 10/26 작성분(기본값)
-  const { up } = useData();
-  const { repo } = useAuth();
   const baseMonths = useMemo<FcBaseMonths>(() => {
     const d: FcBaseMonths = {}; const yms = ['2026-11', '2026-12', '2027-01'];
     Object.entries(FC_HAND).forEach(([f, v]) => yms.forEach((ym, k) => { (d[ym] ??= {})[f] = v.slice(k * 5, k * 5 + 5); }));
@@ -134,10 +176,8 @@ export function Forecast() {
     setBusy(k);
     try {
       if (k === 'plan') {
-        const r = forecast(MINE, S, FC_ASOF, start), F = farmTable(r.rows, adj);
-        const A = weekActual(r.segs, shipRows.map((x) => ({ date: x[0], farm: x[1], n: x[3] })), MY_FARMS);
-        const T: Record<string, number[]> = {}; MY_FARMS.forEach((f) => { T[f] = r.segs.map((s, i) => (A[f]?.[i] ?? 0) + (isPast(s) ? 0 : F[f]?.[i] ?? 0)); });
-        await exportPlan(r.segs, T, MY_FARMS);
+        const r = build(MINE, adj, true, true);
+        await exportPlan(r.segs, r.table, MY_FARMS);
       }
       else {
         const asofM = FC_ASOF.slice(0, 7); const base = start < asofM ? start : asofM;
@@ -172,7 +212,7 @@ export function Forecast() {
           <label className="small muted">그룹<br /><select value={fGroup} onChange={(e) => setFGroup(e.target.value)}><option value="">전체</option>{groupOpts.map((g) => <option key={g.group} value={g.group}>{shortG(g.group)}</option>)}</select></label>
           {filtered && <button className="btn sm ghost" onClick={() => { setFFarm(''); setFIn(''); setFGroup(''); }}>필터 해제</button>}
         </div>
-        <div className="muted small" style={{ marginTop: 8 }}>{MY_MGR} 담당농장 · 오늘({md(FC_ASOF)}) 실시간 재고 · 증체계수는 출하실적 역산 · 주차 = 월~금(공휴일 제외 영업일) · 10두 단위{filtered ? ' · 필터 중에는 수동조정 제외' : ''}</div>
+        <div className="muted small" style={{ marginTop: 8 }}>{MY_MGR} 담당농장 · 오늘({md(TODAY)}) 실시간 재고 · 출하실적 {lastShip ? md(lastShip) : "-"}까지 반영, 이후는 예상 · 증체계수는 출하실적 역산 · 주차 = 월~금(공휴일 제외 영업일) · 10두 단위{filtered ? ' · 필터 중에는 수동조정 제외' : ''}</div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px, 100%), 1fr))', gap: 10, marginTop: 14 }}>
@@ -184,6 +224,28 @@ export function Forecast() {
         })}
         <div className="card" style={{ padding: '14px 16px' }}><div className="muted small">현재 돈군 전체</div><div style={{ fontSize: 24, fontWeight: 700 }}>{fmt(Math.round(sum(rows.map((r) => r.total)) / 10) * 10)}두</div><div className="sub">{rows.length}개 그룹 · 첫출하 지연 {rows.filter((r) => r.status === '지연').length}개</div></div>
       </div>
+
+      {full0.curIdx.length > 0 && (
+        <div className="card" style={{ marginTop: 14 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+            <h2 className="h2" style={{ flex: 1 }}>{Number(restYm.slice(5))}월 말일까지 예상 출하</h2>
+            {restEd && <button className="btn sm ghost" onClick={() => setRestEd(null)}>취소</button>}
+            {Object.keys(restSaved).length > 0 && !restEd && <button className="btn sm ghost" onClick={() => saveRest({})}>입력값 지우기</button>}
+            <button className="btn sm pri" disabled={!restEd} onClick={() => saveRest(restVals)}>저장</button>
+          </div>
+          <div className="muted small" style={{ margin: '6px 0 10px' }}>실적 자료 {lastShip ? md(lastShip) : '-'}까지 · {md(FC_ASOF)}부터 말일까지 나갈 두수 · 비우면 모델 예상(칸 안 회색) · 입력하면 {Number(restYm.slice(5))}월 남은 주차에 나눠 넣고 다음 달부터 남은 재고로 다시 계산</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+            {restFarms.map((f) => {
+              const v = restEd ? restEd[f] ?? '' : restSaved[f] != null ? String(restSaved[f]) : '';
+              return <label key={f} className="small" style={{ display: 'grid', gap: 4 }}><span><b>{f}</b> <span className="muted">실적 {fmt(monthAct(f))}</span></span>
+                <input type="number" inputMode="numeric" min={0} step={10} value={v} placeholder={fmt(Math.round(full0.model[f] ?? 0))} style={{ minHeight: 40 }}
+                  onChange={(e) => setRestEd({ ...(restEd ?? Object.fromEntries(Object.entries(restSaved).map(([k, x]) => [k, String(x)]))), [f]: e.target.value })} /></label>;
+            })}
+          </div>
+          <div className="small" style={{ marginTop: 10 }}>{Number(restYm.slice(5))}월 합계: 실적 {fmt(restFarms.reduce((a, f) => a + monthAct(f), 0))} + 말일까지 {fmt(restFarms.reduce((a, f) => a + (f in restVals ? restVals[f] : Math.round(full0.model[f] ?? 0)), 0))} = <b>{fmt(restFarms.reduce((a, f) => a + monthAct(f) + (f in restVals ? restVals[f] : Math.round(full0.model[f] ?? 0)), 0))}두</b></div>
+          {restMsg && <div className={'chip ' + (restMsg.ok ? 'ok' : 'bad')} style={{ marginTop: 8 }}>{restMsg.t}</div>}
+        </div>
+      )}
 
       <div className="card" style={{ marginTop: 14 }}>
         <h2 className="h2">주차별 예상 출하두수</h2>

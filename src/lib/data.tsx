@@ -13,7 +13,7 @@ import type { Loan, Monthly, FeedBin } from './bonds';
 export interface TotalDoc { file: string; at: string; rows: string[] }
 export interface LoanDoc { file: string; at: string; base: string; rows: string }       // rows: Loan[] JSON
 export interface MonthlyDoc { file: string; at: string; rows: string; bins: string }   // Monthly[] / FeedBin[] JSON
-export interface Uploaded { total: { doc: TotalDoc | null; rows: TotRow[] }; loans: { doc: LoanDoc | null; rows: Loan[] }; monthly: { doc: MonthlyDoc | null; rows: Monthly[]; bins: FeedBin[] }; fcBase: { doc: FcBaseDoc | null; months: FcBaseMonths } }
+export interface Uploaded { total: { doc: TotalDoc | null; rows: TotRow[] }; loans: { doc: LoanDoc | null; rows: Loan[] }; monthly: { doc: MonthlyDoc | null; rows: Monthly[]; bins: FeedBin[] }; fcBase: { doc: FcBaseDoc | null; months: FcBaseMonths }; fcRest: { ym: string; at: string; farms: Record<string, number> } }
 const parseJ = <T,>(s: string | undefined, d: T): T => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
 import { useMemo } from 'react';
 import { setPyesaKey, onPyesaChange, loadSheet, pendingRows, dropSentBefore, onPendChange } from './pyesa';
@@ -29,7 +29,7 @@ export interface Resync { doc: DeathRow; row: DeathRow }
 export interface FarmFix { id: string; _path: string; farm: string; ref: string; was: { date: string; dong: string; group: string; count: number }; date: string; dong: string; group: string; count: number; remove?: boolean; at: string }
 export interface Fixing { fix: FarmFix; target?: DeathRow }
 interface DataState { data: AppData | null; error: string; deaths: DeathRow[]; removing: Removing[]; resync: Resync[]; fixing: Fixing[]; ships: (ManualShip & { id: string })[]; groups: (ManualGroup & { id: string })[]; uploads: (ShipImport & { id: string })[]; imports: ImpRow[]; sheetErr: string; loading: boolean; refresh: () => Promise<void>; up: Uploaded }
-const Ctx = createContext<DataState>({ data: null, error: '', deaths: [], removing: [], resync: [], fixing: [], ships: [], groups: [], uploads: [], imports: [], sheetErr: '', loading: true, refresh: async () => {}, up: { total: { doc: null, rows: [] }, loans: { doc: null, rows: [] }, monthly: { doc: null, rows: [], bins: [] }, fcBase: { doc: null, months: {} } } });
+const Ctx = createContext<DataState>({ data: null, error: '', deaths: [], removing: [], resync: [], fixing: [], ships: [], groups: [], uploads: [], imports: [], sheetErr: '', loading: true, refresh: async () => {}, up: { total: { doc: null, rows: [] }, loans: { doc: null, rows: [] }, monthly: { doc: null, rows: [], bins: [] }, fcBase: { doc: null, months: {} }, fcRest: { ym: '', at: '', farms: {} } } });
 export const useData = () => useContext(Ctx);
 
 export function DataProvider({ children }: { children: ReactNode }) {
@@ -52,7 +52,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const up: Uploaded = useMemo(() => {
     const t = cfg.shipTotal as TotalDoc | undefined, l = cfg.bondLoan as LoanDoc | undefined, m = cfg.bondMonthly as MonthlyDoc | undefined;
     const fb = cfg.fcBase as FcBaseDoc | undefined;
-    return { total: { doc: t ?? null, rows: unpackTotal(t?.rows) }, loans: { doc: l ?? null, rows: parseJ<Loan[]>(l?.rows, []) }, monthly: { doc: m ?? null, rows: parseJ<Monthly[]>(m?.rows, []), bins: parseJ<FeedBin[]>(m?.bins, []) }, fcBase: { doc: fb ?? null, months: parseJ<FcBaseMonths>(fb?.months, {}) } };
+    return { total: { doc: t ?? null, rows: unpackTotal(t?.rows) }, loans: { doc: l ?? null, rows: parseJ<Loan[]>(l?.rows, []) }, monthly: { doc: m ?? null, rows: parseJ<Monthly[]>(m?.rows, []), bins: parseJ<FeedBin[]>(m?.bins, []) }, fcBase: { doc: fb ?? null, months: parseJ<FcBaseMonths>(fb?.months, {}) },
+      // 원료돈: 이번 달 말일까지 예상 출하(직접 입력) — 농장별 두수
+      fcRest: { ym: cfg.fcRest?.ym ?? '', at: cfg.fcRest?.at ?? '', farms: parseJ<Record<string, number>>(cfg.fcRest?.farms, {}) } };
   }, [cfg]);
   // 출하실적종합을 올렸으면 그 기간은 올린 값을 쓴다 (화면이 그리기 전에 바꿔 둠)
   useMemo(() => setShipBase(up.total.rows), [up.total.rows]);
@@ -64,7 +66,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const u4 = repo.watch<ManualGroup>('groups', setGroups);
     const u5 = repo.watch<ShipImport>('shipImport', setUploads);
     const u7 = repo.watch<FarmFix>('**/fixes', (L) => setFixes(L as FarmFix[]), () => {});
-    const u6 = repo.watch<any>('config', (L) => { const o: Record<string, any> = {}; L.forEach((d) => { if (['shipTotal', 'bondLoan', 'bondMonthly', 'fcBase'].includes(d.id)) o[d.id] = d; }); setCfg(o); });
+    const u6 = repo.watch<any>('config', (L) => { const o: Record<string, any> = {}; L.forEach((d) => { if (['shipTotal', 'bondLoan', 'bondMonthly', 'fcBase', 'fcRest'].includes(d.id)) o[d.id] = d; }); setCfg(o); });
     return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); };
   }, [repo]);
   // 폐사입력 앱(구글시트) 기록: 기준일 이후를 1분마다, 저장·수정 직후에 다시 읽는다

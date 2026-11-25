@@ -157,3 +157,36 @@ export function weekActual(segs: (FcSeg | null)[], ships: { date: string; farm: 
   ships.forEach((x) => { if (!out[x.farm] || !(x.n > 0)) return; const i = idx(x.date); if (i >= 0) out[x.farm][i] += x.n; });
   return out;
 }
+
+/** n두를 칸(idx)에 나눠 넣는다 — 모델 예상(w) 비율대로, 예상이 없으면 영업일 수(days) 비율. 정수, 합계 = n */
+export function splitRest(n: number, idx: number[], w: number[], days: number[]): number[] {
+  const out = Array(w.length).fill(0);
+  if (!idx.length || n <= 0) return out;
+  let ws = idx.map((i) => Math.max(0, w[i] || 0));
+  if (!ws.some((x) => x > 0)) ws = idx.map((i) => days[i] || 1);
+  const W = ws.reduce((a, b) => a + b, 0);
+  const raw = ws.map((x) => (n * x) / W), fl = raw.map(Math.floor);
+  let left = n - fl.reduce((a, b) => a + b, 0);
+  raw.map((x, k) => [x - fl[k], k] as const).sort((a, b) => b[0] - a[0]).forEach(([, k]) => { if (left > 0) { fl[k]++; left--; } });
+  idx.forEach((i, k) => (out[i] = fl[k]));
+  return out;
+}
+
+/** 말일까지 예상 출하(입력)를 그룹에 나눠 재고에서 뺀 그룹 목록 — 다음 달부터 다시 예상할 때 쓴다.
+ *  그룹 몫 = 이번 달 남은 칸(idx)의 모델 예상 비율(없으면 재고 비율), 재고를 넘지 않게. */
+export function takeRest(groups: FcGroup[], rows: FcRow[], rest: Record<string, number>, idx: number[], monthEnd: string): FcGroup[] {
+  const out = groups.map((g) => ({ ...g }));
+  Object.entries(rest).forEach(([farm, n0]) => {
+    const G = out.map((g, i) => ({ g, r: rows[i] })).filter((x) => x.g.farm === farm && x.g.stock > 0);
+    if (!G.length || !(n0 > 0)) return;
+    let w = G.map((x) => idx.reduce((a, i) => a + (x.r?.heads[i] ?? 0), 0));
+    if (!w.some((v) => v > 0)) w = G.map((x) => x.g.stock);
+    const W = w.reduce((a, b) => a + b, 0);
+    let left = Math.min(n0, G.reduce((a, x) => a + x.g.stock, 0));
+    const take = G.map((x, k) => Math.min(x.g.stock, Math.floor((left * w[k]) / W)));
+    left -= take.reduce((a, b) => a + b, 0);
+    G.forEach((x, k) => { const more = Math.min(left, x.g.stock - take[k]); take[k] += more; left -= more; });
+    G.forEach((x, k) => { if (!take[k]) return; x.g.stock -= take[k]; x.g.shipped += take[k]; x.g.firstShip = x.g.firstShip ?? monthEnd; });
+  });
+  return out;
+}

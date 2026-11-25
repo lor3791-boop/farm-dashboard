@@ -44,3 +44,20 @@ describe('실제 출하 → 주차 칸', () => {
     expect(a.B).toBeUndefined();
   });
 });
+
+import { splitRest, takeRest } from './forecast';
+describe('말일까지 예상 입력', () => {
+  it('splitRest: 합계 유지, 예상 비율', () => {
+    const r = splitRest(100, [3, 4], [0, 0, 0, 30, 10], [5, 5, 5, 5, 1]);
+    expect(r).toEqual([0, 0, 0, 75, 25]);
+    expect(splitRest(7, [3, 4], [0, 0, 0, 0, 0], [5, 5, 5, 5, 2]).reduce((a, b) => a + b, 0)).toBe(7);
+  });
+  it('takeRest: 재고에서 빼고 출하 시작으로', () => {
+    const G = [{ mgr: 'x', farm: 'A', key: 'A', group: 'g1', indate: '2026-07-01', n: 400, w0: 30, stock: 300, shipped: 0, firstShip: null },
+               { mgr: 'x', farm: 'A', key: 'A', group: 'g2', indate: '2026-08-01', n: 400, w0: 30, stock: 400, shipped: 0, firstShip: null }];
+    const rows = [{ heads: [0, 0, 0, 60, 20] }, { heads: [0, 0, 0, 20, 0] }] as any;
+    const o = takeRest(G, rows, { A: 100 }, [3, 4], '2026-11-30');
+    expect(o[0].stock + o[1].stock).toBe(600);
+    expect(o[0].stock).toBe(220); expect(o[0].firstShip).toBe('2026-11-30');
+  });
+});
