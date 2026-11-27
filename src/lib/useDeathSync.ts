@@ -15,7 +15,7 @@ const FROM = '2026-10-01'; // 이보다 오래된 미등록은 건드리지 않�
 // (정축산 26-4 11/15는 크레임 잔여 0 지정으로 이미 체크를 풀었고 피그온에 등록됨 → 뺌)
 const SEED: Record<string, string> = Object.fromEntries(['2026-11-19|민서|26-10|4', '2026-11-19|민서|26-9|1', '2026-11-21|민서|26-11|1', '2026-11-17|아멘|26-9|1', '2026-11-16|재성|26-9|2', '2026-11-19|재성|26-9|2'].map((k) => [k, '2026-11-21']));
 export function useDeathSync() {
-  const { deaths, removing, resync, fixing, loading, sheetErr } = useData();
+  const { deaths, removing, resync, fixing, relink, loading, sheetErr } = useData();
   const { split, saved, save } = useHerd();
   const { repo } = useAuth();
   const busy = useRef(false);
@@ -30,15 +30,18 @@ export function useDeathSync() {
     const rsy = sheetErr ? undefined : resync.find((x) => !tried.current.has('r' + x.doc.id + (x.doc as any).editedAt + (x.doc as any).photosAt));
     // 0-2) 농장이 고친·지운 다른 곳 입력 폐사 (피그온 등록된 줄 지우기는 사람이 확인 — 남겨 둠)
     const fixx = sheetErr ? undefined : fixing.find((x) => !tried.current.has('x' + x.fix.id) && !(x.fix.remove && x.target?.checked));
+    // 0-3) 시트에 이미 들어간(짝을 찾은) 농장 입력인데 '보냈음' 표시가 없음 → 표시만 (다시 보내면 중복)
+    const rlk = sheetErr ? undefined : relink.find((d) => !tried.current.has('l' + d.id));
     // 1) 공유 화면 폐사 → 시트
-    const fwd = deaths.find((d) => !isSheet(d) && d.src === 'share' && !d.checked && !(d as any).sheetAt && d.count > 0 && d.date >= FROM && !tried.current.has('f' + d.id));
+    //    보내기 전에 '보내는 중(sheetTry)'을 먼저 적고, 15분 안에는 다시 보내지 않는다 (창을 닫아 '보냈음'을 못 적은 경우 중복 방지)
+    const fwd = sheetErr ? undefined : deaths.find((d) => !isSheet(d) && d.src === 'share' && !d.checked && !(d as any).sheetAt && d.count > 0 && d.date >= FROM && !tried.current.has('f' + d.id) && !(Date.now() - Date.parse((d as any).sheetTry ?? '') < 15 * 60e3));
     // 2) 크레임 줄
     const cl = deaths.find((d) => isSheet(d) && !d.checked && d.date >= FROM && (split[d.id]?.claim ?? 0) > 0 && !saved.settled[d.farm + ' ' + d.group] && !tried.current.has('c' + d.id + '|' + d.count));
     // 3) 크레임이라 체크했던 줄이 이제 폐사로 바뀌면(크레임 잔여를 고친 경우 등) 체크를 다시 푼다 → 피그온 등록 대상으로
     const MK = { ...SEED, ...(saved.claimMarked ?? {}) };
     const ck = (d: DeathRow) => [d.date, d.farm, d.group, d.count].join('|');
     const un = deaths.find((d) => isSheet(d) && d.checked && MK[ck(d)] && (split[d.id]?.claim ?? 0) === 0 && (split[d.id]?.death ?? 0) > 0 && !tried.current.has('u' + d.id));
-    if (!del && !rsy && !fixx && !fwd && !cl && !un) return;
+    if (!del && !rsy && !fixx && !rlk && !fwd && !cl && !un) return;
     busy.current = true;
     (async () => {
       try {
@@ -47,8 +50,11 @@ export function useDeathSync() {
           for (const r of del.rows) await repo.removeDeath(r);
           await repo.removeDeath(del.doc);
         } else if (rsy) {
-          const d = rsy.doc, r = rsy.row;
+          const d = rsy.doc;
           tried.current.add('r' + d.id + (d as any).editedAt + (d as any).photosAt);
+          // 크레임 처리로 나뉜 줄이면 한 줄(맨 위)만 남기고 나머지를 지운 뒤 고친다 — 아래 줄부터 지워야 줄 번호가 안 밀림
+          const R = [...rsy.rows].sort((a, b) => Number(a.sheetRow) - Number(b.sheetRow)), r = R[0];
+          for (const x of R.slice(1).reverse()) await repo.removeDeath(x);
           // 사진 먼저(시트 줄의 지금 값으로 확인하므로), 그다음 날짜·동·두수
           if (((d as any).photosAt ?? '') > ((d as any).sheetAt ?? '')) await editSheetPhotos(r, [], d.photos ?? []);
           if (r.date !== d.date || String(r.dong ?? '') !== String(d.dong ?? '') || r.group !== d.group || r.count !== d.count) await repo.updateDeath(r, { date: d.date, dong: d.dong, group: d.group, count: d.count }, 'farm');
@@ -58,8 +64,13 @@ export function useDeathSync() {
           tried.current.add('x' + f.id);
           if (t) { if (f.remove) await repo.removeDeath(t); else await repo.updateDeath(t, { date: f.date, dong: f.dong, group: f.group, count: f.count }, 'farm'); }
           await repo.removePath(f._path);
+        } else if (rlk) {
+          tried.current.add('l' + rlk.id);
+          const w = (rlk as any).sheetWas ?? { date: rlk.date, dong: rlk.dong, group: rlk.group, count: rlk.count };
+          await repo.updateDeath(rlk, { sheetAt: (rlk as any).sheetTry ?? new Date().toISOString(), sheetWas: w } as any, 'sync');
         } else if (fwd) {
           tried.current.add('f' + fwd.id);
+          await repo.updateDeath(fwd, { sheetTry: new Date().toISOString() } as any, 'sync');
           await saveToSheet({ date: fwd.date, farm: fwd.farm, dong: fwd.dong, group: fwd.group, count: fwd.count, photos: fwd.photos ?? [] });
           await repo.updateDeath(fwd, { sheetAt: new Date().toISOString(), sheetWas: { date: fwd.date, dong: fwd.dong, group: fwd.group, count: fwd.count } } as any, 'sync');
         } else if (cl) {
@@ -81,5 +92,5 @@ export function useDeathSync() {
       } catch (e) { console.warn('[폐사정리]', e); }
       finally { busy.current = false; }
     })();
-  }, [deaths, removing, resync, fixing, sheetErr, split, loading, repo, saved.settled, saved.claimMarked, save]);
+  }, [deaths, removing, resync, fixing, relink, sheetErr, split, loading, repo, saved.settled, saved.claimMarked, save]);
 }
