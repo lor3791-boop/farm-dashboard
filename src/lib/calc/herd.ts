@@ -1,7 +1,7 @@
 // 그룹 계산 — 목업 v5의 rec()/agg()를 그대로 옮기고, 숫자 기준은 설정(thresholds)에서 읽는다.
 // 화면은 계산식을 직접 쓰지 않고 이 파일의 결과만 쓴다.
 import type { Thresholds } from '@/data/types';
-import { G as G0, LOTS as LOTS0, LAST_SHIP, WEEKLY, REF, TODAY as SNAP_TODAY, FARM_SURV, type Lot, type GRow } from '@/data/snapshot';
+import { G as G0, LOTS as LOTS0, LAST_SHIP, WEEKLY, REF, TODAY as SNAP_TODAY, FARM_SURV, G_DEATH_1101_1105, type Lot, type GRow } from '@/data/snapshot';
 import { iso, days, addIso, r1 } from './dates';
 import { applyDeaths, type DeathLike, type Split, type DeathBase } from '@/share/applyDeaths';
 
@@ -64,6 +64,7 @@ export function buildGroups(T: Thresholds, firstShipByFarm: Record<string, numbe
   const base: Record<string, DeathBase & { inDeath: number }> = {};
   // 기준일 남은 크레임: 크레임 돼지가 먼저 죽고 그 폐사는 피그온에 등록하지 않는다(크레임 처리).
   // → 피그온 폐사가 1두라도 있으면 크레임은 이미 다 처리된 것(0). 피그온 폐사가 0이면 기준일까지 처리한 폐사기록만큼 뺀다.
+  //   판정은 피그온 10/31까지 폐사로 (11/27 G에 더한 11/1~11/5 폐사는 빼고 본다 — 크레임잔여가 바뀌지 않게)
   // 재고 = 피그온 재고(크레임 뺀 두수) + 남은 크레임 = 실제 농장 두수
   const preDead: Record<string, number> = {};
   live?.deaths.forEach((d) => { if (d.date <= REF && d.checked !== false && d.count > 0) preDead[d.farm + ' ' + d.group] = (preDead[d.farm + ' ' + d.group] ?? 0) + d.count; });
@@ -72,7 +73,7 @@ export function buildGroups(T: Thresholds, firstShipByFarm: Record<string, numbe
     const added = (addLots[who] ?? []).reduce((a, l) => a + l[2], 0); // 기준일 뒤 더한 차수의 크레임은 그대로 남음
     const claim = (LOTS[who] ?? []).reduce((a, l) => a + l[2], 0) - added;
     const fix = live?.claimFix?.[who];
-    const left = (fix !== undefined ? Math.max(0, Math.min(fix, claim)) : r[5] > 0 ? 0 : Math.max(0, claim - (preDead[who] ?? 0))) + added; // 직접 지정이 있으면 그 값
+    const left = (fix !== undefined ? Math.max(0, Math.min(fix, claim)) : r[5] - (G_DEATH_1101_1105[who] ?? 0) > 0 ? 0 : Math.max(0, claim - (preDead[who] ?? 0))) + added; // 직접 지정이 있으면 그 값
     base[who] = { death: r[5], stock: r[7] + left, claimLeft: left, inDeath: r[5] };
   });
   const split = live ? applyDeaths(base, live.deaths, REF, (d) => d.farm + ' ' + d.group) : {};

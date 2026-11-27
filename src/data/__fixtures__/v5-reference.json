@@ -6,8 +6,8 @@
    "claim": 20,
    "age": 179,
    "prog": 0,
-   "surv": 95.5,
-   "expSurv": 95.5,
+   "surv": 95.2,
+   "expSurv": 95.2,
    "bad": false,
    "last": null,
    "since": null,
@@ -21,7 +21,7 @@
    ],
    "warnBad": false,
    "wkSum": 50,
-   "wkDiff": 8,
+   "wkDiff": 12,
    "marks": {
     "2": "구충",
     "3": "구충",
@@ -37,8 +37,8 @@
    "claim": 9,
    "age": 168,
    "prog": 0,
-   "surv": 95.7,
-   "expSurv": 95.7,
+   "surv": 95.5,
+   "expSurv": 95.5,
    "bad": false,
    "last": null,
    "since": null,
@@ -50,7 +50,7 @@
    "warn": [],
    "warnBad": false,
    "wkSum": 16,
-   "wkDiff": 3,
+   "wkDiff": 4,
    "marks": {
     "5": "구충",
     "9": "FMD"
@@ -169,8 +169,8 @@
    "claim": 0,
    "age": 172,
    "prog": 0,
-   "surv": 97.3,
-   "expSurv": 97.3,
+   "surv": 97.1,
+   "expSurv": 97.1,
    "bad": false,
    "last": null,
    "since": null,
@@ -185,7 +185,7 @@
    ],
    "warnBad": false,
    "wkSum": 13,
-   "wkDiff": 2,
+   "wkDiff": 3,
    "marks": {
     "5": "구충",
     "6": "구충",
@@ -200,8 +200,8 @@
    "claim": 0,
    "age": 163,
    "prog": 0,
-   "surv": 98.5,
-   "expSurv": 98.5,
+   "surv": 98,
+   "expSurv": 98,
    "bad": false,
    "last": null,
    "since": null,
@@ -213,7 +213,7 @@
    "warn": [],
    "warnBad": false,
    "wkSum": 3,
-   "wkDiff": 0,
+   "wkDiff": 1,
    "marks": {
     "5": "구충",
     "9": "FMD"
@@ -332,8 +332,8 @@
    "claim": 5,
    "age": 126,
    "prog": 0,
-   "surv": 99.2,
-   "expSurv": 99.2,
+   "surv": 99.5,
+   "expSurv": 99.5,
    "bad": false,
    "last": null,
    "since": null,
@@ -345,7 +345,7 @@
    "warn": [],
    "warnBad": false,
    "wkSum": 3,
-   "wkDiff": 0,
+   "wkDiff": -1,
    "marks": {
     "3": "구충",
     "8": "FMD"
@@ -440,8 +440,8 @@
    "claim": 0,
    "age": 155,
    "prog": 0,
-   "surv": 96.3,
-   "expSurv": 96.3,
+   "surv": 95.5,
+   "expSurv": 95.5,
    "bad": false,
    "last": null,
    "since": null,
@@ -453,7 +453,7 @@
    "warn": [],
    "warnBad": false,
    "wkSum": 26,
-   "wkDiff": -2,
+   "wkDiff": 3,
    "marks": {
     "5": "구충",
     "9": "FMD"
@@ -466,8 +466,8 @@
    "claim": 0,
    "age": 138,
    "prog": 0,
-   "surv": 98,
-   "expSurv": 98,
+   "surv": 96.5,
+   "expSurv": 96.5,
    "bad": false,
    "last": null,
    "since": null,
@@ -479,7 +479,7 @@
    "warn": [],
    "warnBad": false,
    "wkSum": 13,
-   "wkDiff": 0,
+   "wkDiff": 10,
    "marks": {
     "5": "구충",
     "9": "FMD"
@@ -492,8 +492,8 @@
    "claim": 0,
    "age": 131,
    "prog": 0,
-   "surv": 98.2,
-   "expSurv": 98.2,
+   "surv": 96.9,
+   "expSurv": 96.9,
    "bad": false,
    "last": null,
    "since": null,
@@ -505,7 +505,7 @@
    "warn": [],
    "warnBad": false,
    "wkSum": 10,
-   "wkDiff": 0,
+   "wkDiff": 7,
    "marks": {
     "5": "구충",
     "9": "FMD"
@@ -518,8 +518,8 @@
    "claim": 0,
    "age": 123,
    "prog": 0,
-   "surv": 98.5,
-   "expSurv": 98.5,
+   "surv": 97.4,
+   "expSurv": 97.4,
    "bad": false,
    "last": null,
    "since": null,
@@ -531,7 +531,7 @@
    "warn": [],
    "warnBad": false,
    "wkSum": 5,
-   "wkDiff": 3,
+   "wkDiff": 9,
    "marks": {
     "5": "구충",
     "9": "FMD"
@@ -596,8 +596,8 @@
    "claim": 6,
    "age": 226,
    "prog": 91,
-   "surv": 93.9,
-   "expSurv": 93.9,
+   "surv": 93.2,
+   "expSurv": 93.2,
    "bad": true,
    "last": "2026-11-04",
    "since": 2,
@@ -611,7 +611,7 @@
    ],
    "warnBad": true,
    "wkSum": 18,
-   "wkDiff": 0,
+   "wkDiff": 2,
    "marks": {
     "5": "구충",
     "9": "FMD"
@@ -681,8 +681,8 @@
    "claim": 4,
    "age": 144,
    "prog": 0,
-   "surv": 94.9,
-   "expSurv": 94.9,
+   "surv": 94.6,
+   "expSurv": 94.6,
    "bad": false,
    "last": null,
    "since": null,
@@ -694,7 +694,7 @@
    "warn": [],
    "warnBad": false,
    "wkSum": 12,
-   "wkDiff": 3,
+   "wkDiff": 4,
    "marks": {
     "5": "구충",
     "9": "FMD"
@@ -789,8 +789,8 @@
    "claim": 10,
    "age": 133,
    "prog": 0,
-   "surv": 58,
-   "expSurv": 58,
+   "surv": 57.8,
+   "expSurv": 57.8,
    "bad": true,
    "last": null,
    "since": null,
@@ -802,7 +802,7 @@
    "warn": [],
    "warnBad": false,
    "wkSum": 206,
-   "wkDiff": 0,
+   "wkDiff": 1,
    "marks": {
     "5": "구충",
     "9": "FMD"
@@ -815,8 +815,8 @@
    "claim": 7,
    "age": 112,
    "prog": 0,
-   "surv": 99.4,
-   "expSurv": 99.4,
+   "surv": 97.8,
+   "expSurv": 97.8,
    "bad": false,
    "last": null,
    "since": null,
@@ -828,7 +828,7 @@
    "warn": [],
    "warnBad": false,
    "wkSum": 3,
-   "wkDiff": 0,
+   "wkDiff": 8,
    "marks": {
     "2": "구충",
     "7": "FMD"
@@ -841,8 +841,8 @@
    "claim": 20,
    "age": 156,
    "prog": 0,
-   "surv": 91.9,
-   "expSurv": 91.9,
+   "surv": 90.8,
+   "expSurv": 90.8,
    "bad": true,
    "last": null,
    "since": null,
@@ -854,7 +854,7 @@
    "warn": [],
    "warnBad": false,
    "wkSum": 73,
-   "wkDiff": 6,
+   "wkDiff": 17,
    "marks": {
     "5": "구충",
     "6": "구충",
@@ -869,8 +869,8 @@
    "claim": 7,
    "age": 146,
    "prog": 0,
-   "surv": 92.4,
-   "expSurv": 92.4,
+   "surv": 91.7,
+   "expSurv": 91.7,
    "bad": true,
    "last": null,
    "since": null,
@@ -882,7 +882,7 @@
    "warn": [],
    "warnBad": false,
    "wkSum": 34,
-   "wkDiff": 3,
+   "wkDiff": 6,
    "marks": {
     "5": "구충",
     "9": "FMD"
@@ -952,8 +952,8 @@
    "claim": 8,
    "age": 154,
    "prog": 0,
-   "surv": 98.7,
-   "expSurv": 98.7,
+   "surv": 98.5,
+   "expSurv": 98.5,
    "bad": false,
    "last": null,
    "since": null,
@@ -965,7 +965,7 @@
    "warn": [],
    "warnBad": false,
    "wkSum": 0,
-   "wkDiff": 6,
+   "wkDiff": 7,
    "marks": {
     "2": "구충",
     "5": "구충",
@@ -1005,9 +1005,9 @@
    "net": 385,
    "claim": 5,
    "age": 199,
-   "prog": 62,
-   "surv": 90.4,
-   "expSurv": 90.4,
+   "prog": 63,
+   "surv": 89.4,
+   "expSurv": 89.4,
    "bad": true,
    "last": "2026-10-29",
    "since": 8,
@@ -1021,7 +1021,7 @@
    ],
    "warnBad": true,
    "wkSum": 37,
-   "wkDiff": 0,
+   "wkDiff": 4,
    "marks": {
     "2": "구충",
     "4": "FMD",
@@ -1035,8 +1035,8 @@
    "claim": 28,
    "age": 191,
    "prog": 4,
-   "surv": 90.3,
-   "expSurv": 90.2,
+   "surv": 89.5,
+   "expSurv": 89.4,
    "bad": true,
    "last": "2026-10-29",
    "since": 8,
@@ -1050,7 +1050,7 @@
    ],
    "warnBad": true,
    "wkSum": 68,
-   "wkDiff": 5,
+   "wkDiff": 11,
    "marks": {
     "2": "구충",
     "4": "FMD",
@@ -1091,8 +1091,8 @@
    "claim": 8,
    "age": 141,
    "prog": 0,
-   "surv": 91.2,
-   "expSurv": 91.2,
+   "surv": 90.4,
+   "expSurv": 90.4,
    "bad": true,
    "last": null,
    "since": null,
@@ -1104,7 +1104,7 @@
    "warn": [],
    "warnBad": false,
    "wkSum": 27,
-   "wkDiff": 5,
+   "wkDiff": 8,
    "marks": {
     "5": "구충",
     "9": "FMD"
@@ -1117,8 +1117,8 @@
    "claim": 2,
    "age": 128,
    "prog": 0,
-   "surv": 95.3,
-   "expSurv": 95.3,
+   "surv": 94.6,
+   "expSurv": 94.6,
    "bad": false,
    "last": null,
    "since": null,
@@ -1130,7 +1130,7 @@
    "warn": [],
    "warnBad": false,
    "wkSum": 7,
-   "wkDiff": 0,
+   "wkDiff": 1,
    "marks": {
     "5": "구충",
     "9": "FMD"
@@ -1195,8 +1195,8 @@
    "claim": 9,
    "age": 119,
    "prog": 0,
-   "surv": 100,
-   "expSurv": 100,
+   "surv": 99.6,
+   "expSurv": 99.6,
    "bad": false,
    "last": null,
    "since": null,
@@ -1208,7 +1208,7 @@
    "warn": [],
    "warnBad": false,
    "wkSum": 0,
-   "wkDiff": 0,
+   "wkDiff": 2,
    "marks": {
     "5": "구충",
     "9": "FMD"
@@ -1324,7 +1324,7 @@
    "d": "07-27",
    "who": "아멘 26-5",
    "job": "구충제 · 사료 2호 변경",
-   "heads": "26두",
+   "heads": "24두",
    "sub": "현재 재고"
   },
   {
@@ -1359,7 +1359,7 @@
    "d": "08-03",
    "who": "재성 26-4",
    "job": "구충제 · 사료 2호 변경",
-   "heads": "132두",
+   "heads": "128두",
    "sub": "현재 재고"
   },
   {
@@ -1506,7 +1506,7 @@
    "d": "08-26",
    "who": "아멘 26-5",
    "job": "구제역 백신",
-   "heads": "26두",
+   "heads": "24두",
    "sub": "현재 재고"
   },
   {
@@ -1590,7 +1590,7 @@
    "d": "09-08",
    "who": "명임 26-11",
    "job": "구충제 · 사료 2호 변경",
-   "heads": "196두",
+   "heads": "195두",
    "sub": "현재 재고"
   },
   {
@@ -1625,7 +1625,7 @@
    "d": "09-13",
    "who": "산성농원 26-5",
    "job": "구충제 · 사료 2호 변경",
-   "heads": "624두",
+   "heads": "619두",
    "sub": "현재 재고"
   },
   {
@@ -1688,7 +1688,7 @@
    "d": "09-24",
    "who": "골드피그 26-2",
    "job": "구충제 · 사료 2호 변경",
-   "heads": "423두",
+   "heads": "422두",
    "sub": "현재 재고"
   },
   {
@@ -1709,7 +1709,7 @@
    "d": "09-28",
    "who": "산성농원 26-6",
    "job": "구충제 · 사료 2호 변경",
-   "heads": "635두",
+   "heads": "625두",
    "sub": "현재 재고"
   },
   {
@@ -1751,14 +1751,14 @@
    "d": "10-04",
    "who": "용암 26-7",
    "job": "구충제 · 사료 2호 변경",
-   "heads": "447두",
+   "heads": "444두",
    "sub": "현재 재고"
   },
   {
    "d": "10-05",
    "who": "산성농원 26-7",
    "job": "구충제 · 사료 2호 변경",
-   "heads": "534두",
+   "heads": "527두",
    "sub": "현재 재고"
   },
   {
@@ -1772,7 +1772,7 @@
    "d": "10-08",
    "who": "명임 26-11",
    "job": "구제역 백신",
-   "heads": "196두",
+   "heads": "195두",
    "sub": "현재 재고"
   },
   {
@@ -1786,35 +1786,35 @@
    "d": "10-10",
    "who": "아멘 26-8",
    "job": "구충제 · 사료 2호 변경",
-   "heads": "281두",
+   "heads": "280두",
    "sub": "현재 재고"
   },
   {
    "d": "10-11",
    "who": "민서 26-8",
    "job": "구충제 · 사료 2호 변경",
-   "heads": "378두",
+   "heads": "379두",
    "sub": "현재 재고"
   },
   {
    "d": "10-12",
    "who": "재성 26-7",
    "job": "구충제 · 사료 2호 변경",
-   "heads": "331두",
+   "heads": "328두",
    "sub": "현재 재고"
   },
   {
    "d": "10-13",
    "who": "산성농원 26-5",
    "job": "구제역 백신",
-   "heads": "624두",
+   "heads": "619두",
    "sub": "현재 재고"
   },
   {
    "d": "10-14",
    "who": "산성농원 26-8",
    "job": "구충제 · 사료 2호 변경",
-   "heads": "536두",
+   "heads": "530두",
    "sub": "현재 재고"
   },
   {
@@ -1842,7 +1842,7 @@
    "d": "10-21",
    "who": "욥 26-3",
    "job": "구충제 · 사료 2호 변경",
-   "heads": "285두",
+   "heads": "284두",
    "sub": "현재 재고"
   },
   {
@@ -1856,7 +1856,7 @@
    "d": "10-24",
    "who": "골드피그 26-2",
    "job": "구제역 백신",
-   "heads": "423두",
+   "heads": "422두",
    "sub": "현재 재고"
   },
   {
@@ -1870,7 +1870,7 @@
    "d": "10-25",
    "who": "욥 26-4",
    "job": "구충제 · 사료 2호 변경",
-   "heads": "491두",
+   "heads": "483두",
    "sub": "현재 재고"
   },
   {
@@ -1884,14 +1884,14 @@
    "d": "10-28",
    "who": "산성농원 26-6",
    "job": "구제역 백신",
-   "heads": "635두",
+   "heads": "625두",
    "sub": "현재 재고"
   },
   {
    "d": "10-29",
    "who": "재성 26-8",
    "job": "구충제 · 사료 2호 변경",
-   "heads": "141두",
+   "heads": "140두",
    "sub": "현재 재고"
   },
   {
@@ -1919,7 +1919,7 @@
    "d": "11-01",
    "who": "정축산 26-4",
    "job": "구충제 · 사료 2호 변경",
-   "heads": "510두",
+   "heads": "508두",
    "sub": "현재 재고"
   },
   {
@@ -1933,28 +1933,28 @@
    "d": "11-03",
    "who": "용암 26-7",
    "job": "구제역 백신",
-   "heads": "447두",
+   "heads": "444두",
    "sub": "현재 재고"
   },
   {
    "d": "11-04",
    "who": "산성농원 26-7",
    "job": "구제역 백신",
-   "heads": "534두",
+   "heads": "527두",
    "sub": "현재 재고"
   },
   {
    "d": "11-09",
    "who": "아멘 26-8",
    "job": "구제역 백신",
-   "heads": "281두",
+   "heads": "280두",
    "sub": "현재 재고"
   },
   {
    "d": "11-10",
    "who": "민서 26-8",
    "job": "구제역 백신",
-   "heads": "378두",
+   "heads": "379두",
    "sub": "현재 재고"
   },
   {
@@ -1968,7 +1968,7 @@
    "d": "11-11",
    "who": "재성 26-7",
    "job": "구제역 백신",
-   "heads": "331두",
+   "heads": "328두",
    "sub": "현재 재고"
   },
   {
@@ -1982,7 +1982,7 @@
    "d": "11-13",
    "who": "산성농원 26-8",
    "job": "구제역 백신",
-   "heads": "536두",
+   "heads": "530두",
    "sub": "현재 재고"
   },
   {
@@ -1996,7 +1996,7 @@
    "d": "11-20",
    "who": "욥 26-3",
    "job": "구제역 백신",
-   "heads": "285두",
+   "heads": "284두",
    "sub": "현재 재고"
   },
   {
@@ -2017,7 +2017,7 @@
    "d": "11-24",
    "who": "욥 26-4",
    "job": "구제역 백신",
-   "heads": "491두",
+   "heads": "483두",
    "sub": "현재 재고"
   },
   {
@@ -2031,7 +2031,7 @@
    "d": "11-28",
    "who": "재성 26-8",
    "job": "구제역 백신",
-   "heads": "141두",
+   "heads": "140두",
    "sub": "현재 재고"
   },
   {
@@ -2052,7 +2052,7 @@
    "d": "12-01",
    "who": "정축산 26-4",
    "job": "구제역 백신",
-   "heads": "510두",
+   "heads": "508두",
    "sub": "현재 재고"
   },
   {
@@ -2092,9 +2092,9 @@
   }
  ],
  "kpi": {
-  "stock": 14448,
+  "stock": 14371,
   "groups": 46,
-  "mort": 7.5,
+  "mort": 7.9,
   "warn": 11,
   "probFarms": 8,
   "week": 5,

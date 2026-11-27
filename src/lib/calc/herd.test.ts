@@ -1,4 +1,4 @@
-// 검산: 정답 파일(__fixtures__/v5-reference.json)과 한 칸도 다르지 않아야 한다. 처음엔 목업 v5 원본 계산 결과, 2026-11-06 피그온 11/5 스냅샷으로 다시 만듦.
+// 검산: 정답 파일(__fixtures__/v5-reference.json)과 한 칸도 다르지 않아야 한다. 처음엔 목업 v5 원본 계산 결과, 2026-11-06 피그온 11/5 스냅샷, 2026-11-27 피그온 11/1~11/5 폐사 반영으로 다시 만듦.
 // 기준값을 바꾸면(예: 94% → 95%) 이 테스트는 의도적으로 실패하므로, 그때는 정답 파일도 같이 다시 만든다.
 import { describe, it, expect } from 'vitest';
 import ref from '@/data/__fixtures__/v5-reference.json';

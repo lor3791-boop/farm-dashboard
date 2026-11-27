@@ -37,6 +37,6 @@ describe('기준일 남은 크레임', () => {
   it('피그온 폐사 0이면 기준일까지 처리한 폐사기록만큼 크레임에서 뺌', () => {
     const d = [{ id: 'a', farm: '정축산', group: '26-4', date: '2026-11-03', count: 2, checked: true }];
     const g = buildGroups(T, {}, live([], d)).find((x) => x.who === '정축산 26-4')!;
-    expect([g.claim, g.claimLeft, g.stock - 501]).toEqual([9, 7, 7]);
+    expect([g.claim, g.claimLeft, g.stock - 499]).toEqual([9, 7, 7]); // 499 = 피그온 재고(11/5 폐사 반영)
   });
 });
